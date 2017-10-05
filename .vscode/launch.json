@@ -1,0 +1,31 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Launch",
+            "program": "${workspaceRoot}/${fileBasenameNoExtension}",
+            "args": [],
+            "cwd": "${workspaceRoot}"
+        },
+        // {
+        //     "name": "C++ Launch",
+        //     "type": "cppdbg",
+        //     "request": "launch",
+        //     "program": "${workspaceRoot}/${fileBasenameNoExtension}",
+        //     "args": [],
+        //     "stopAtEntry": false,
+        //     "cwd": "${workspaceRoot}",
+        //     "environment": [],
+        //     "externalConsole": false,
+        //     "osx": {
+            //         "MIMode": "lldb"
+            //     }
+            // }
+            
+        
+
+
+    ]
+}
