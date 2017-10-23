@@ -7,12 +7,12 @@
             "taskName": "build",
             "command": "c++",
             "isShellCommand": true,
-            "args": ["-g", "-Wall" ,"-std=gnu++11", "${file}", "-o", "${fileBasenameNoExtension}"],
+            "args": ["-g", "-Wall" ,"-std=gnu++11", "${file}", "-o", "bin/${fileBasenameNoExtension}"],
             "showOutput": "always"
         },
         {
             "taskName": "run",
-            "command": "./${fileBasenameNoExtension}", 
+            "command": "./bin/${fileBasenameNoExtension}", 
             "args": [],
             "isShellCommand": true,
             "showOutput": "always"

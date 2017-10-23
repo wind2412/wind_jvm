@@ -5,7 +5,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch",
-            "program": "${workspaceRoot}/${fileBasenameNoExtension}",
+            "program": "${workspaceRoot}/test/bin/${fileBasenameNoExtension}",
             "args": [],
             "cwd": "${workspaceRoot}"
         },
