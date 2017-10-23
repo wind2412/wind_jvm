@@ -56,12 +56,13 @@ bool RtJarDirectory::find_file(StringSplitter && ss) const
 {
 	const string & target = ss.result()[ss.counter()];
 	// first check `target` is this a file && is this the true file.
-	if (ss.counter() == ss.result().size() && this->name == target)	return true;
+	// if (ss.counter() == ss.result().size() && this->name == target)	return true;
 	// second the `target` must be a dir. find in sub-dirs
 	auto next_dir = findFolderInThis(target);
 	if (next_dir != nullptr) {
 		ss.counter() += 1;
-		return (*next_dir).find_file(std::move(ss));
+		if (ss.counter() == ss.result().size())	return true;
+		else return (*next_dir).find_file(std::move(ss));
 	} else
 		return false;
 }
