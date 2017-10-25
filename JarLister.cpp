@@ -1,4 +1,4 @@
-#include "JarLister.h"
+#include "jarLister.h"
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
@@ -30,8 +30,8 @@ shared_ptr<RtJarDirectory> RtJarDirectory::findFolderInThis(const string & fdr_n
 void RtJarDirectory::add_file(StringSplitter && ss)
 {
 	if (ss.counter() == 0) {		// 仅仅在第一次的时候做检查，看文件到底存不存在
-		assert (this->find_file(std::move(ss)) == false);
-		ss.counter() = 0;
+		if (this->find_file(std::move(ss)) == true) return;
+		else ss.counter() = 0;
 	}
 
 	const string & target = ss.result()[ss.counter()];
@@ -95,6 +95,10 @@ bool JarLister::getjarlist(const string & rtjar_pos) const
 {
 	string cmd = "jar tf " + rtjar_pos + " > " + this->rtlist;
 	int status =  system(cmd.c_str());
+	cmd = "mkdir " + uncompressed_dir + " > /dev/null 2>&1";
+	system(cmd.c_str());
+	cmd = "unzip " + rtjar_pos + " -d " + uncompressed_dir + " > /dev/null 2>&1";
+	system(cmd.c_str());
 	if (status == -1) {  	// http://blog.csdn.net/cheyo/article/details/6595955 [shell 命令是否执行成功的判定]
 		cerr << "system error!" << endl;
 	} else {  
@@ -120,15 +124,10 @@ JarLister::JarLister(const string & rtjar_pos) : rjd("root")
 	ifstream f(this->rtlist, std::ios_base::in);
 	string s;
 	while(!f.eof()) {
-		f >> s;
+		f >> s;		// 这里有一个细节。因为最后一行仅仅有个回车，所以会读入空，也就是 s 还是原来的 s，即最后一个名字被读入了两遍。使用其他的方法对效率不好，因此在 add_file 中解决了。如果检测到有，忽略。
 		if (!Filter::filt(s)) {
 			this->rjd.add_file(StringSplitter(s));
 		}
 	}
 	this->rjd.print();
-}
-
-void JarLister::parsejarlist()
-{
-
 }

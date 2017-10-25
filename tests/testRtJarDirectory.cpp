@@ -1,4 +1,4 @@
-#include "../JarLister.h"
+#include "../jarLister.h"
 #include <iostream>
 
 int main()

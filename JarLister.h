@@ -79,12 +79,12 @@ private:
 	string rtjar_pos;	// for cache.
 	RtJarDirectory rjd;
 	const string rtlist = "rt.list";
+	const string uncompressed_dir = "sun_src";
 private:
 	// get rt.jar files list and put them into a file `rt.list`
 	bool getjarlist(const std::string & rtjar_pos) const;
 public:
 	JarLister(const std::string & rtjar_pos = "/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk/Contents/Home/jre/lib/rt.jar");	// for Mac
-	void parsejarlist();
 	
 };
 
