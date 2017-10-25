@@ -1,12 +1,14 @@
-#include "jarLister.h"
 #include <iostream>
 #include <cstdlib>
 #include <fstream>
+#include <boost/filesystem.hpp>
+#include <jarLister.h> 
 
 using std::cout;
 using std::cerr;
 using std::endl;
 using std::ifstream;
+namespace bf = boost::filesystem;
 
 using std::make_shared;
 
@@ -95,6 +97,10 @@ bool JarLister::getjarlist(const string & rtjar_pos) const
 {
 	string cmd = "jar tf " + rtjar_pos + " > " + this->rtlist;
 	int status =  system(cmd.c_str());
+	// TODO: judge whether mkdir is exist?
+	if (bf::exists(uncompressed_dir)) {	// 如果存在
+		return;
+	}
 	cmd = "mkdir " + uncompressed_dir + " > /dev/null 2>&1";
 	system(cmd.c_str());
 	cmd = "unzip " + rtjar_pos + " -d " + uncompressed_dir + " > /dev/null 2>&1";
