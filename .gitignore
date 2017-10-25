@@ -6,6 +6,6 @@
 */bin/*
 .DS_Store
 *.class
-/test/rt.list
+/tests/rt.list
 ./rt.list
-test/sun_src
+tests/sun_src
