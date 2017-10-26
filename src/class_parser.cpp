@@ -9,7 +9,7 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#include <class_parser.h>
+#include <class_parser.hpp>
 
 using namespace std;
 

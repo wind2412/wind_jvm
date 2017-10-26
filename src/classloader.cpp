@@ -1,8 +1,10 @@
-#include <classloader.h>
+#include <classloader.hpp>
 
-ClassLoader::ClassLoader() 
+MetaClass BootStrapClassLoader::loadClass(const string & classname) 
 {
+	if (jl.find_file(classname + ".class")) {
 
+	}
 }
 
 // ClassLoader::

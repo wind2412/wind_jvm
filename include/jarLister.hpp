@@ -85,7 +85,9 @@ private:
 	bool getjarlist(const std::string & rtjar_pos) const;
 public:
 	JarLister(const std::string & rtjar_pos = "/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk/Contents/Home/jre/lib/rt.jar");	// for Mac
-	
+	bool find_file(const std::string & classname) {	// java/util/Map.class
+		return rjd.find_file(StringSplitter(classname));
+	}
 };
 
 

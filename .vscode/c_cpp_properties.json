@@ -7,7 +7,8 @@
                 "/usr/local/include",
                 "/usr/include/c++/4.2.1",
                 "/usr/include/c++/4.2.1/tr1",
-                "${workspaceRoot}/include"
+                "${workspaceRoot}/include",
+                "/usr/local/Cellar/llvm/4.0.0/include/c++/v1"
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,

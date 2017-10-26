@@ -1,6 +1,6 @@
-#include <class_parser.h>
 #include <iostream>
 #include <fstream>
+#include <class_parser.hpp>
 
 using std::cout;
 using std::endl;

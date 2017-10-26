@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <boost/filesystem.hpp>
-#include <jarLister.h>
+#include <jarLister.hpp>
 
 using std::cout;
 using std::cerr;
