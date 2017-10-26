@@ -7,14 +7,15 @@
                 "/usr/local/include",
                 "/usr/include/c++/4.2.1",
                 "/usr/include/c++/4.2.1/tr1",
-                "${workspaceRoot}/include/"
+                "${workspaceRoot}/include"
             ],
             "browse": {
-                "limitSymbolsToIncludedHeaders": true,
+                "limitSymbolsToIncludedHeaders": false,
                 "databaseFilename": "",
                 "path": [
                     "/usr/include",
-                    "/usr/local/include"
+                    "/usr/local/include",
+                    "${workspaceRoot}/include"
                 ]
             },
             "intelliSenseMode": "clang-x64",

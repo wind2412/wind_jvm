@@ -1,9 +1,9 @@
 #ifndef __CLASS_LOADER_H__
 #define __CLASS_LOADER_H__
 
-#include "class_parser.h"
 #include <map>
 #include <string>
+#include <class_parser.h>
 
 using std::string;
 using std::map;

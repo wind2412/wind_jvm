@@ -5,9 +5,10 @@
     "tasks": [
         {
             "taskName": "build",
-            "command": "c++",
+            // "command": "c++",
+            "command": "make",
             "isShellCommand": true,
-            "args": ["-g", "-Wall" ,"-std=gnu++11", "${file}", "-o", "bin/${fileBasenameNoExtension}"],
+            // "args": ["-g", "-Wall" ,"-std=gnu++11", "${file}", "-o", "bin/${fileBasenameNoExtension}"],"
             "showOutput": "always"
         },
         {
