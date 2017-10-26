@@ -18,10 +18,10 @@ class MetaClass;
 class BootStrapClassLoader : public ClassLoader {
 private:
 	JarLister jl;
-	map<string, MetaClass> classmap;
+	map<wstring, MetaClass> classmap;
 public:
 	BootStrapClassLoader() {}
-	MetaClass loadClass(const string & classname);	// java/util/Map	// java/蛤蛤/ArrayList	// 还是不支持 unicode 了......
+	MetaClass loadClass(const wstring & classname);	// java/util/Map	// java/蛤蛤/ArrayList	// 还是不支持 unicode 了......
 };
 
 

@@ -6,15 +6,15 @@
 #include <class_parser.hpp>
 #include <memory>
 
-using std::string;
+using std::wstring;
 using std::unordered_map;
 using std::shared_ptr;
 
 class Interfaces {
 private:
-	unordered_map<string, shared_ptr<struct CONSTANT_CS_info>> imap;		// 必须要写一个 struct...... 否则编译报错？
+	unordered_map<wstring, shared_ptr<struct CONSTANT_CS_info>> imap;		// 必须要写一个 struct...... 否则编译报错？
 public:
-	shared_ptr<CONSTANT_CS_info> getInterface(const string & ) const;
+	shared_ptr<CONSTANT_CS_info> getInterface(const wstring & ) const;
 };
 
 class Fields {
@@ -31,7 +31,7 @@ class Attributes {
 };
 
 class MetaClass {
-	
+
 };
 
 

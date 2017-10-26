@@ -63,7 +63,8 @@
         "ratio": "cpp",
         "system_error": "cpp",
         "thread": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "__string": "cpp"
     },
 	"clang.cxxflags": ["-std=c++11", "-I${workspaceRoot}/include"]
 }
