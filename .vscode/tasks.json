@@ -8,6 +8,7 @@
             // "command": "c++",
             "command": "make",
             "isShellCommand": true,
+            "args": ["-I${workspaceRoot}/include"],
             // "args": ["-g", "-Wall" ,"-std=gnu++11", "${file}", "-o", "bin/${fileBasenameNoExtension}"],"
             "showOutput": "always"
         },

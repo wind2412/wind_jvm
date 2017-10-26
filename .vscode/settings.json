@@ -41,6 +41,7 @@
         "initializer_list": "cpp",
         "__nullptr": "cpp",
         "codecvt": "cpp",
-        "__functional_03": "cpp"
+        "__functional_03": "cpp",
+        "cassert": "cpp"
     }
 }
