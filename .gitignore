@@ -3,9 +3,11 @@
 !*/
 *.dSYM
 */*.dSYM
+*/*.o
 */bin/*
 .DS_Store
 *.class
-/tests/rt.list
-./rt.list
-tests/sun_src
+rt.list
+*/rt.list
+sun_src
+*/sun_src

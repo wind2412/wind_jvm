@@ -43,5 +43,6 @@
         "codecvt": "cpp",
         "__functional_03": "cpp",
         "cassert": "cpp"
-    }
+	},
+	"clang.cxxflags": ["-std=c++11", "-I${workspaceRoot}/include"]
 }
