@@ -305,7 +305,7 @@ void print_constant_pool(cp_info **bufs, int length) {	// constant pool length
 			case CONSTANT_Utf8:{
 				CONSTANT_Utf8_info* target = (CONSTANT_Utf8_info*)bufs[i];
 				printf("(DEBUG) #%4d = Utf8 %16s ", i+1, "");
-				std::wcout.imbue(locale(""));
+				// std::wcout.imbue(locale(""));
 				std::wcout << target->convert_to_Unicode() << std::endl;
 				break;
 			}
@@ -1968,7 +1968,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 					u2 string_index = ((CONSTANT_CS_info *)constant_pool[index-1])->index;
 					assert (constant_pool[string_index-1]->tag == CONSTANT_Utf8);
 					std::cout << "String ";
-					std::wcout.imbue(std::locale(""));
+					// std::wcout.imbue(std::locale(""));
 					std::wcout << ((CONSTANT_Utf8_info *)constant_pool[string_index-1])->convert_to_Unicode() << std::endl;
 					break;
 				}
@@ -2135,6 +2135,15 @@ std::ifstream & operator >> (std::ifstream & f, ClassFile & cf) {
 	return f;
 }
 		
+ClassFile::ClassFile(ClassFile && cf) {
+	memcpy(&cf, this, sizeof(ClassFile));
+	cf.attributes = nullptr;
+	cf.constant_pool = nullptr;
+	cf.fields = nullptr;
+	cf.interfaces = nullptr;
+	cf.methods = nullptr;
+}
+
 ClassFile::~ClassFile() {
 	if (constant_pool != nullptr) {
 		for(int i = 0; i < constant_pool_count-1; i ++) {

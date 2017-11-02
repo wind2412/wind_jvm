@@ -64,7 +64,8 @@
         "system_error": "cpp",
         "thread": "cpp",
         "typeindex": "cpp",
-        "__string": "cpp"
+        "__string": "cpp",
+        "set": "cpp"
     },
 	"clang.cxxflags": ["-std=c++11", "-I${workspaceRoot}/include"]
 }

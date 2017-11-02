@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <unordered_map>
-#include <classloader.hpp>
 
 #define DEBUG
 
@@ -689,8 +688,6 @@ struct ClassFile {
 	u2 attributes_count;
 	attribute_info *attributes = nullptr;		// [attributes_count];
 
-	ClassLoader *classloader = nullptr;
-	
 	void parse_header(std::ifstream & f);
 	void parse_constant_pool(std::ifstream & f);
 	void parse_class_msgs(std::ifstream & f);
@@ -700,7 +697,11 @@ struct ClassFile {
 	
 	friend std::ifstream & operator >> (std::ifstream & f, ClassFile & cf);
 	
+	ClassFile() {}
+	ClassFile(ClassFile && cf);
 	~ClassFile();
+private:
+	ClassFile(const ClassFile & cf);	// banned copy
 };
 
 #endif
