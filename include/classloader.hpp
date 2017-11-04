@@ -3,33 +3,34 @@
 
 #include <map>
 #include <string>
-#include <class_parser.hpp>
-#include <jarLister.hpp>
 #include <fstream>
-#include <runtime/klass.hpp>
+#include "class_parser.hpp"
+#include "jarLister.hpp"
+#include "system_directory.hpp"
 
 using std::map;
 
 class ClassFile;
+class InstanceKlass;
 
 class ClassLoader {};
 
 class BootStrapClassLoader : public ClassLoader {
 private:
 	JarLister jl;
-	map<wstring, shared_ptr<ClassFile>> classmap;
-public:
 	BootStrapClassLoader() {}
-	shared_ptr<ClassFile> loadClass(const wstring & classname);	// java/util/Map	// java/蛤蛤/ArrayList
+	static BootStrapClassLoader bootstrap;
+public:
+	static BootStrapClassLoader & get_bootstrap() { return bootstrap; }	// singleton
+	shared_ptr<InstanceKlass> loadClass(const wstring & classname);	// load and link class.
 };
 
 class MyClassLoader {
 private:
-	BootStrapClassLoader bs;
-	map<wstring, shared_ptr<ClassFile>> classmap;
+	BootStrapClassLoader bs = BootStrapClassLoader::get_bootstrap();
+	map<wstring, shared_ptr<InstanceKlass>> classmap;
 public:
-	shared_ptr<ClassFile> loadClass(const wstring & classname);
-	shared_ptr<Klass> linkClass(const wstring & classname);
+	shared_ptr<InstanceKlass> loadClass(const wstring & classname);
 };
 
 

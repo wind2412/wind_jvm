@@ -9,7 +9,7 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
-#include <class_parser.hpp>
+#include "class_parser.hpp"
 
 using namespace std;
 
@@ -1414,7 +1414,7 @@ void print_fields(field_info *bufs, int length, cp_info **constant_pool) {
 		std::wcout << ((CONSTANT_Utf8_info *)constant_pool[bufs[i].name_index-1])->convert_to_Unicode() << L";\n";
 		// parse descriptor_index
 		assert (constant_pool[bufs[i].descriptor_index-1]->tag == CONSTANT_Utf8);
-		std::wcout << "(DEBUG)   descriptor: " << ((CONSTANT_Utf8_info *)constant_pool[bufs[i].name_index-1])->convert_to_Unicode() << std::endl;
+		std::wcout << "(DEBUG)   descriptor: " << ((CONSTANT_Utf8_info *)constant_pool[bufs[i].descriptor_index-1])->convert_to_Unicode() << std::endl;
 		// output flags
 		std::cout << "(DEBUG)   flags: " << ss.str() << std::endl;
 		// parse ConstantValue / Signature / RuntimeVisibleAnnotations / RuntimeInvisibleAnnotations

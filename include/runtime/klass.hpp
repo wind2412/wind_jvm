@@ -9,14 +9,14 @@
 #define INCLUDE_RUNTIME_KLASS_HPP_
 
 #include "method.hpp"
-#include "field.hpp"
-#include "constantpool.hpp"
+#include "class_parser.hpp"
 #include <unordered_map>
 #include <memory>
+#include <utility>
 
 using std::unordered_map;
 using std::shared_ptr;
-
+using std::pair;
 
 /**
  * 这个 Klass 是一定要被 new 出来的！
@@ -29,7 +29,7 @@ protected:
 	State cur = Zero;
 protected:
 	wstring name;		// this class's name		// use constant_pool single string but not copy.
-	int access_flags;	// this class's access flags
+	u2 access_flags;	// this class's access flags
 
 	Klass *parent;
 	Klass *next_sibling;
@@ -52,17 +52,36 @@ public:
 	Klass() {}
 };
 
-class InstanceKlass : public Klass {
-private:
-	ClassFile cf;		// origin non-dynamic constant pool
+class Fields;
+class Field_info;
 
-	unordered_map<wstring, Klass*> interfaces;
-	unordered_map<wstring, Field*> fields;
-	unordered_map<wstring, Method*> methods;		// 虽然效率不高，不过为了实现直观起见，使用了基于字符串的查找。
+class InstanceKlass : public Klass {
+	friend Fields;
+private:
+//	ClassFile *cf;		// origin non-dynamic constant pool
+	ClassLoader *loader;
+
+	// interfaces
+	unordered_map<int, Klass*> interfaces;
+	// fields (non-static / static)
+	unordered_map<int, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
+	unordered_map<int, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<constant_pool's index, static_fields' offset>
+	int total_non_static_fields_bytes = 0;
+	int total_static_fields_bytes = 0;
+	uint8_t *static_fields;													// static field values. [non-static field values are in oop].
+	// methods
+	unordered_map<int, Method*> methods;
 
 	// 其他的 attributes 稍后再加
+	attribute_info *attributes;
 private:
+	void parse_methods(const ClassFile & cf);
+	void parse_fields(const ClassFile & cf);
+private:
+	InstanceKlass(const InstanceKlass &);
+public:
 	InstanceKlass(const ClassFile & cf, ClassLoader *loader);
+	~InstanceKlass();
 };
 
 #endif /* INCLUDE_RUNTIME_KLASS_HPP_ */
