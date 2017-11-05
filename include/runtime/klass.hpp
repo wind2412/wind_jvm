@@ -22,7 +22,7 @@ using std::pair;
  * 这个 Klass 是一定要被 new 出来的！
  */
 
-class Klass {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
+class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
 	enum State{Zero, Loaded, Parsed, Initialized};
 protected:
@@ -37,14 +37,15 @@ protected:
 public:
 	State get_state() { return cur; }
 	void set_state(State s) { cur = s; }
-	Klass *get_parent() { return parent; }
-	void set_parent(Klass *parent) { this->parent = parent; }
-	Klass *get_next_sibling() { return next_sibling; }
-	void set_next_sibling(Klass *next_sibling) { this->next_sibling = next_sibling; }
-	Klass *get_child() { return child; }
-	void set_child(Klass *child) { this->child = child; }
+	shared_ptr<Klass> get_parent() { return parent; }
+	void set_parent(shared_ptr<Klass> parent) { this->parent = parent; }
+	shared_ptr<Klass> get_next_sibling() { return next_sibling; }
+	void set_next_sibling(shared_ptr<Klass> next_sibling) { this->next_sibling = next_sibling; }
+	shared_ptr<Klass> get_child() { return child; }
+	void set_child(shared_ptr<Klass> child) { this->child = child; }
 	int get_access_flags() { return access_flags; }
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
+	wstring get_name() { return name; }
 protected:
 	Klass(const Klass &);
 	Klass operator= (const Klass &);
@@ -77,12 +78,13 @@ private:
 private:
 	void parse_methods(const ClassFile & cf);
 	void parse_fields(const ClassFile & cf);
+	void parse_superclass(const ClassFile & cf, ClassLoader *loader);
 	void parse_interfaces(const ClassFile & cf, ClassLoader *loader);
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
 	InstanceKlass(const ClassFile & cf, ClassLoader *loader);
-	~InstanceKlass();
+	~InstanceKlass() {};
 };
 
 #endif /* INCLUDE_RUNTIME_KLASS_HPP_ */

@@ -84,10 +84,12 @@ private:
 	// get rt.jar files list and put them into a file `rt.list`
 	bool getjarlist(const std::wstring & rtjar_pos) const;
 public:
-	JarLister(const std::wstring & rtjar_pos = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_111.jdk/Contents/Home/jre/lib/rt.jar");	// for Mac
+	JarLister(const std::wstring & rtjar_pos = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/rt.jar");	// for Mac
 	bool find_file(const std::wstring & classname) {	// java/util/Map.class
 		return rjd.find_file(StringSplitter(classname));
 	}
+	wstring get_sun_dir() { return uncompressed_dir; }
+	void print() { rjd.print(); }
 };
 
 

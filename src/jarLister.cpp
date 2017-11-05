@@ -131,7 +131,7 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	return false;
 }
 
-JarLister::JarLister(const wstring & rtjar_pos) : rjd(L"root")
+JarLister::JarLister(const wstring & rtjar_pos) : rjd(L"root"), rtjar_pos(rtjar_pos)
 {
 	bool success = this->getjarlist(rtjar_pos);
 	if (!success)	exit(-1);
@@ -144,5 +144,7 @@ JarLister::JarLister(const wstring & rtjar_pos) : rjd(L"root")
 			this->rjd.add_file(StringSplitter(utf8_to_wstring(s)));
 		}
 	}
+//	std::cout << "haha JarLister! " << this << std::endl;	// delete
 //	this->rjd.print();		// delete.
+//	sleep(3);				// delete.
 }

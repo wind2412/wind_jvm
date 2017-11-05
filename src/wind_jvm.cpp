@@ -5,11 +5,13 @@
  *      Author: zhengxiaolin
  */
 
-#include <classloader.hpp>
+#include "classloader.hpp"
+#include <iostream>
 
 int main(int argc, char *argv[])
 {
-	wstring target(L"Test");
+	std::wcout.imbue(std::locale(""));
+	wstring target(L"Example");
 	MyClassLoader::get_loader().loadClass(target);
 }
 

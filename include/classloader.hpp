@@ -20,22 +20,34 @@ private:
 	JarLister jl;
 private:
 	BootStrapClassLoader() {}
-	static BootStrapClassLoader bootstrap;
+	BootStrapClassLoader(const BootStrapClassLoader &);
+	BootStrapClassLoader& operator= (const BootStrapClassLoader &);
+	~BootStrapClassLoader() {}
 public:
-	static BootStrapClassLoader & get_bootstrap() { return bootstrap; }	// singleton
+	static BootStrapClassLoader & get_bootstrap() {
+		static BootStrapClassLoader bootstrap;		// 把这句放到 private 中，然后在 classloader.cpp 加上 static 初始化，然后就和 Mayers 条款 4 一样，static 在模块初始化顺序不确定！！会出现相当诡异的结果！！
+		return bootstrap;
+	}	// singleton
 	shared_ptr<InstanceKlass> loadClass(const wstring & classname);	// load and link class.
+	void print();
 };
 
-class MyClassLoader {
+class MyClassLoader : public ClassLoader {
 private:
-	BootStrapClassLoader bs = BootStrapClassLoader::get_bootstrap();
+	BootStrapClassLoader & bs = BootStrapClassLoader::get_bootstrap();
 	map<wstring, shared_ptr<InstanceKlass>> classmap;
 private:
 	MyClassLoader() {};
-	static MyClassLoader mloader;
+	MyClassLoader(const MyClassLoader &);
+	MyClassLoader& operator= (const MyClassLoader &);
+	~MyClassLoader() {}
 public:
-	static MyClassLoader & get_loader() { return mloader; }
+	static MyClassLoader & get_loader() {
+		static MyClassLoader mloader;
+		return mloader;
+	}	// singleton
 	shared_ptr<InstanceKlass> loadClass(const wstring & classname);
+	void print();
 };
 
 
