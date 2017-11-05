@@ -2,8 +2,6 @@
 !*.*
 !*/
 *.dSYM
-*/*.dSYM
-*/*.o
 *.o
 */bin/*
 .DS_Store

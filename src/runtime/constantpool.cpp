@@ -6,28 +6,48 @@
  */
 
 #include "runtime/constantpool.hpp"
+#include "classloader.hpp"
+#include "runtime/klass.hpp"
 #include <string>
 
 using std::make_pair;
 using std::wstring;
 
-rt_constant_pool::rt_constant_pool(Klass *this_class, int this_class_index, cp_info **bufs, int length, ClassLoader *loader) : loader(loader)
+shared_ptr<InstanceKlass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
+	if (loader == nullptr) {
+		return BootStrapClassLoader::get_bootstrap().loadClass(name);
+	} else {
+		return loader->loadClass(name);
+	}
+}
+
+rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLoader *loader, const ClassFile & cf) : loader(loader)
+{
+	int this_class_index = cf.this_class;
+	cp_info **bufs = cf.constant_pool;
+	int length = cf.constant_pool_count;
+
 	for(int i = 0; i < length; i ++) {
 		switch (bufs[i]->tag) {
 			case CONSTANT_Class:{
-				// TODO: load the class! 并且把运行时的 Klass 引用放进常量池！(自己的话要把 this 放进去！注意是指针。因为我禁止了 Klass 的拷贝，而 any 的实现基于拷贝，且它无法使用引用类型。)
 				if (i == this_class_index - 1) {
-					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(this_class)));		// Klass *
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(this_class)));		// shared_ptr<InstanceKlass>
 				} else {
-
+					// get should-be-loaded class name
+					CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
+					assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
+					wstring name = ((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode();	// e.g. java/lang/Object
+					// load the class
+					shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, name);
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(new_class)));
 				}
 				break;
 			}
 			case CONSTANT_String:{	// TODO: 我认为最后形成的 String 类内部应该封装一个 std::wstring & 才好。这样能够保证常量池唯一！～
 				CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 				assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
-				this->pool.push_back(make_pair(bufs[i]->tag, target->index-1));	// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target->index-1)));	// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// wstring
 				break;
 			}
@@ -36,12 +56,28 @@ rt_constant_pool::rt_constant_pool(Klass *this_class, int this_class_index, cp_i
 			case CONSTANT_InterfaceMethodref:{
 				// TODO: make all three! 并且把运行时的 Fieldref Methodref InterfaceMethodref 引用放进常量池！
 				CONSTANT_FMI_info* target = (CONSTANT_FMI_info*)bufs[i];
-				if (target->tag == CONSTANT_Fieldref)
+				assert(bufs[target->class_index-1]->tag == CONSTANT_Class);
+				assert(bufs[target->name_and_type_index-1]->tag == CONSTANT_NameAndType);
+				// get class name
+				wstring name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
+				// load class
+				shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, name);
+
+				if (target->tag == CONSTANT_Fieldref) {
+//					wstring
+
+
 					printf("(DEBUG) #%4d = Fieldref %12s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
-				else if (target->tag == CONSTANT_Methodref)
+
+				}
+				else if (target->tag == CONSTANT_Methodref) {
 					printf("(DEBUG) #%4d = Methodref %11s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
-				else
+
+				}
+				else {
 					printf("(DEBUG) #%4d = InterfaceMethodref %2s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
+
+				}
 				break;
 			}
 			case CONSTANT_Integer:{

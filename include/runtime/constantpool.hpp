@@ -8,24 +8,28 @@
 #ifndef INCLUDE_RUNTIME_CONSTANTPOOL_HPP_
 #define INCLUDE_RUNTIME_CONSTANTPOOL_HPP_
 
-#include <class_parser.hpp>
+#include "class_parser.hpp"
 #include <vector>
 #include <utility>
 #include <boost/any.hpp>
 #include <cassert>
+#include <memory>
 
 using std::vector;
 using std::pair;
+using std::shared_ptr;
+using std::wstring;
 
-
-class Klass;
+class InstanceKlass;
 
 class rt_constant_pool {	// runtime constant pool
 private:
 	vector<pair<int, boost::any>> pool;
 	ClassLoader *loader;
+private:
+	shared_ptr<InstanceKlass> if_didnt_load_then_load(ClassLoader *loader, const wstring & name);
 public:
-	explicit rt_constant_pool(Klass *this_class, int this_class_index, cp_info **bufs, int length, ClassLoader *loader);		// bufs 前边加上 const 竟然会报错 ???
+	explicit rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLoader *loader, const ClassFile & cf);		// bufs 前边加上 const 竟然会报错 ???
 	int type(int index) {
 		return pool[index].first;
 	}

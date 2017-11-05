@@ -13,7 +13,12 @@ using std::map;
 class ClassFile;
 class InstanceKlass;
 
-class ClassLoader {};
+class ClassLoader {
+public:
+	virtual shared_ptr<InstanceKlass> loadClass(const wstring & classname) = 0;	// load and link class.
+	virtual void print() = 0;
+	virtual ~ClassLoader() {};	// need to be defined!!
+};
 
 class BootStrapClassLoader : public ClassLoader {
 private:
@@ -28,8 +33,8 @@ public:
 		static BootStrapClassLoader bootstrap;		// 把这句放到 private 中，然后在 classloader.cpp 加上 static 初始化，然后就和 Mayers 条款 4 一样，static 在模块初始化顺序不确定！！会出现相当诡异的结果！！
 		return bootstrap;
 	}	// singleton
-	shared_ptr<InstanceKlass> loadClass(const wstring & classname);	// load and link class.
-	void print();
+	shared_ptr<InstanceKlass> loadClass(const wstring & classname) override;
+	void print() override;
 };
 
 class MyClassLoader : public ClassLoader {
@@ -46,8 +51,8 @@ public:
 		static MyClassLoader mloader;
 		return mloader;
 	}	// singleton
-	shared_ptr<InstanceKlass> loadClass(const wstring & classname);
-	void print();
+	shared_ptr<InstanceKlass> loadClass(const wstring & classname) override;
+	void print() override;
 };
 
 

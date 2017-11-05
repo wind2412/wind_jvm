@@ -22,6 +22,7 @@ using std::pair;
  * 这个 Klass 是一定要被 new 出来的！
  */
 
+
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
 	enum State{Zero, Loaded, Parsed, Initialized};
@@ -46,6 +47,8 @@ public:
 	int get_access_flags() { return access_flags; }
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
 	wstring get_name() { return name; }
+public:
+	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 protected:
 	Klass(const Klass &);
 	Klass operator= (const Klass &);
@@ -55,6 +58,7 @@ public:
 
 class Fields;
 class Field_info;
+class rt_constant_pool;
 
 class InstanceKlass : public Klass {
 	friend Fields;
@@ -63,15 +67,17 @@ private:
 	ClassLoader *loader;
 
 	// interfaces
-	unordered_map<int, shared_ptr<InstanceKlass>> interfaces;
+	unordered_map<wstring, shared_ptr<InstanceKlass>> interfaces;
 	// fields (non-static / static)
-	unordered_map<int, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
-	unordered_map<int, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<constant_pool's index, static_fields' offset>
+	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
+	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_bytes = 0;
 	int total_static_fields_bytes = 0;
 	uint8_t *static_fields;													// static field values. [non-static field values are in oop].
 	// methods
-	unordered_map<int, Method*> methods;
+	unordered_map<wstring, shared_ptr<Method>> methods;
+	// constant pool
+	shared_ptr<rt_constant_pool> rt_pool;
 
 	// 其他的 attributes 稍后再加
 	attribute_info *attributes;
@@ -80,6 +86,7 @@ private:
 	void parse_fields(const ClassFile & cf);
 	void parse_superclass(const ClassFile & cf, ClassLoader *loader);
 	void parse_interfaces(const ClassFile & cf, ClassLoader *loader);
+	void parse_constantpool(const ClassFile & cf, ClassLoader *loader);
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

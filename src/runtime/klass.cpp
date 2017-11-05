@@ -8,22 +8,30 @@
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
 #include "classloader.hpp"
+#include "runtime/constantpool.hpp"
 #include <utility>
 #include <cstring>
+#include <sstream>
 
 using std::make_pair;
 using std::make_shared;
+using std::wstringstream;
 
 void InstanceKlass::parse_methods(const ClassFile & cf)
 {
+	wstringstream ss;
 	for(int i = 0; i < cf.methods_count; i ++) {
-		this->methods.insert(make_pair(i, new Method(this, cf.methods[i], cf.constant_pool)));
+		shared_ptr<Method> method = make_shared<Method>(this, cf.methods[i], cf.constant_pool);
+		ss << method->get_name() << L":" << method->get_descriptor();
+		this->methods.insert(make_pair(ss.str(), method));	// add into
+		ss.str(L"");		// make empty
 	}
 #ifdef DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
 	std::cout << "methods: total " << this->methods.size() << std::endl;
+	int counter = 0;
 	for (auto iter : this->methods) {
-		std::wcout << "  #" << iter.first << ", name: " << iter.second->get_name() << ", descriptor: " << iter.second->get_descriptor() << std::endl;
+		std::wcout << "  #" << counter++ << "  " << iter.first << std::endl;
 	}
 	std::cout << "===---------------------------------------------------------===" << std::endl;
 #endif
@@ -31,16 +39,19 @@ void InstanceKlass::parse_methods(const ClassFile & cf)
 
 void InstanceKlass::parse_fields(const ClassFile & cf)
 {
+	wstringstream ss;
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf.fields_count; i ++) {
 		shared_ptr<Field_info> metaField = make_shared<Field_info>(cf.fields[i], cf.constant_pool);
+		ss << metaField->get_name() << L":" << metaField->get_descriptor();
 		if((cf.fields[i].access_flags & 0x08) != 0) {	// static field
-			this->static_fields_layout.insert(make_pair(i, make_pair(total_static_fields_bytes, metaField)));
+			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_bytes, metaField)));
 			total_static_fields_bytes += metaField->get_value_size();	// offset +++
 		} else {		// non-static field
-			this->fields_layout.insert(make_pair(i, make_pair(total_static_fields_bytes, metaField)));
+			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_bytes, metaField)));
 			total_non_static_fields_bytes += metaField->get_value_size();
 		}
+		ss.str(L"");
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.
@@ -50,12 +61,14 @@ void InstanceKlass::parse_fields(const ClassFile & cf)
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
 	std::cout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
 	if (this->fields_layout.size() != 0)		std::cout << "non-static as below:" << std::endl;
+	int counter = 0;
 	for (auto iter : this->fields_layout) {
-		std::wcout << "  #" << iter.first << ", offset: " << iter.second.first << ", name: " << iter.second.second->get_name() << ", descriptor: " << iter.second.second->get_descriptor() << ", size: " << iter.second.second->get_value_size() << std::endl;
+		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << ", size: " << iter.second.second->get_value_size() << std::endl;
 	}
+	counter = 0;
 	if (this->static_fields_layout.size() != 0)	std::cout << "static as below:" << std::endl;
 	for (auto iter : this->static_fields_layout) {
-		std::wcout << "  #" << iter.first << ", offset: " << iter.second.first << ", name: " << iter.second.second->get_name() << ", descriptor: " << iter.second.second->get_descriptor() << ", size: " << iter.second.second->get_value_size() << std::endl;
+		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << ", size: " << iter.second.second->get_value_size() << std::endl;
 	}
 	std::cout << "===--------------------------------------------------------===" << std::endl;
 #endif
@@ -72,7 +85,7 @@ void InstanceKlass::parse_superclass(const ClassFile & cf, ClassLoader *loader)
 		if (loader == nullptr) {	// bootstrap classloader do this
 			this->parent = BootStrapClassLoader::get_bootstrap().loadClass(super_name);
 		} else {		// my classloader do this
-			this->parent = MyClassLoader::get_loader().loadClass(super_name);
+			this->parent = loader->loadClass(super_name);
 		}
 
 		if (this->parent != nullptr) {
@@ -103,19 +116,27 @@ void InstanceKlass::parse_interfaces(const ClassFile & cf, ClassLoader *loader)	
 			std::cout << "wrong..." << std::endl;	//delete
 			interface = BootStrapClassLoader::get_bootstrap().loadClass(interface_name);
 		} else {
-			interface = MyClassLoader::get_loader().loadClass(interface_name);
+			interface = loader->loadClass(interface_name);
+			assert(interface != nullptr);
 		}
 		assert(interface != nullptr);
-		this->interfaces.insert(make_pair(i, interface));
+		this->interfaces.insert(make_pair(interface_name, interface));
 	}
 #ifdef DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime InterfacePool ---------------===" << std::endl;
 	std::cout << "interfaces: total " << this->interfaces.size() << std::endl;
+	int counter = 0;
 	for (auto iter : this->interfaces) {
-		std::wcout << "  #" << iter.first << ", name: " << iter.second->name << std::endl;
+		std::wcout << "  #" << counter++ << "  name: " << iter.first << std::endl;
 	}
 	std::cout << "===------------------------------------------------------------===" << std::endl;
 #endif
+}
+
+void InstanceKlass::parse_constantpool(const ClassFile & cf, ClassLoader *loader)
+{
+	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
+	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
 }
 
 InstanceKlass::InstanceKlass(const ClassFile & cf, ClassLoader *loader) : loader(loader), Klass()
@@ -133,9 +154,10 @@ InstanceKlass::InstanceKlass(const ClassFile & cf, ClassLoader *loader) : loader
 	// this_class
 	this->access_flags = cf.access_flags;
 	cur = Loaded;
-
 	// become Runtime interfaces
 	parse_interfaces(cf, loader);
+	// become Runtime constant pool
+//	parse_constantpool(cf, loader);
 
 	// TODO: enum status, Loaded, Parsed...
 	// TODO: Runtime constant pool and remove Non-Dynamic cp_pool.
@@ -144,6 +166,7 @@ InstanceKlass::InstanceKlass(const ClassFile & cf, ClassLoader *loader) : loader
 	// TODO: 貌似没对 java.lang.Object 父类进行处理。比如 wait 方法等等...
 	// TODO: ReferenceKlass......
 	// TODO: Inner Class!!
+	// TODO: 补全 oop 的 Fields.
 
 #ifdef DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
