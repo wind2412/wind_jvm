@@ -31,9 +31,9 @@ protected:
 	wstring name;		// this class's name		// use constant_pool single string but not copy.
 	u2 access_flags;	// this class's access flags
 
-	Klass *parent;
-	Klass *next_sibling;
-	Klass *child;
+	shared_ptr<Klass> parent;
+	shared_ptr<Klass> next_sibling;
+	shared_ptr<Klass> child;
 public:
 	State get_state() { return cur; }
 	void set_state(State s) { cur = s; }
@@ -62,7 +62,7 @@ private:
 	ClassLoader *loader;
 
 	// interfaces
-	unordered_map<int, Klass*> interfaces;
+	unordered_map<int, shared_ptr<InstanceKlass>> interfaces;
 	// fields (non-static / static)
 	unordered_map<int, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
 	unordered_map<int, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<constant_pool's index, static_fields' offset>
@@ -77,6 +77,7 @@ private:
 private:
 	void parse_methods(const ClassFile & cf);
 	void parse_fields(const ClassFile & cf);
+	void parse_interfaces(const ClassFile & cf, ClassLoader *loader);
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

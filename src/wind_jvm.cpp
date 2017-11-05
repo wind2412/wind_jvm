@@ -10,8 +10,7 @@
 int main(int argc, char *argv[])
 {
 	wstring target(L"Test");
-	MyClassLoader mcl;
-	mcl.loadClass(target);
+	MyClassLoader::get_loader().loadClass(target);
 }
 
 

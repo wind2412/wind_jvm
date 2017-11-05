@@ -686,7 +686,7 @@ struct ClassFile {
 	u2 methods_count;
 	method_info *methods = nullptr;			// [methods_count];
 	u2 attributes_count;
-	attribute_info *attributes = nullptr;		// [attributes_count];
+	attribute_info **attributes = nullptr;		// [attributes_count];
 
 	void parse_header(std::ifstream & f);
 	void parse_constant_pool(std::ifstream & f);
@@ -694,6 +694,7 @@ struct ClassFile {
 	void parse_interfaces(std::ifstream & f);
 	void parse_fields(std::ifstream & f);
 	void parse_methods(std::ifstream & f);
+	void parse_attributes(std::ifstream & f);
 	
 	friend std::ifstream & operator >> (std::ifstream & f, ClassFile & cf);
 	

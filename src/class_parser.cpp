@@ -2065,6 +2065,93 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			std::cout << std::endl << "(DEBUG)" << std::endl;
 			break;
 		}
+		case 4:{	// InnerClass
+			std::cout << "(DEBUG) InnerClasses:" << std::endl;
+			auto *inner_ptr = (InnerClasses_attribute *)ptr;
+			for(int i = 0; i < inner_ptr->number_of_classes; i ++) {
+				// get all indexes
+				int inner_class_info_index = inner_ptr->classes[i].inner_class_info_index;
+				int outer_class_info_index = inner_ptr->classes[i].outer_class_info_index;
+				int inner_name_index = inner_ptr->classes[i].inner_name_index;
+//				cout << "..." <<	inner_class_info_index << " "<< outer_class_info_index << " " << inner_name_index << endl;	// delete
+				wstring inner_class_info = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[inner_class_info_index-1])->index-1])->convert_to_Unicode();
+				// parse inner class access flags
+				u2 access_flags = inner_ptr->classes[i].inner_class_access_flags;
+//				cout << "..." << access_flags << endl;	// delete
+				stringstream ss;
+				int flags_num = 0;
+				if ((access_flags & ACC_PUBLIC) == ACC_PUBLIC) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "public";
+					flags_num ++;
+				} else if ((access_flags & ACC_PRIVATE) == ACC_PRIVATE) {		// in fact, private and protected member shouldn't be output. haha.
+					if (flags_num != 0)		ss << ", ";
+					ss << "private";
+					flags_num ++;
+				} else if ((access_flags & ACC_PROTECTED) == ACC_PROTECTED) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "protected";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_STATIC) == ACC_STATIC) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "static";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_FINAL) == ACC_FINAL) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "final";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_INTERFACE) == ACC_INTERFACE) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "interface";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_ABSTRACT) == ACC_ABSTRACT) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "abstract";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_SYNTHETIC) == ACC_SYNTHETIC) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "synthetic";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_ANNOTATION) == ACC_ANNOTATION) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "annotation";
+					flags_num ++;
+				}
+				if ((access_flags & ACC_ENUM) == ACC_ENUM) {
+					if (flags_num != 0)		ss << ", ";
+					ss << "enum";
+					flags_num ++;
+				}
+				// print
+				if (inner_name_index == 0 && outer_class_info_index == 0) {
+					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_class_info_index << "  //<class:> " << inner_class_info << endl;	// wcout 只能输出 char * 和 wstring，但是不能输出 string！！
+				} else {
+					wstring outer_class_info = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[outer_class_info_index-1])->index-1])->convert_to_Unicode();
+					wstring inner_name = ((CONSTANT_Utf8_info *)constant_pool[inner_name_index-1])->convert_to_Unicode();
+					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_name_index << "= #" << inner_class_info_index << " of #" << outer_class_info_index;
+					std::wcout << "  //" << inner_name << "=<class:> " << inner_class_info << " of <class:> " << outer_class_info << endl;
+				}
+			}
+			break;
+		}
+		case 5:{	// Enclosing Method
+			auto *enclosing_ptr = (EnclosingMethod_attribute *)ptr;
+			std::cout << "(DEBUG) EnclosingMethod: #" << enclosing_ptr->class_index << ".#" << enclosing_ptr->method_index;
+			wstring class_info = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[enclosing_ptr->class_index-1])->index-1])->convert_to_Unicode();
+			std::wcout << "   // " << class_info;
+			if (enclosing_ptr->method_index != 0) {
+				wstring method_info = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[enclosing_ptr->method_index-1])->index-1])->convert_to_Unicode();
+				std::wcout << "." << method_info;
+			}
+			std::wcout << std::endl;
+			break;
+		}
 		case 6:{	// Synthetic
 			std::cout << "(DEBUG)   Synthetic: (length) " << ptr->attribute_length << std::endl;
 			break;
@@ -2072,7 +2159,15 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 		case 7:{	// Signature
 			auto *signature_ptr = (Signature_attribute *)ptr;
 			assert (constant_pool[signature_ptr->signature_index-1]->tag == CONSTANT_Utf8);
-			std::wcout << "(DEBUG)   Signature: " << ((CONSTANT_Utf8_info *)constant_pool[signature_ptr->signature_index-1])->convert_to_Unicode() << std::endl;
+			std::wcout << "(DEBUG)   Signature: #" << signature_ptr->signature_index << " " << ((CONSTANT_Utf8_info *)constant_pool[signature_ptr->signature_index-1])->convert_to_Unicode() << std::endl;
+			break;
+		}
+		case 8:{	// SourceFile
+			auto *sourcefile_ptr = (SourceFile_attribute *)ptr;
+			std::wcout << "(DEBUG) SourceFile: \"" << ((CONSTANT_Utf8_info *)constant_pool[sourcefile_ptr->sourcefile_index-1])->convert_to_Unicode() << "\"" << std::endl;
+			break;
+		}
+		case 9:{	// SourceDebug (no use for jvm)
 			break;
 		}
 		case 10:{	// LineNumberTable (Inside the Code Attribution)
@@ -2082,6 +2177,12 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 				auto *table = &line_table->line_number_table[pos];
 				printf("(DEBUG)%7sline: %4d, start_pc: %-4d\n", "", table->line_number, table->start_pc);
 			}
+			break;
+		}
+		case 11:{	// LocalVariableTable (no use for jvm, use for Debugger.)
+			break;
+		}
+		case 12:{	// LocalVariableTypeTable (no use for jvm, use for Debugger.)
 			break;
 		}
 		case 13:{	// Deprecated
@@ -2118,6 +2219,8 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			}
 			break;
 		}
+		// TODO: case 18, 19, 20, 21, 22
+		// TODO: all above.
 	}
 }
 
@@ -2131,6 +2234,7 @@ std::ifstream & operator >> (std::ifstream & f, ClassFile & cf) {
 	cf.parse_interfaces(f);
 	cf.parse_fields(f);
 	cf.parse_methods(f);
+	cf.parse_attributes(f);
 
 	return f;
 }
@@ -2250,7 +2354,7 @@ void ClassFile::parse_class_msgs(std::ifstream & f) {
 	this_class = read2(f);
 	super_class = read2(f);
 #ifdef DEBUG
-	std::cout << "(DEBUG) access_flags: " << access_flags << "  this_class: " << this_class << "  super_class:" << super_class << endl;
+	std::cout << "(DEBUG) access_flags: " << access_flags << "  this_class: #" << this_class << "  super_class: #" << super_class << endl;
 #endif
 }
 
@@ -2302,7 +2406,26 @@ void ClassFile::parse_methods(std::ifstream & f) {
 		std::cout << "(DEBUG) method_number: " << methods_count << std::endl;
 		print_methods(methods, methods_count, constant_pool);
 	} else {
-		std::cout << "(DEBUG) no method functions" << std::endl;
+		std::cout << "(DEBUG) no method functions." << std::endl;
+	}
+#endif
+}
+
+void ClassFile::parse_attributes(std::ifstream & f) {
+	attributes_count = read2(f);
+	if (attributes_count != 0)
+		attributes = new attribute_info*[attributes_count];
+	for(int pos = 0; pos < attributes_count; pos ++) {
+		attributes[pos] = new_attribute(f, constant_pool);
+	}
+#ifdef DEBUG
+	if (attributes_count != 0) {
+		std::cout << "(DEBUG) attribute_number: " << attributes_count << std::endl;
+		for (int pos = 0; pos < attributes_count; pos ++) {
+			print_attributes(attributes[pos], constant_pool);
+		}
+	} else {
+		std::cout << "(DEBUG) no class attributes." << std::endl;
 	}
 #endif
 }

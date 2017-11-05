@@ -18,6 +18,7 @@ class ClassLoader {};
 class BootStrapClassLoader : public ClassLoader {
 private:
 	JarLister jl;
+private:
 	BootStrapClassLoader() {}
 	static BootStrapClassLoader bootstrap;
 public:
@@ -29,7 +30,11 @@ class MyClassLoader {
 private:
 	BootStrapClassLoader bs = BootStrapClassLoader::get_bootstrap();
 	map<wstring, shared_ptr<InstanceKlass>> classmap;
+private:
+	MyClassLoader() {};
+	static MyClassLoader mloader;
 public:
+	static MyClassLoader & get_loader() { return mloader; }
 	shared_ptr<InstanceKlass> loadClass(const wstring & classname);
 };
 

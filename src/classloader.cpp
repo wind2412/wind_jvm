@@ -3,7 +3,6 @@
 #include "vm_exceptions.hpp"
 #include "runtime/klass.hpp"
 
-
 using std::ifstream;
 using std::shared_ptr;
 using std::make_shared;
