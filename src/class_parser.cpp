@@ -309,15 +309,59 @@ void print_constant_pool(cp_info **bufs, int length) {	// constant pool length
 				std::wcout << target->convert_to_Unicode() << std::endl;
 				break;
 			}
+			case CONSTANT_MethodHandle:{
+				CONSTANT_MethodHandle_info* target = (CONSTANT_MethodHandle_info*)bufs[i];
+				const char *ref_kind;
+				// 1. judge REF_kind
+				switch (target->reference_kind) {
+					case REF_getField:
+						ref_kind = "[getField]";
+						break;
+					case REF_getStatic:
+						ref_kind = "[getStatic]";
+						break;
+					case REF_putField:
+						ref_kind = "[putField]";
+						break;
+					case REF_putStatic:
+						ref_kind = "[putStatic]";
+						break;
+					case REF_invokeVirtual:
+						ref_kind = "[invokeVirtual]";
+						break;
+					case REF_invokeStatic:
+						ref_kind = "[invokeStatic]";
+						break;
+					case REF_invokeSpecial:
+						ref_kind = "[invokeSpecial]";
+						break;
+					case REF_newInvokeSpecial:
+						ref_kind = "[newInvokeSpecial]";
+						break;
+					case REF_invokeInterface:
+						ref_kind = "[invokeInterface]";
+						break;
+					default:
+						std::cerr << "can't get here!" << std::endl;
+						assert(false);
+				}
+				printf("(DEBUG) #%4d = MethodHandle %8s %s:#%d\n", i+1, "", ref_kind, target->reference_index);
+				break;
+			}
+			case CONSTANT_MethodType:{
+				CONSTANT_MethodType_info* target = (CONSTANT_MethodType_info*)bufs[i];
+				printf("(DEBUG) #%4d = MethodType %10s #%d\n", i+1, "", target->descriptor_index);
+				break;
+			}
+			case CONSTANT_InvokeDynamic:{
+				CONSTANT_InvokeDynamic_info* target = (CONSTANT_InvokeDynamic_info*)bufs[i];
+				printf("(DEBUG) #%4d = InvokeDynamic %7s #%d:#%d\n", i+1, "", target->bootstrap_method_attr_index, target->name_and_type_index);
+				break;
+			}
 			default:{
 				std::cerr << "didn't finish MethodHandle, MethodType and InvokeDynamic!!" << std::endl;
 				assert(false);
 			}
-//			case CONSTANT_MethodHandle:{		// TODO !!!!!!!!!!!!
-//				
-//			}
-//			case CONSTANT_MethodType:
-//			case CONSTANT_InvokeDynamic:;
 		}
 	}
 }
@@ -1035,12 +1079,6 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path & i) 
 
 type_annotation::type_path::~type_path() { delete[] path; }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::element_value_pairs_t & i) {
-	i.element_name_index = read2(f);
-	f >> i.value;
-	return f;
-}
-
 std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
 	i.target_type = read1(f);
 	if (i.target_type == 0x00 || i.target_type == 0x01) {
@@ -1088,19 +1126,14 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
 		assert(false);
 	}
 	f >> i.target_path;
-	i.type_index = read2(f);
-	i.num_element_value_pairs = read2(f);
-	if (i.num_element_value_pairs != 0)
-		i.element_value_pairs = new type_annotation::element_value_pairs_t[i.num_element_value_pairs];
-	for(int pos = 0; pos < i.num_element_value_pairs; pos ++) {
-		f >> i.element_value_pairs[pos];
-	}
+	i.anno = new annotation;
+	f >> *i.anno;
 	return f;
 }
 
 type_annotation::~type_annotation() {
 	delete target_info;
-	delete[] element_value_pairs;
+	delete anno;
 }
 
 std::ifstream & operator >> (std::ifstream & f, parameter_annotations_t & i) {
@@ -1420,8 +1453,10 @@ void print_fields(field_info *bufs, int length, cp_info **constant_pool) {
 		// parse ConstantValue / Signature / RuntimeVisibleAnnotations / RuntimeInvisibleAnnotations
 		for (int pos = 0; pos < bufs[i].attributes_count; pos ++) {
 			int attribute_tag = peek_attribute(bufs[i].attributes[pos]->attribute_name_index, constant_pool);
-			if (!(attribute_tag == 0 || attribute_tag == 6 || attribute_tag == 7 || attribute_tag == 13 || attribute_tag == 14 || attribute_tag == 15)) {
-				// ignore (not 0, 6, 7, 13, 14, 15). in Java SE 8 Specification $ 4.5
+			if (!(attribute_tag == 0 || attribute_tag == 6 || attribute_tag == 7 ||
+					attribute_tag == 13 || attribute_tag == 14 || attribute_tag == 15 ||
+					attribute_tag == 18 || attribute_tag == 19)) {
+				// ignore (not 0, 6, 7, 13, 14, 15, 18, 19). in Java SE 8 Specification $ 4.5
 				continue;
 			}
 			print_attributes(bufs[i].attributes[pos], constant_pool);		// I only implemented the '0' --> ConstantValue output. ?????????
@@ -1563,8 +1598,9 @@ void print_methods(method_info *bufs, int length, cp_info **constant_pool) {
 			int attribute_tag = peek_attribute(bufs[i].attributes[pos]->attribute_name_index, constant_pool);
 			if (!(attribute_tag == 1 || attribute_tag == 3 || attribute_tag == 6 ||
 				  attribute_tag == 7 || attribute_tag == 13 || attribute_tag == 14 || 
-				  attribute_tag == 15 || attribute_tag == 16 || attribute_tag == 17 || attribute_tag == 18)) {
-				// ignore (not 1, 3, 6, 7, 13, 14, 15, 16, 17, 18). in Java SE 8 Specification $ 4.5
+				  attribute_tag == 15 || attribute_tag == 16 || attribute_tag == 17 ||
+				  attribute_tag == 18 || attribute_tag == 19 || attribute_tag == 20 || attribute_tag == 22)) {
+				// ignore (not 1, 3, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 22). in Java SE 8 Specification $ 4.5
 				continue;
 			}
 			print_attributes(bufs[i].attributes[pos], constant_pool);		// I only implemented the '0' --> ConstantValue output. ?????????
@@ -1788,64 +1824,64 @@ std::unordered_map<u1, std::pair<std::string, int>> bccode_map{	// pair<bccode_n
 // aux pasing Runtime(In)visibleAnnotations.
 // e.g. RuntimeInvisibleAnnotations:
 // 			0: #12(#13=s#14,#15=@#10())
+// 1. parse value
+std::string parse_inner_element_value(element_value *inner_ev) {
+	std::stringstream ss;
+	switch ((char)inner_ev->tag) {
+		case 'B':case 'C':case 'D':case 'F':
+		case 'I':case 'J':case 'S':case 'Z':
+		case 's':{
+			ss << "s#" << ((const_value_t *)inner_ev->value)->const_value_index;		// bug2: 指针强转不会有错误提示！！因此......这里原先写得是((const_value_t *)inner_ev)，但其实 inner_ev 内部的 inner_ev->value 才是真正应该被转换的......编译器不给报错！！
+			break;
+		}
+		case 'e':{
+			ss << "e#" << ((enum_const_value_t *)inner_ev->value)->type_name_index << "."
+						<< ((enum_const_value_t *)inner_ev->value)->const_name_index;
+			break;
+		}
+		case 'c':{
+			ss << "c#" << ((class_info_t *)inner_ev)->class_info_index;
+			break;
+		}
+		case '@':{
+			ss << "@" << recursive_parse_annotation((annotation *)inner_ev->value);	// recursive call outer function.
+			break;
+		}
+		case '[':{
+			ss << "[";
+			int length = ((array_value_t *)inner_ev->value)->num_values;
+			for (int pos = 0; pos < length; pos ++) {
+						// bug 3 ！！调试时间最长的 bug！！在这里我不小心定义了和这个函数的参数一模一样的 inner_ev 变量！！在程序走到这里的时候，发生了如下错误！！重新定义一个和原先名字一模一样的变量 clang++ 竟然不报错吗 ???
+						/**
+							就好像:
+
+							void haha(char **argv)
+							{
+								{
+									char **argv = argv;	// 不会有错误提示！唉（  g++ 和 clang++ 都没有错误提示...... 万一写错了咋办......看来只能自己小心了...
+								}
+							};
+
+							*/
+				// element_value *inner_ev = &((array_value_t *)inner_ev->value)->values[pos];	// error: Couldn't apply expression side effects : Couldn't dematerialize a result variable: couldn't read its memory
+				element_value *inner_ev_2 = &((array_value_t *)inner_ev->value)->values[pos];
+				ss << parse_inner_element_value(inner_ev_2);		// recursive !
+				if (pos != length-1)	ss << ",";
+			}
+			ss << "]";
+			break;
+		}
+		default:{
+			std::cerr << "can't get here. in element_value." << std::endl;
+			assert(false);
+		}
+	}
+	return ss.str();
+};
+// 2. parse annotation
 std::string recursive_parse_annotation (annotation *target) {
 	std::stringstream total_str;
 	total_str << "#" << target->type_index << "(";	// print key: #12
-	
-	// parse value
-	std::function<std::string(element_value*)> parse_inner_element_value = [&parse_inner_element_value](element_value *inner_ev) -> std::string {
-		std::stringstream ss;
-		switch ((char)inner_ev->tag) {
-			case 'B':case 'C':case 'D':case 'F':
-			case 'I':case 'J':case 'S':case 'Z':
-			case 's':{
-				ss << "s#" << ((const_value_t *)inner_ev->value)->const_value_index;		// bug2: 指针强转不会有错误提示！！因此......这里原先写得是((const_value_t *)inner_ev)，但其实 inner_ev 内部的 inner_ev->value 才是真正应该被转换的......编译器不给报错！！
-				break;
-			}
-			case 'e':{
-				ss << "e#" << ((enum_const_value_t *)inner_ev->value)->const_name_index << "+"
-							<< ((enum_const_value_t *)inner_ev->value)->type_name_index;
-				break;
-			}
-			case 'c':{
-				ss << "c#" << ((class_info_t *)inner_ev)->class_info_index;
-				break;
-			}
-			case '@':{
-				ss << "@" << recursive_parse_annotation((annotation *)inner_ev->value);	// recursive call outer function.
-				break;
-			}
-			case '[':{
-				ss << "[";
-				int length = ((array_value_t *)inner_ev->value)->num_values;
-				for (int pos = 0; pos < length; pos ++) {
-							// bug 3 ！！调试时间最长的 bug！！在这里我不小心定义了和这个函数的参数一模一样的 inner_ev 变量！！在程序走到这里的时候，发生了如下错误！！重新定义一个和原先名字一模一样的变量 clang++ 竟然不报错吗 ???
-							/**
-								就好像:
-								
-								void haha(char **argv) 
-								{
-									{
-										char **argv = argv;	// 不会有错误提示！唉（  g++ 和 clang++ 都没有错误提示...... 万一写错了咋办......看来只能自己小心了...
-									}
-								};
-
-								*/
-					// element_value *inner_ev = &((array_value_t *)inner_ev->value)->values[pos];	// error: Couldn't apply expression side effects : Couldn't dematerialize a result variable: couldn't read its memory
-					element_value *inner_ev_2 = &((array_value_t *)inner_ev->value)->values[pos];
-					ss << parse_inner_element_value(inner_ev_2);		// recursive !
-					if (pos != length-1)	ss << ",";
-				}
-				ss << "]";
-				break;
-			}
-			default:{
-				std::cerr << "can't get here. in element_value." << std::endl;
-				assert(false);
-			}
-		}
-		return ss.str();
-	};
 	
 	// bool is_first = false;
 	for (int j = 0; j < target->num_element_value_pairs; j ++) {
@@ -2081,50 +2117,50 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 				stringstream ss;
 				int flags_num = 0;
 				if ((access_flags & ACC_PUBLIC) == ACC_PUBLIC) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "public";
 					flags_num ++;
 				} else if ((access_flags & ACC_PRIVATE) == ACC_PRIVATE) {		// in fact, private and protected member shouldn't be output. haha.
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "private";
 					flags_num ++;
 				} else if ((access_flags & ACC_PROTECTED) == ACC_PROTECTED) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "protected";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_STATIC) == ACC_STATIC) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "static";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_FINAL) == ACC_FINAL) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "final";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_INTERFACE) == ACC_INTERFACE) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "interface";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_ABSTRACT) == ACC_ABSTRACT) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "abstract";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_SYNTHETIC) == ACC_SYNTHETIC) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "synthetic";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_ANNOTATION) == ACC_ANNOTATION) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "annotation";
 					flags_num ++;
 				}
 				if ((access_flags & ACC_ENUM) == ACC_ENUM) {
-					if (flags_num != 0)		ss << ", ";
+					if (flags_num != 0)		ss << " ";
 					ss << "enum";
 					flags_num ++;
 				}
@@ -2204,7 +2240,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			break;
 		}
 		case 16:
-		case 17:{
+		case 17:{	// Runtime(In)VisibleParameterAnnotations
 			if (attribute_tag == 16)
 				std::cout << "(DEBUG)   RuntimeVisibleParameterAnnotations:" << std::endl;
 			else
@@ -2219,8 +2255,163 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			}
 			break;
 		}
-		// TODO: case 18, 19, 20, 21, 22
-		// TODO: all above.
+		case 18:
+		case 19:{	// Runtime(In)VisibleTypeAnnotations
+			if (attribute_tag == 18)
+				std::cout << "(DEBUG)   RuntimeVisibleTypeAnnotations:" << std::endl;
+			else
+				std::cout << "(DEBUG)   RuntimeInisibleTypeAnnotations:" << std::endl;
+			auto *annotations_ptr = (RuntimeVisibleTypeAnnotations_attribute *)ptr;
+			for (int i = 0; i < annotations_ptr->num_annotations; i ++) {
+				type_annotation *ta = &annotations_ptr->annotations[i];
+				// 1. print [target_info]
+				std::cout << "(DEBUG)     ";
+				std::cout << "tag == " << hex << (int)ta->target_type << " ";	// TODO: NEW / CLASS_EXTENSIONS 信息显示
+				switch (ta->target_type) {
+					case 0x00:
+					case 0x01:{	// target_info is [type_parameter_target]
+						auto target = (type_annotation::type_parameter_target *)ta->target_info;
+						std::cout << i << ": [type_parameter_target] " << "#" << target->type_parameter_index << std::endl;
+						break;
+					}
+					case 0x10:{	// target_info is [supertype_target]
+						auto target = (type_annotation::supertype_target *)ta->target_info;
+						std::cout << i << ": [supertype_target] " << "#" << target->supertype_index << std::endl;
+						break;
+					}
+					case 0x11:
+					case 0x12:{	// target_info is [type_parameter_bound_target]
+						auto target = (type_annotation::type_parameter_bound_target *)ta->target_info;
+						std::cout << i << ": [type_parameter_bound_target] " << "#" << target->type_parameter_index << " #" << target->bound_index << std::endl;
+						break;
+					}
+					case 0x13:
+					case 0x14:
+					case 0x15:{	// target_info is [empty_target]
+						std::cout << i << ": [empty_target]" << std::endl;
+						break;
+					}
+					case 0x16:{	// target_info is [formal_parameter_target]
+						auto target = (type_annotation::formal_parameter_target *)ta->target_info;
+						std::cout << i << ": [formal_parameter_target] " << "#" << target->formal_parameter_index << std::endl;
+						break;
+					}
+					case 0x17:{	// target_info is [throws_target]
+						auto target = (type_annotation::throws_target *)ta->target_info;
+						std::cout << i << ": [throws_target] " << "#" << target->throws_type_index << std::endl;
+						break;
+					}
+					case 0x40:
+					case 0x41:{	// target_info is [localvar_target]
+						auto target = (type_annotation::localvar_target *)ta->target_info;
+						std::cout << i << ": [localvar_target] " << std::endl;
+						for (int pos = 0; pos < target->table_length; pos ++) {
+							auto table = target->table[pos];
+							std::cout << "(DEBUG)       " << "index: " << table.index << ", start_pc: " << table.start_pc << ", length: " << table.length << std::endl;
+						}
+						break;
+					}
+					case 0x42:{	// target_info is [catch_target]
+						auto target = (type_annotation::catch_target *)ta->target_info;
+						std::cout << i << ": [catch_target] " << "#" << target->exception_table_index << std::endl;
+						break;
+					}
+					case 0x43:
+					case 0x44:
+					case 0x45:
+					case 0x46:{	// target_info is [offset_target]
+						auto target = (type_annotation::offset_target *)ta->target_info;
+						std::cout << i << ": [offset_target] " << "#" << target->offset << std::endl;
+						break;
+					}
+					case 0x47:
+					case 0x48:
+					case 0x49:
+					case 0x4A:
+					case 0x4B:{	// target_info is [type_argument_target]
+						auto target = (type_annotation::type_argument_target *)ta->target_info;
+						std::cout << i << ": [type_argument_target] " << "#" << target->offset << " #" << target->type_argument_index << std::endl;
+						break;
+					}
+					default:{
+						std::cerr << "can't get here!" << std::endl;
+						assert(false);
+					}
+				}
+				// 2. print [target_path]
+				type_annotation::type_path *path_ptr = &ta->target_path;
+				if (path_ptr->path_length != 0)
+					std::cout << "(DEBUG)     ";
+				for (int pos = 0; pos < path_ptr->path_length; pos ++) {
+					std::cout << "type_path_kind: " << (int)path_ptr->path[pos].type_path_kind << "; type_argument_index: " << (int)path_ptr->path[pos].type_argument_index << std::endl;
+				}
+				// 3. print [annotation]
+				annotation *target = ta->anno;
+				std::cout << "(DEBUG)     ";
+				std::cout << recursive_parse_annotation(target) << std::endl;
+			}
+			break;
+		}
+		case 20:{	// Annotation Default
+			std::cout << "(DEBUG)    AnnotationDefault:" << std::endl;
+			std::cout << "(DEBUG)      default_value: ";
+			auto *default_ptr = (AnnotationDefault_attribute *)ptr;
+			auto element_value = default_ptr->default_value;
+			// 1. print [type]
+			std::cout << (char)element_value.tag;
+			// 2. print [annotation default value pos in constant_pool]
+			std::cout << parse_inner_element_value(&element_value) << std::endl;	// 我都忘了已经写过现成的递归函数了......
+			break;
+		}
+		case 21:{	// BootstrapMethods	// 注：此表全局唯一。是所有的 lambda 动态调用的方法的集合表。invokeDynamic 通过此表查找想要 invoke 的方法。
+			std::cout << "(DEBUG)  BootstrapMethods:" << std::endl;
+			auto lambda_tbl = (BootstrapMethods_attribute *)ptr;
+			for (int pos = 0; pos < lambda_tbl->num_bootstrap_methods; pos ++) {
+				auto method_handle_msg = &lambda_tbl->bootstrap_methods[pos];
+				// 1. parse MethodHandle pos in constant_pool
+				std::cout << "(DEBUG)    " << pos << ": [CONSTANT_MethodHandle pos]#" << method_handle_msg->bootstrap_method_ref << std::endl;
+				// 2. parse MethodHandle arguments
+				std::cout << "(DEBUG)      Method arguments:" << std::endl;
+				for (int k = 0; k < method_handle_msg->num_bootstrap_arguments; k ++) {
+					int rtpool_ref = method_handle_msg->bootstrap_arguments[k];
+					std::cout << "(DEBUG)        #" << rtpool_ref << " " << std::endl;
+				}
+			}
+			break;
+		}
+		case 22:{	// MethodParameters	// 注：这个属性只有在：用 java8 编译 + 使用 java.lang.reflect.Parameter 类库 + 用 `javac -parameters` 来进行编译的时候才会生效！ MethodParameters 属性会被注入到 .class 文件中去！
+			std::cout << "(DEBUG)  MethodParameters:" << std::endl;
+			auto parameters = (MethodParameters_attribute *)ptr;
+			for (int pos = 0; pos < parameters->parameters_count; pos ++) {
+				int name_index = parameters->parameters[pos].name_index;
+				int access_flags = parameters->parameters[pos].access_flags;
+				if (name_index == 0) {
+					std::cout << "(DEBUG)    NONAME" << std::endl;		// TODO: Java8 Specification $4.7.24 指出这里有可能是 0。不过还没有试验出来...
+				} else {
+					assert(constant_pool[name_index-1]->tag == CONSTANT_Utf8);
+					wstring name = ((CONSTANT_Utf8_info *)constant_pool[name_index-1])->convert_to_Unicode();
+					// 1. print [name]
+					std::wcout << "(DEBUG)    " << name << " ";
+					// 2. print [access_flags]
+					wstringstream ss;
+					if ((access_flags & ACC_FINAL) == ACC_FINAL) {
+						ss << L"final ";
+					}
+					if ((access_flags & ACC_SYNTHETIC) == ACC_SYNTHETIC) {
+						ss << L"synthetic ";
+					}
+					if ((access_flags & ACC_MANDATED) == ACC_MANDATED) {
+						ss << L"mandated ";
+					}
+					std::wcout << ss.str() << std::endl;
+				}
+			}
+			break;
+		}
+		default:{
+			std::cerr << "can't get here!" << std::endl;
+			assert(false);
+		}
 	}
 }
 

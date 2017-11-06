@@ -29,6 +29,7 @@
 #define ACC_SYNTHETIC	0x1000			// the code is not generalized by java (by compiler but not the coder) (CFMI)
 #define ACC_ANNOTATION	0x2000			// this is an annotation like @Override. at the same time the `ACC_INTERFACE` should also be settled (CI)
 #define ACC_ENUM			0x4000			// this is an enum like enum {...} (CFI)
+#define ACC_MANDATED		0x8000
 
 // constant pool
 #define CONSTANT_Class				7
@@ -45,6 +46,17 @@
 #define CONSTANT_MethodHandle		15
 #define CONSTANT_MethodType			16
 #define CONSTANT_InvokeDynamic		18
+
+// constant pool: MethodHandle
+#define REF_getField					1
+#define REF_getStatic				2
+#define REF_putField					3
+#define REF_putStatic				4
+#define REF_invokeVirtual			5
+#define REF_invokeStatic				6
+#define REF_invokeSpecial			7
+#define REF_newInvokeSpecial			8
+#define REF_invokeInterface			9
 
 /*===------------  basic -----------------*/
 
@@ -243,8 +255,8 @@ struct Code_attribute : public attribute_info {
 };
 
 // StackMapTable Attributes
-#define ITEM_Top				0
-#define ITEM_Integer			1
+#define ITEM_Top					0
+#define ITEM_Integer				1
 #define ITEM_Float				2
 #define ITEM_Double				3
 #define ITEM_Long				4
@@ -485,7 +497,7 @@ struct class_info_t : public value_t {
 
 struct element_value {
 	u1 tag;
-	value_t *value = nullptr;
+	value_t *value = nullptr;	// [1]
 	friend std::ifstream & operator >> (std::ifstream & f, element_value & i);
 	~element_value();
 };
@@ -577,13 +589,7 @@ struct type_annotation {
 	u1 target_type;
 	target_info_t *target_info = nullptr;	// [1]
 	type_path target_path;
-	u2 type_index;
-	u2 num_element_value_pairs;
-	struct element_value_pairs_t {   
-		u2 element_name_index;
-		element_value value;
-		friend std::ifstream & operator >> (std::ifstream & f, type_annotation::element_value_pairs_t & i);
-	} *element_value_pairs = nullptr;		// [num_element_value_pairs];
+	annotation *anno = nullptr;
 	
 	friend std::ifstream & operator >> (std::ifstream & f, type_annotation & i);
 	~type_annotation();
@@ -665,6 +671,9 @@ struct MethodParameters_attribute : public attribute_info {
 };
 
 attribute_info* new_attribute(std::ifstream & f, cp_info **constant_pool);
+
+std::string parse_inner_element_value(element_value *inner_ev);
+std::string recursive_parse_annotation (annotation *target);
 
 /*===----------- .class ----------------===*/
 
