@@ -15,7 +15,7 @@ using std::make_pair;
 using std::wstring;
 using std::make_shared;
 
-shared_ptr<InstanceKlass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
+shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
 	if (loader == nullptr) {
 		return BootStrapClassLoader::get_bootstrap().loadClass(name);
@@ -35,15 +35,18 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 		switch (bufs[i]->tag) {
 			case CONSTANT_Class:{
 				if (i == this_class_index - 1) {
-					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(this_class)));		// shared_ptr<InstanceKlass>
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(this_class))));		// shared_ptr<Klass>，不过其实真正的是 shared_ptr<InstanceKlass>.
 				} else {
 					// get should-be-loaded class name
 					CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 					assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
 					wstring name = ((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode();	// e.g. java/lang/Object
 					// load the class
-					shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, name);
-					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(new_class)));
+					std::wcout << "load class ===> " << "<" << name << ">" << std::endl;
+					shared_ptr<Klass> new_class = if_didnt_load_then_load(loader, name);	// TODO: 这里可能得到数组类！需要额外判断一下！
+					assert(new_class != nullptr);
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(new_class))));			// shared_ptr<Klass> ，不过可能可以是 InstanceKlass 或者 TypeArrayKlass 或者 ObjArrayKlass......
+																													// TODO: 所以必须要有一种方法来判断型别......明天试试 traits??????
 				}
 				break;
 			}
@@ -64,7 +67,8 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				// get class name
 				wstring class_name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
 				// load class
-				shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, class_name);
+				shared_ptr<InstanceKlass> new_class = std::static_pointer_cast<InstanceKlass>(if_didnt_load_then_load(loader, class_name));		// 这里不可能得到数组类。
+				assert(new_class != nullptr);
 				// get field/method/interface_method name
 				auto name_type_ptr = (CONSTANT_NameAndType_info *)bufs[target->name_and_type_index-1];
 				wstring name = ((CONSTANT_Utf8_info *)bufs[name_type_ptr->name_index-1])->convert_to_Unicode();
@@ -165,12 +169,12 @@ void rt_constant_pool::print_debug()
 		switch (iter.first) {
 			case CONSTANT_Class:{
 				std::wcout << "Class              ===> ";
-				std::wcout << boost::any_cast<shared_ptr<InstanceKlass>>(iter.second)->get_name() << std::endl;
+//				std::cout << &*boost::any_cast<shared_ptr<Klass>>(iter.second) << std::endl;
+				std::wcout << boost::any_cast<shared_ptr<Klass>>(iter.second)->get_name() << std::endl;
 				break;
 			}
 			case CONSTANT_String:{
 				std::wcout << "String             ===> ";
-				std::cout << this->pool[boost::any_cast<int>(iter.second)].first << std::endl;
 				assert(this->pool[boost::any_cast<int>(iter.second)-1].first == CONSTANT_Utf8);		// 别忘了 -1......QAQQAQ
 				std::wcout << *boost::any_cast<shared_ptr<wstring>>(this->pool[boost::any_cast<int>(iter.second)-1].second) << std::endl;
 				break;

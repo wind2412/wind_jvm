@@ -17,6 +17,53 @@ using std::make_pair;
 using std::make_shared;
 using std::wstringstream;
 
+/*===----------------   aux   --------------------===*/
+Type get_type(const wstring & name)
+{
+	assert(name.size() == 1);		// B,C,D,J,S,.... only one char.
+	Type type;
+	switch (name[0]) {
+		case L'Z':{
+			type = Type::BOOLEAN;
+			break;
+		}
+		case L'B':{
+			type = Type::BYTE;
+			break;
+		}
+		case L'C':{
+			type = Type::CHAR;
+			break;
+		}
+		case L'S':{
+			type = Type::SHORT;
+			break;
+		}
+		case L'I':{
+			type = Type::INT;
+			break;
+		}
+		case L'F':{
+			type = Type::FLOAT;
+			break;
+		}
+		case L'J':{
+			type = Type::LONG;
+			break;
+		}
+		case L'D':{
+			type = Type::DOUBLE;
+			break;
+		}
+		default:{
+			std::cerr << "can't get here!" << std::endl;
+			assert(false);
+		}
+	}
+	return type;
+}
+
+/*===----------------  InstanceKlass  ------------------===*/
 void InstanceKlass::parse_methods(const ClassFile & cf)
 {
 	wstringstream ss;
@@ -83,9 +130,9 @@ void InstanceKlass::parse_superclass(const ClassFile & cf, ClassLoader *loader)
 		wstring super_name = ((CONSTANT_Utf8_info *)cf.constant_pool[((CONSTANT_CS_info *)cf.constant_pool[cf.super_class-1])->index-1])->convert_to_Unicode();
 		std::wcout << super_name << std::endl;
 		if (loader == nullptr) {	// bootstrap classloader do this
-			this->parent = BootStrapClassLoader::get_bootstrap().loadClass(super_name);
+			this->parent = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(super_name));
 		} else {		// my classloader do this
-			this->parent = loader->loadClass(super_name);
+			this->parent = std::static_pointer_cast<InstanceKlass>(loader->loadClass(super_name));
 		}
 
 		if (this->parent != nullptr) {
@@ -113,9 +160,9 @@ void InstanceKlass::parse_interfaces(const ClassFile & cf, ClassLoader *loader)	
 		wstring interface_name = ((CONSTANT_Utf8_info *)cf.constant_pool[((CONSTANT_CS_info *)cf.constant_pool[cf.interfaces[i]-1])->index-1])->convert_to_Unicode();
 		shared_ptr<InstanceKlass> interface;
 		if (loader == nullptr) {
-			interface = BootStrapClassLoader::get_bootstrap().loadClass(interface_name);
+			interface = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(interface_name));
 		} else {
-			interface = loader->loadClass(interface_name);
+			interface = std::static_pointer_cast<InstanceKlass>(loader->loadClass(interface_name));
 			assert(interface != nullptr);
 		}
 		assert(interface != nullptr);
@@ -236,3 +283,73 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	assert(this->interfaces.size() == 0);		// 这里画蛇添足一下。因为接口最多只有一个父接口，且不能 implements 只能 extends。因而应该只有一个 parent 而不能有 interfaces。
 	return nullptr;
 }
+
+
+/*===---------------  TypeArrayKlass  --------------------===*/
+TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader) : type(type), ArrayKlass(dimension, loader)
+{	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
+	// 1. get name
+	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
+	for (int i = 0; i < dimension; i ++) {
+		ss << L"[";
+	}
+	switch (type) {
+		case Type::BOOLEAN:{
+			ss << L"Z";
+			break;
+		}
+		case Type::BYTE:{
+			ss << L"B";
+			break;
+		}
+		case Type::CHAR:{
+			ss << L"C";
+			break;
+		}
+		case Type::SHORT:{
+			ss << L"S";
+			break;
+		}
+		case Type::INT:{
+			ss << L"I";
+			break;
+		}
+		case Type::FLOAT:{
+			ss << L"F";
+			break;
+		}
+		case Type::LONG:{
+			ss << L"J";
+			break;
+		}
+		case Type::DOUBLE:{
+			ss << L"D";
+			break;
+		}
+		default:{
+			std::cerr << "can't get here!" << std::endl;
+			assert(false);
+		}
+	}
+	this->name = ss.str();
+	// 2. set super class
+	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java.lang.Object"));
+	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
+}
+
+ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader) : element_klass(element_klass), ArrayKlass(dimension, loader)
+{
+	// 1. set name
+	wstringstream ss;
+	for (int i = 0; i < dimension; i ++) {
+		ss << L"[";
+	}
+	ss << element_klass->get_name();
+	this->name = ss.str();
+	// 2. set super class
+	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java.lang.Object"));
+}
+
+
+
+

@@ -20,14 +20,30 @@ using std::pair;
 
 /**
  * 这个 Klass 是一定要被 new 出来的！
+ * TODO: 方法区。
  */
 
+enum Type {		// TODO: 如果这里发生了变动，那么 TypeArrayKlass 可能需要变动？
+	BYTE,
+	BOOLEAN,
+	CHAR,
+	SHORT,
+	INT,
+	FLOAT,
+	LONG,
+	DOUBLE,
+	OBJECT,		// emmm. puzzled			// maybe this is not BasicType.
+	ARRAY,		// emmm. more puzzled	// as above.
+	VOID,		// emmm. most puzzled...	// ...	// got it. Please see [hotspot/src/cpu/x86/vm/sharedRuntime_x86_32.cpp:460 in OpenJDK8.] We will get the answer that T_VOID is for the `missing half` of Long and Double in constant_pool.
+};
+
+Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
 	enum State{Zero, Loaded, Parsed, Initialized};
 protected:
-	State cur = Zero;
+	State cur = Zero;	// TODO: 需不需要？
 protected:
 	wstring name;		// this class's name		// use constant_pool single string but not copy.
 	u2 access_flags;	// this class's access flags
@@ -79,6 +95,7 @@ private:
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
+	// TODO: attributes... 还在 ClassFile 中......
 	// 其他的 attributes 稍后再加
 	attribute_info *attributes;
 private:
@@ -97,6 +114,53 @@ private:
 public:
 	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader);
 	~InstanceKlass() {};
+};
+
+class ArrayKlass : public Klass {
+private:
+	ClassLoader *loader;
+
+	int dimension;			// (n) dimension (this)
+//	shared_ptr<Klass> higher_dimension;	// (n+1) dimension		// TODO: don't know what they use for????
+//	shared_ptr<Klass> lower_dimension;	// (n-1) dimension
+	// TODO: vtable
+	// TODO: mirror: reflection support
+
+public:
+//	shared_ptr<Klass> get_higher_dimension() { return higher_dimension; }
+//	void set_higher_dimension(shared_ptr<Klass> higher) { higher_dimension = higher; }
+//	shared_ptr<Klass> get_lower_dimension() { return lower_dimension; }
+//	void set_lower_dimension(shared_ptr<Klass> lower) { lower_dimension = lower; }
+	int get_dimension() { return dimension; }
+private:
+	ArrayKlass(const ArrayKlass &);
+public:
+	ArrayKlass(int dimension, ClassLoader *loader) : dimension(dimension), loader(loader) {}
+	~ArrayKlass() {};
+};
+
+class TypeArrayKlass : public ArrayKlass {
+private:
+	Type type;		// I dont' want to set the MAXLENGTH.
+public:
+	Type get_basic_type() { return type; }
+private:
+	TypeArrayKlass(const TypeArrayKlass &);
+public:
+	TypeArrayKlass(Type type, int dimension, ClassLoader *loader);
+	~TypeArrayKlass() {};
+};
+
+class ObjArrayKlass : public ArrayKlass {
+private:
+	shared_ptr<InstanceKlass> element_klass;		// e.g. java.lang.String
+public:
+	shared_ptr<InstanceKlass> get_element_type() { return element_klass; }
+private:
+	ObjArrayKlass(const ObjArrayKlass &);
+public:
+	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader);
+	~ObjArrayKlass() {};
 };
 
 #endif /* INCLUDE_RUNTIME_KLASS_HPP_ */
