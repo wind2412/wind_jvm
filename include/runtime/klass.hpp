@@ -89,8 +89,9 @@ private:
 public:
 	void parse_constantpool(const ClassFile & cf, ClassLoader *loader);
 public:
-	shared_ptr<Field_info> get_field(const wstring & signature);		// [name + ':' + descriptor]
-	shared_ptr<Method> get_method(const wstring & signature);		// [name + ':' + descriptor]
+	shared_ptr<Field_info> get_field(const wstring & signature);				// [name + ':' + descriptor]
+	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
+	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

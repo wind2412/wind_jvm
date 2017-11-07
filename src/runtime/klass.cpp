@@ -194,8 +194,8 @@ shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
 		}
 		// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
 		// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
-		if (this->parent != nullptr)	// not java.lang.Object
-		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
+		if (this->parent != nullptr)	// this class is not java.lang.Object. java.lang.Object has no parent.
+			target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
 		return target;		// nullptr or Real result.
 	} else {
 		return (*iter).second.second;
@@ -203,9 +203,36 @@ shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
 
 }
 
-shared_ptr<Method> InstanceKlass::get_method(const wstring & signature)
+shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 {
+	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
+	shared_ptr<Method> target;
+	// search in this->methods
 	auto iter = this->methods.find(signature);
-	if (iter == this->methods.end())	return nullptr;
-	return (*iter).second;
+	if (iter != this->methods.end())	return (*iter).second;
+	// search in parent class (parent 既可以代表接口，又可以代表类。如果此类是接口，那么 parent 是接口。如果此类是个类，那么 parent 也是类。parent 完全按照 this 而定。)
+	if (this->parent != nullptr)	// not java.lang.Object
+		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
+	if (target != nullptr)	return target;
+	// search in interfaces and interfaces' [parent interface].
+	for (auto iter : this->interfaces) {
+		target = iter.second->get_interface_method(signature);
+		if (target != nullptr)	return target;
+	}
+	return nullptr;
+}
+
+shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature)
+{
+	assert(this->is_interface() == true);		// TODO: 此处的 verify 应该改成抛出异常。
+	shared_ptr<Method> target;
+	// search in this->methods
+	auto iter = this->methods.find(signature);
+	if (iter != this->methods.end())	return (*iter).second;
+	// search in parent interface
+	if (this->parent != nullptr)	// not java.lang.Object
+		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_interface_method(signature);
+	if (target != nullptr)	return target;
+	assert(this->interfaces.size() == 0);		// 这里画蛇添足一下。因为接口最多只有一个父接口，且不能 implements 只能 extends。因而应该只有一个 parent 而不能有 interfaces。
+	return nullptr;
 }

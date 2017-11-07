@@ -24,6 +24,7 @@ shared_ptr<InstanceKlass> rt_constant_pool::if_didnt_load_then_load(ClassLoader 
 	}
 }
 
+// 运行时常量池解析。包括解析类、字段以及方法属性。方法字节码的解析留到最后进行。
 rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLoader *loader, const ClassFile & cf) : loader(loader)
 {
 	int this_class_index = cf.this_class;
@@ -49,7 +50,7 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 			case CONSTANT_String:{	// TODO: 我认为最后形成的 String 类内部应该封装一个 std::wstring & 才好。这样能够保证常量池唯一！～
 				CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 				assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
-				this->pool.push_back(make_pair(bufs[i]->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
+				this->pool.push_back(make_pair(target->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// wstring
 				break;
 			}
@@ -69,14 +70,21 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				wstring name = ((CONSTANT_Utf8_info *)bufs[name_type_ptr->name_index-1])->convert_to_Unicode();
 				wstring descriptor = ((CONSTANT_Utf8_info *)bufs[name_type_ptr->descriptor_index-1])->convert_to_Unicode();
 
-				// TODO: Methodref 和 InterfaceMethodref 的信息丢失了。他俩混杂在一块了。不知道会有什么样的后果？其实也没丢失。在 this->pool 的 pair.second.first 里边存着（逃
+				// Methodref 和 InterfaceMethodref 的信息丢失了。他俩混杂在一块了。不知道会有什么样的后果？其实也没丢失。在 this->pool 的 pair.second.first 里边存着（逃
+				// 上边问题的解决：因为 解析 的方式不同，看下文方法的实现也不同。一个调用 get_class_method，另一个调用 get_interface_method。因此可以解除上边的疑惑。
 				if (target->tag == CONSTANT_Fieldref) {
 					shared_ptr<Field_info> target = new_class->get_field(name + L":" + descriptor);
 					std::wcout << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
-					assert(target != nullptr);
+					assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
 					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
-				} else {
-					shared_ptr<Method> target = new_class->get_method(name + L":" + descriptor);
+				} else if (target->tag == CONSTANT_Methodref) {
+					shared_ptr<Method> target = new_class->get_class_method(name + L":" + descriptor);
+					std::wcout << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+					assert(target != nullptr);
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
+				} else {	// InterfaceMethodref
+					shared_ptr<Method> target = new_class->get_interface_method(name + L":" + descriptor);
+					std::wcout << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 					assert(target != nullptr);
 					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 				}
@@ -145,8 +153,14 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 void rt_constant_pool::print_debug()
 {
 	std::cout << "rt_pool: total " << this->pool.size() << std::endl;
-	int counter = 0;
+	int counter = 1;			// [p.s.] this is 1...
+	bool next_jump = false;	// for Long and Double take 2 constant_pool positions.
 	for (auto iter : this->pool) {
+		if (next_jump) {
+			next_jump = false;
+			counter ++;
+			continue;
+		}
 		std::wcout << "  #" << counter++ << " = ";
 		switch (iter.first) {
 			case CONSTANT_Class:{
@@ -156,8 +170,9 @@ void rt_constant_pool::print_debug()
 			}
 			case CONSTANT_String:{
 				std::wcout << "String             ===> ";
-				assert(this->pool[boost::any_cast<int>(iter.second)].first == CONSTANT_Utf8);
-				std::wcout << *boost::any_cast<shared_ptr<wstring>>(this->pool[boost::any_cast<int>(iter.second)].second) << std::endl;
+				std::cout << this->pool[boost::any_cast<int>(iter.second)].first << std::endl;
+				assert(this->pool[boost::any_cast<int>(iter.second)-1].first == CONSTANT_Utf8);		// 别忘了 -1......QAQQAQ
+				std::wcout << *boost::any_cast<shared_ptr<wstring>>(this->pool[boost::any_cast<int>(iter.second)-1].second) << std::endl;
 				break;
 			}
 			case CONSTANT_Fieldref:{
@@ -189,11 +204,13 @@ void rt_constant_pool::print_debug()
 			case CONSTANT_Long:{
 				std::wcout << "Long               ===> ";
 
+				next_jump = true;
 				break;
 			}
 			case CONSTANT_Double:{
 				std::wcout << "Double             ===> ";
 
+				next_jump = true;
 				break;
 			}
 			case CONSTANT_NameAndType:{
@@ -220,6 +237,10 @@ void rt_constant_pool::print_debug()
 				std::wcout << "InvokeDynamic      ===> ";
 
 				break;
+			}
+			default:{
+				std::cerr << "can't get here!" << std::endl;
+				assert(false);
 			}
 		}
 	}
