@@ -9,6 +9,7 @@
 #include <vector>
 #include <unordered_map>
 #include <utility>
+#include <map>
 #include "class_parser.hpp"
 
 using namespace std;
@@ -1690,10 +1691,10 @@ std::unordered_map<u1, std::pair<std::string, int>> bccode_map{	// pair<bccode_n
 	{0x48, {"dstore_1", 0}},
 	{0x49, {"dstore_2", 0}},
 	{0x4a, {"dstore_3", 0}},
-	{0x4b, {"astore_0", 1}},
-	{0x4c, {"astore_1", 1}},
-	{0x4d, {"astore_2", 1}},
-	{0x4e, {"astore_3", 1}},
+	{0x4b, {"astore_0", 0}},
+	{0x4c, {"astore_1", 0}},
+	{0x4d, {"astore_2", 0}},
+	{0x4e, {"astore_3", 0}},
 	{0x4f, {"iastore", 0}},
 	{0x50, {"lastore", 0}},
 	{0x51, {"fastore", 0}},
@@ -1785,8 +1786,8 @@ std::unordered_map<u1, std::pair<std::string, int>> bccode_map{	// pair<bccode_n
 	{0xa7, {"goto", 2}},
 	{0xa8, {"jsr", 2}},
 	{0xa9, {"ret", 1}},
-	{0xaa, {"tableswitch", -1}},	// va_args
-	{0xab, {"lookupswitch", -1}},	// va_args
+	{0xaa, {"tableswitch", -1}},		// va_args
+	{0xab, {"lookupswitch", -2}},	// va_args
 	{0xac, {"ireturn", 0}},
 	{0xad, {"lreturn", 0}},
 	{0xae, {"freturn", 0}},
@@ -1811,7 +1812,7 @@ std::unordered_map<u1, std::pair<std::string, int>> bccode_map{	// pair<bccode_n
 	{0xc1, {"instanceof", 2}},
 	{0xc2, {"monitorenter", 0}},
 	{0xc3, {"monitorexit", 0}},
-	{0xc4, {"wide", -2}},			// length 3 or 5. [extend local variable index]
+	{0xc4, {"wide", -3}},			// length 3 or 5. [extend local variable index]
 	{0xc5, {"multianewarray", 3}},	// 3.
 	{0xc6, {"ifnull", 2}},
 	{0xc7, {"ifnonnull", 2}},
@@ -2022,12 +2023,91 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			std::cout << "(DEBUG)     stack=" << code_ptr->max_stack << ", locals=" << code_ptr->max_locals /*<< ", args_size=" << args_size*/ << std::endl;	// output arg_size need parse descriptor. not important.
 			// output bccode
 			for (int bc_num = 0; bc_num < code_ptr->code_length; bc_num ++) {
+				auto *code = code_ptr->code;
 				std::cout << "(DEBUG)     ";
-				printf("%3d: %-15s", bc_num, bccode_map[code_ptr->code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
-				if (bccode_map[bc_num].second >= 0) {	
-					bc_num += bccode_map[code_ptr->code[bc_num]].second;
+				printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
+				if (bccode_map[code[bc_num]].second >= 0) {
+					bc_num += bccode_map[code[bc_num]].second;
 				} else {		// 变长参数 以及 扩展局部变量索引 分别被定义为 -1 -2。 这里需要改进 !!!!!
-					
+					if (bccode_map[code[bc_num]].second == -1) {	// tableswitch: switch case 中连续的跳转表。比如连续的 1～5 跳转
+						int origin_bc_num = bc_num;	// tableswitch 指令的所在位置
+						// switch 指令的特性，即保证 defaultbytes1 在 4 字节边界对齐的特性使得 nops 必然存在。如果 tableswitch 自身正好占在 4 边界对齐的位置的话，那么很不幸 nops 会增大到 3 个以保证 defaultbytes 的对齐。
+						if (bc_num % 4 != 0) {
+//							for (int temp = bc_num + 1; temp < bc_num + (4 - bc_num % 4) + 50; temp ++) {		// delete
+//								std::cout << temp << ": " << (int)code[temp] << " (" << bccode_map[code[temp]].first << ")" << std::endl;
+//							}
+							bc_num += (4 - bc_num % 4);		// jump off nops: [lookup/tableswitch] align to 4
+						} else {
+							bc_num += 4;	// 跳过 tableswitch 指令自身外加 3 个 nops。
+						}
+						int ptr = bc_num;
+						// calculate basic values
+						int defaultbyte = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+						int lowbyte = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7]));
+						int highbyte = ((code[ptr+8] << 24) | (code[ptr+9] << 16) | (code[ptr+10] << 8) | (code[ptr+11]));
+//						std::cout << defaultbyte << " " << lowbyte << " " << highbyte << std::endl;	// delete
+						int num = highbyte - lowbyte + 1;
+						ptr += 12;
+						// create jump_table
+						vector<int> jump_tbl;
+						for (int pos = 0; pos < num; pos ++) {
+							int jump_pos = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3])) + origin_bc_num;
+							ptr += 4;
+							jump_tbl.push_back(jump_pos);
+						}
+						jump_tbl.push_back(defaultbyte + origin_bc_num);		// 额外多 push 一个 default 跳转址
+//						for_each(jump_tbl.begin(), jump_tbl.end(), [](int n) { cout << n << " ";});	// delete
+						// print
+						std::cout << " {" << std::endl;
+						for (int pos = 0; pos < jump_tbl.size(); pos ++) {
+							if (pos != jump_tbl.size() - 1) {
+								printf("(DEBUG)%20d", pos + 1);
+							} else {
+								printf("(DEBUG)%20s", "default");
+							}
+							std::cout << ": " << jump_tbl[pos] << std::endl;
+						}
+						printf("(DEBUG)%6s}", " ");
+						// end
+						bc_num = ptr - 1;	// 别忘了循环结束之后 bc_num 默认 +1.
+					} else if (bccode_map[code_ptr->code[bc_num]].second == -2) {		// lookupswitch：switch case 中非连续的跳转表。比如非连续的 1~5, 50 的跳转。
+						int origin_bc_num = bc_num;
+						if (bc_num % 4 != 0) {
+							bc_num += (4 - bc_num % 4);
+						} else {
+							bc_num += 4;
+						}
+						int ptr = bc_num;
+						// calculate basic values
+						int defaultbyte = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+						int npairs = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7]));
+						ptr += 8;
+						// create jump_table
+						map<int, int> jump_tbl;
+						for (int pos = 0; pos < npairs; pos ++) {
+							int match_value = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+							int jump_pos = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7])) + origin_bc_num;
+							ptr += 8;
+							jump_tbl.insert(make_pair(match_value, jump_pos));
+						}
+						jump_tbl.insert(make_pair(INT_MAX, defaultbyte + origin_bc_num));		// 额外多 insert 一个 default 跳转址
+						// print
+						std::cout << " {" << std::endl;
+						for (auto iter : jump_tbl) {
+							if (iter.first != INT_MAX) {
+								printf("(DEBUG)%20d", iter.first);
+							} else {
+								printf("(DEBUG)%20s", "default");
+							}
+							std::cout << ": " << iter.second << std::endl;
+						}
+						printf("(DEBUG)%6s}", " ");
+						// end
+						bc_num = ptr - 1;	// 别忘了循环结束之后 bc_num 默认 +1.
+					} else {
+						std::cerr << "didn't support -3!" << std::endl;
+						assert(false);
+					}
 				}
 				std::cout << std::endl;		// ....... 还有其他的参数没有输出......????
 			}
