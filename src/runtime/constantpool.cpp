@@ -8,10 +8,12 @@
 #include "runtime/constantpool.hpp"
 #include "classloader.hpp"
 #include "runtime/klass.hpp"
+#include "runtime/field.hpp"
 #include <string>
 
 using std::make_pair;
 using std::wstring;
+using std::make_shared;
 
 shared_ptr<InstanceKlass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
@@ -28,7 +30,7 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 	cp_info **bufs = cf.constant_pool;
 	int length = cf.constant_pool_count;
 
-	for(int i = 0; i < length; i ++) {
+	for(int i = 0; i < length-1; i ++) {		// 别忘了 -1 啊！！！！
 		switch (bufs[i]->tag) {
 			case CONSTANT_Class:{
 				if (i == this_class_index - 1) {
@@ -47,7 +49,7 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 			case CONSTANT_String:{	// TODO: 我认为最后形成的 String 类内部应该封装一个 std::wstring & 才好。这样能够保证常量池唯一！～
 				CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 				assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
-				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target->index-1)));	// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// wstring
 				break;
 			}
@@ -59,24 +61,24 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				assert(bufs[target->class_index-1]->tag == CONSTANT_Class);
 				assert(bufs[target->name_and_type_index-1]->tag == CONSTANT_NameAndType);
 				// get class name
-				wstring name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
+				wstring class_name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
 				// load class
-				shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, name);
+				shared_ptr<InstanceKlass> new_class = if_didnt_load_then_load(loader, class_name);
+				// get field/method/interface_method name
+				auto name_type_ptr = (CONSTANT_NameAndType_info *)bufs[target->name_and_type_index-1];
+				wstring name = ((CONSTANT_Utf8_info *)bufs[name_type_ptr->name_index-1])->convert_to_Unicode();
+				wstring descriptor = ((CONSTANT_Utf8_info *)bufs[name_type_ptr->descriptor_index-1])->convert_to_Unicode();
 
+				// TODO: Methodref 和 InterfaceMethodref 的信息丢失了。他俩混杂在一块了。不知道会有什么样的后果？其实也没丢失。在 this->pool 的 pair.second.first 里边存着（逃
 				if (target->tag == CONSTANT_Fieldref) {
-//					wstring
-
-
-					printf("(DEBUG) #%4d = Fieldref %12s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
-
-				}
-				else if (target->tag == CONSTANT_Methodref) {
-					printf("(DEBUG) #%4d = Methodref %11s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
-
-				}
-				else {
-					printf("(DEBUG) #%4d = InterfaceMethodref %2s #%d.#%d\n", i+1, "", target->class_index, target->name_and_type_index);
-
+					shared_ptr<Field_info> target = new_class->get_field(name + L":" + descriptor);
+					std::wcout << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+					assert(target != nullptr);
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
+				} else {
+					shared_ptr<Method> target = new_class->get_method(name + L":" + descriptor);
+					assert(target != nullptr);
+					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 				}
 				break;
 			}
@@ -110,26 +112,115 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				break;
 			}
 			case CONSTANT_NameAndType:{
-				// TODO: 把 wstring 和 Klass 组成一个 pair 放进常量池！
 				CONSTANT_NameAndType_info* target = (CONSTANT_NameAndType_info*)bufs[i];
-				printf("(DEBUG) #%4d = NameAndType %9s #%d.#%d\n", i+1, "", target->name_index, target->descriptor_index);
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_pair((int)target->name_index, (int)target->descriptor_index))));	// pair<u2, u2> 索引。
 				break;
 			}
 			case CONSTANT_Utf8:{
 				CONSTANT_Utf8_info* target = (CONSTANT_Utf8_info*)bufs[i];
-				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(new wstring(target->convert_to_Unicode()))));		// wstring * 类型。这样能够保证常量唯一。
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_shared<wstring>(target->convert_to_Unicode()))));		// shared_ptr<wstring> 类型。这样能够保证常量唯一。
+				break;
+			}
+			case CONSTANT_MethodHandle:{	// TODO:!!
+
+				break;
+			}
+			case CONSTANT_MethodType:{	// TODO:!!
+
+				break;
+			}
+			case CONSTANT_InvokeDynamic:{	// TODO:!!
+
 				break;
 			}
 			default:{
-				// TODO: finish these three below:
+				std::cerr << "wrong! tag == " << (int)bufs[i]->tag << std::endl;
 				std::cerr << "didn't finish MethodHandle, MethodType and InvokeDynamic!!" << std::endl;
 				assert(false);
 			}
-//			case CONSTANT_MethodHandle:{		// TODO !!!!!!!!!!!!
-//
-//			}
-//			case CONSTANT_MethodType:
-//			case CONSTANT_InvokeDynamic:;
+		}
+	}
+}
+
+void rt_constant_pool::print_debug()
+{
+	std::cout << "rt_pool: total " << this->pool.size() << std::endl;
+	int counter = 0;
+	for (auto iter : this->pool) {
+		std::wcout << "  #" << counter++ << " = ";
+		switch (iter.first) {
+			case CONSTANT_Class:{
+				std::wcout << "Class              ===> ";
+				std::wcout << boost::any_cast<shared_ptr<InstanceKlass>>(iter.second)->get_name() << std::endl;
+				break;
+			}
+			case CONSTANT_String:{
+				std::wcout << "String             ===> ";
+				assert(this->pool[boost::any_cast<int>(iter.second)].first == CONSTANT_Utf8);
+				std::wcout << *boost::any_cast<shared_ptr<wstring>>(this->pool[boost::any_cast<int>(iter.second)].second) << std::endl;
+				break;
+			}
+			case CONSTANT_Fieldref:{
+				std::wcout << "Fieldref           ===> ";
+				boost::any_cast<shared_ptr<Field_info>>(iter.second)->print();
+				std::wcout << std::endl;
+				break;
+			}
+			case CONSTANT_Methodref:{
+				std::wcout << "Methodref          ===> ";
+
+				break;
+			}
+			case CONSTANT_InterfaceMethodref:{
+				std::wcout << "InterfaceMethodref ===> ";
+
+				break;
+			}
+			case CONSTANT_Integer:{
+				std::wcout << "Integer            ===> ";
+
+				break;
+			}
+			case CONSTANT_Float:{
+				std::wcout << "Float              ===> ";
+
+				break;
+			}
+			case CONSTANT_Long:{
+				std::wcout << "Long               ===> ";
+
+				break;
+			}
+			case CONSTANT_Double:{
+				std::wcout << "Double             ===> ";
+
+				break;
+			}
+			case CONSTANT_NameAndType:{
+				std::wcout << "NameAndType        ===> ";
+
+				break;
+			}
+			case CONSTANT_Utf8:{
+				std::wcout << "Utf8               ===> ";
+
+				break;
+			}
+			case CONSTANT_MethodHandle:{	// TODO:!!
+				std::wcout << "MethodHandle       ===> ";
+
+				break;
+			}
+			case CONSTANT_MethodType:{	// TODO:!!
+				std::wcout << "MethodType         ===> ";
+
+				break;
+			}
+			case CONSTANT_InvokeDynamic:{	// TODO:!!
+				std::wcout << "InvokeDynamic      ===> ";
+
+				break;
+			}
 		}
 	}
 }

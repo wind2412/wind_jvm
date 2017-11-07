@@ -39,11 +39,11 @@ private:
 	u2 attributes_count;
 	attribute_info **attributes;
 public:
-	explicit Field_info(const field_info & fi, cp_info **constant_pool) {
+	explicit Field_info(const field_info & fi, cp_info **constant_pool) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
 		this->access_flags = fi.access_flags;
 		assert(constant_pool[fi.name_index-1]->tag == CONSTANT_Utf8 && constant_pool[fi.descriptor_index-1]->tag == CONSTANT_Utf8);
 		this->name = ((CONSTANT_Utf8_info *)constant_pool[fi.name_index-1])->convert_to_Unicode();
-		this->descriptor = ((CONSTANT_Utf8_info *)constant_pool[fi.name_index-1])->convert_to_Unicode();
+		this->descriptor = ((CONSTANT_Utf8_info *)constant_pool[fi.descriptor_index-1])->convert_to_Unicode();
 		this->attributes_count = fi.attributes_count;
 		this->attributes = fi.attributes;
 		value_size = parse_field_descriptor(descriptor);
@@ -51,6 +51,7 @@ public:
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	int get_value_size() { return value_size; }
+	void print() { std::wcout << name << ":" << descriptor; }
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。
 };

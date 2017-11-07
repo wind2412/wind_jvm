@@ -30,6 +30,7 @@ private:
 	shared_ptr<InstanceKlass> if_didnt_load_then_load(ClassLoader *loader, const wstring & name);
 public:
 	explicit rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLoader *loader, const ClassFile & cf);		// bufs 前边加上 const 竟然会报错 ???
+public:
 	int type(int index) {
 		return pool[index].first;
 	}
@@ -37,6 +38,8 @@ public:
 		assert(index >= 0 && index < pool.size());
 		return pool[index].second;
 	}
+public:
+	void print_debug();
 };
 
 

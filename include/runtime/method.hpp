@@ -40,7 +40,7 @@ public:
 
 		for(int i = 0; i < mi.attributes_count; i ++) {
 			int attribute_tag = peek_attribute(mi.attributes[i]->attribute_name_index, constant_pool);
-			switch (attribute_tag) {	// must be 1, 3, 6, 7, 13, 14, 15, 16, 17, 18
+			switch (attribute_tag) {	// must be 1, 3, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 22
 				case 1: {	// Code
 					code = (Code_attribute *)mi.attributes[i];
 					break;
@@ -61,6 +61,7 @@ public:
 //	bool operator< (const Method & m) {
 //		return (name < m.name) ? true : (name > m.name) ? false : descriptor < m.descriptor;		// 先比较 name 在比较 descriptor
 //	}
+	void print() { std::wcout << name << ":" << descriptor; }
 };
 
 

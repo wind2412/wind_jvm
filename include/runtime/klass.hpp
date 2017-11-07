@@ -86,11 +86,15 @@ private:
 	void parse_fields(const ClassFile & cf);
 	void parse_superclass(const ClassFile & cf, ClassLoader *loader);
 	void parse_interfaces(const ClassFile & cf, ClassLoader *loader);
+public:
 	void parse_constantpool(const ClassFile & cf, ClassLoader *loader);
+public:
+	shared_ptr<Field_info> get_field(const wstring & signature);		// [name + ':' + descriptor]
+	shared_ptr<Method> get_method(const wstring & signature);		// [name + ':' + descriptor]
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
-	InstanceKlass(const ClassFile & cf, ClassLoader *loader);
+	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader);
 	~InstanceKlass() {};
 };
 

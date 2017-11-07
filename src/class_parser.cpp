@@ -1388,21 +1388,22 @@ attribute_info* new_attribute(std::ifstream & f, cp_info **constant_pool) {		// 
 
 void print_fields(field_info *bufs, int length, cp_info **constant_pool) {
 	for(int i = 0; i < length; i ++) {
+		std::cout << "(DEBUG) ";
 		std::stringstream ss;
 		// parse access_flags
 		int flags_num = 0;
 		if ((bufs[i].access_flags & ACC_PUBLIC) == ACC_PUBLIC) {
-			std::cout << "(DEBUG) public ";
+			std::cout << "public ";
 			if (flags_num != 0)		ss << ", ";
 			ss << "ACC_PUBLIC";
 			flags_num ++;
 		} else if ((bufs[i].access_flags & ACC_PRIVATE) == ACC_PRIVATE) {		// in fact, private and protected member shouldn't be output. haha.
-			std::cout << "(DEBUG) private ";
+			std::cout << "private ";
 			if (flags_num != 0)		ss << ", ";
 			ss << "ACC_PRIVATE";
 			flags_num ++;
 		} else if ((bufs[i].access_flags & ACC_PROTECTED) == ACC_PROTECTED) {
-			std::cout << "(DEBUG) protected ";
+			std::cout << "protected ";
 			if (flags_num != 0)		ss << ", ";
 			ss << "ACC_PROTECTED";
 			flags_num ++;
@@ -2165,13 +2166,19 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 					flags_num ++;
 				}
 				// print
+				// verify:	inner_name_index 和 outer_class_info_index 要为 0 必须全都为 0
+				if (inner_name_index == 0) {
+					assert(outer_class_info_index == 0);
+				}
 				if (inner_name_index == 0 && outer_class_info_index == 0) {
 					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_class_info_index << "  //<class:> " << inner_class_info << endl;	// wcout 只能输出 char * 和 wstring，但是不能输出 string！！
 				} else {
-					wstring outer_class_info = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[outer_class_info_index-1])->index-1])->convert_to_Unicode();
-					wstring inner_name = ((CONSTANT_Utf8_info *)constant_pool[inner_name_index-1])->convert_to_Unicode();
+					// extra: 但是这时，虽然能够保证 inner_name_index 不为 0，但是却不能保证 outer_class_info_index 不为 0！
 					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_name_index << "= #" << inner_class_info_index << " of #" << outer_class_info_index;
-					std::wcout << "  //" << inner_name << "=<class:> " << inner_class_info << " of <class:> " << outer_class_info << endl;
+					wstring outer_class_info = (outer_class_info_index != 0) ? ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[outer_class_info_index-1])->index-1])->convert_to_Unicode()
+																			: L"";
+					wstring inner_name = ((CONSTANT_Utf8_info *)constant_pool[inner_name_index-1])->convert_to_Unicode();
+					std::wcout << "  //" << inner_name << "=<class:> " << inner_class_info << " of <class:> " << ((outer_class_info_index != 0) ? outer_class_info : L"ANONYMOUS") << endl;
 				}
 			}
 			break;
@@ -2545,6 +2552,8 @@ void ClassFile::parse_class_msgs(std::ifstream & f) {
 	this_class = read2(f);
 	super_class = read2(f);
 #ifdef DEBUG
+	wstring this_class_name = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[this_class-1])->index-1])->convert_to_Unicode();
+	std::wcout << "(DEBUG) ----------------- (" << this_class_name << ") static constant_pool over --------------------" << std::endl;
 	std::cout << "(DEBUG) access_flags: " << access_flags << "  this_class: #" << this_class << "  super_class: #" << super_class << endl;
 #endif
 }

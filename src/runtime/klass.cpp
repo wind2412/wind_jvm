@@ -22,7 +22,7 @@ void InstanceKlass::parse_methods(const ClassFile & cf)
 	wstringstream ss;
 	for(int i = 0; i < cf.methods_count; i ++) {
 		shared_ptr<Method> method = make_shared<Method>(this, cf.methods[i], cf.constant_pool);
-		ss << method->get_name() << L":" << method->get_descriptor();
+		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
 		this->methods.insert(make_pair(ss.str(), method));	// add into
 		ss.str(L"");		// make empty
 	}
@@ -113,7 +113,6 @@ void InstanceKlass::parse_interfaces(const ClassFile & cf, ClassLoader *loader)	
 		wstring interface_name = ((CONSTANT_Utf8_info *)cf.constant_pool[((CONSTANT_CS_info *)cf.constant_pool[cf.interfaces[i]-1])->index-1])->convert_to_Unicode();
 		shared_ptr<InstanceKlass> interface;
 		if (loader == nullptr) {
-			std::cout << "wrong..." << std::endl;	//delete
 			interface = BootStrapClassLoader::get_bootstrap().loadClass(interface_name);
 		} else {
 			interface = loader->loadClass(interface_name);
@@ -137,26 +136,31 @@ void InstanceKlass::parse_constantpool(const ClassFile & cf, ClassLoader *loader
 {
 	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
 	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
+#ifdef DEBUG
+	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
+	this->rt_pool->print_debug();
+	std::cout << "===------------------------------------------------------------===" << std::endl;
+#endif
 }
 
-InstanceKlass::InstanceKlass(const ClassFile & cf, ClassLoader *loader) : loader(loader), Klass()
+InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader) : loader(loader), Klass()
 {
 	// this_class (only name)
-	assert(cf.constant_pool[cf.this_class-1]->tag == CONSTANT_Class);
-	this->name = ((CONSTANT_Utf8_info *)cf.constant_pool[((CONSTANT_CS_info *)cf.constant_pool[cf.this_class-1])->index-1])->convert_to_Unicode();
+	assert(cf->constant_pool[cf->this_class-1]->tag == CONSTANT_Class);
+	this->name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->this_class-1])->index-1])->convert_to_Unicode();
 
 	// become Runtime methods
-	parse_methods(cf);
+	parse_methods(*cf);
 	// become Runtime fields
-	parse_fields(cf);
+	parse_fields(*cf);
 	// super_class
-	parse_superclass(cf, loader);
+	parse_superclass(*cf, loader);
 	// this_class
-	this->access_flags = cf.access_flags;
+	this->access_flags = cf->access_flags;
 	cur = Loaded;
 	// become Runtime interfaces
-	parse_interfaces(cf, loader);
-	// become Runtime constant pool
+	parse_interfaces(*cf, loader);
+	// become Runtime constant pool	// 必须放在构造函数之外！因为比如我加载 java.lang.Object，然后经由常量池加载了 java.lang.StringBuilder，注意此时 java.lang.Object 没被放到 system_classmap 中！然后又会加载 java.lang.Object，回来的时候会加载两遍 Object ！这是肯定不对的。于是设计成了丑恶的由 classloader 调用...QAQ
 //	parse_constantpool(cf, loader);
 
 	// TODO: enum status, Loaded, Parsed...
@@ -168,10 +172,40 @@ InstanceKlass::InstanceKlass(const ClassFile & cf, ClassLoader *loader) : loader
 	// TODO: Inner Class!!
 	// TODO: 补全 oop 的 Fields.
 
-#ifdef DEBUG
-	BootStrapClassLoader::get_bootstrap().print();
-	MyClassLoader::get_loader().print();
-#endif
 }
 
+shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
+{
+	shared_ptr<Field_info> target;
+	// search in this->fields_layout
+	auto iter = this->fields_layout.find(signature);
+	if (iter == this->fields_layout.end()) {
+		// search in this->static_fields_layout
+		iter = this->static_fields_layout.find(signature);
+	} else {
+		return (*iter).second.second;
+	}
+	if (iter == this->static_fields_layout.end()) {
+		// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
+		for (auto iter : this->interfaces) {
+			// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
+			target = iter.second->get_field(signature);
+			if (target != nullptr)	return target;
+		}
+		// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
+		// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
+		if (this->parent != nullptr)	// not java.lang.Object
+		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
+		return target;		// nullptr or Real result.
+	} else {
+		return (*iter).second.second;
+	}
 
+}
+
+shared_ptr<Method> InstanceKlass::get_method(const wstring & signature)
+{
+	auto iter = this->methods.find(signature);
+	if (iter == this->methods.end())	return nullptr;
+	return (*iter).second;
+}

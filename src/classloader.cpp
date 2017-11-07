@@ -24,11 +24,16 @@ shared_ptr<InstanceKlass> BootStrapClassLoader::loadClass(const wstring & classn
 				std::cerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
-			ClassFile cf;
-			f >> cf;
+			shared_ptr<ClassFile> cf(new ClassFile);
+			f >> *cf;
 			// convert to a MetaClass (link)
-			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(std::move(cf), nullptr);
-			system_classmap.insert(make_pair(target, newklass));
+			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, nullptr);
+			system_classmap.insert(make_pair(target, newklass));	// 插入之后就可以 parse 运行时常量池了...
+			newklass->parse_constantpool(*cf, nullptr);
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 			return newklass;
 		}
 	} else {		// BootStrap 无法加载
@@ -68,11 +73,16 @@ shared_ptr<InstanceKlass> MyClassLoader::loadClass(const wstring & classname)
 				std::cerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
-			ClassFile cf;
-			f >> cf;
+			shared_ptr<ClassFile> cf(new ClassFile);
+			f >> *cf;
 			// convert to a MetaClass (link)
-			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(std::move(cf), this);
-			classmap.insert(make_pair(target, newklass));
+			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this);
+			classmap.insert(make_pair(target, newklass));	// 插入之后就可以 parse 运行时常量池了...
+			newklass->parse_constantpool(*cf, this);
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 			return newklass;
 		}
 	}
