@@ -145,7 +145,7 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 			}
 			case CONSTANT_NameAndType:{
 				CONSTANT_NameAndType_info* target = (CONSTANT_NameAndType_info*)bufs[i];
-				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_pair((int)target->name_index, (int)target->descriptor_index))));	// pair<u2, u2> 索引。
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_pair((int)target->name_index, (int)target->descriptor_index))));	// pair<int, int> 索引。
 				break;
 			}
 			case CONSTANT_Utf8:{
@@ -154,15 +154,18 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				break;
 			}
 			case CONSTANT_MethodHandle:{	// TODO:!!
-
+				CONSTANT_MethodHandle_info *target = (CONSTANT_MethodHandle_info*)bufs[i];
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_pair((int)target->reference_kind, (int)target->reference_index))));	// pair<int, int> 索引。
 				break;
 			}
 			case CONSTANT_MethodType:{	// TODO:!!
-
+				CONSTANT_MethodType_info *target = (CONSTANT_MethodType_info*)bufs[i];
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any((int)target->descriptor_index)));	// int 索引。指向一个 utf8。
 				break;
 			}
 			case CONSTANT_InvokeDynamic:{	// TODO:!!
-
+				CONSTANT_InvokeDynamic_info *target = (CONSTANT_InvokeDynamic_info*)bufs[i];
+				this->pool.push_back(make_pair(bufs[i]->tag, boost::any(make_pair((int)target->bootstrap_method_attr_index, (int)target->name_and_type_index))));	// pair<int, int> 索引。
 				break;
 			}
 			default:{
@@ -195,6 +198,7 @@ void rt_constant_pool::print_debug()
 			}
 			case CONSTANT_String:{
 				std::wcout << "String             ===> ";
+				std::cout << "[type]:" << this->pool[boost::any_cast<int>(iter.second)-1].first << std::endl;
 				assert(this->pool[boost::any_cast<int>(iter.second)-1].first == CONSTANT_Utf8);		// 别忘了 -1......QAQQAQ
 				std::wcout << *boost::any_cast<shared_ptr<wstring>>(this->pool[boost::any_cast<int>(iter.second)-1].second) << std::endl;
 				break;

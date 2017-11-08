@@ -2012,6 +2012,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 					std::cout << "String ";
 					// std::wcout.imbue(std::locale(""));
 					std::wcout << ((CONSTANT_Utf8_info *)constant_pool[string_index-1])->convert_to_Unicode() << std::endl;
+					wcout.clear();		// 防止 fuckking 拉丁文。
 					break;
 				}
 				default:{
