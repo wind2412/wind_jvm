@@ -2025,7 +2025,8 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			for (int bc_num = 0; bc_num < code_ptr->code_length; bc_num ++) {
 				auto *code = code_ptr->code;
 				std::cout << "(DEBUG)     ";
-				printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
+				if (bccode_map[code[bc_num]].second != -3)		// wide 指令集由我在后边自行输出。
+					printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
 				if (bccode_map[code[bc_num]].second >= 0) {
 					bc_num += bccode_map[code[bc_num]].second;
 				} else {		// 变长参数 以及 扩展局部变量索引 分别被定义为 -1 -2。 这里需要改进 !!!!!
@@ -2070,7 +2071,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						printf("(DEBUG)%6s}", " ");
 						// end
 						bc_num = ptr - 1;	// 别忘了循环结束之后 bc_num 默认 +1.
-					} else if (bccode_map[code_ptr->code[bc_num]].second == -2) {		// lookupswitch：switch case 中非连续的跳转表。比如非连续的 1~5, 50 的跳转。
+					} else if (bccode_map[code[bc_num]].second == -2) {		// lookupswitch：switch case 中非连续的跳转表。比如非连续的 1~5, 50 的跳转。
 						int origin_bc_num = bc_num;
 						if (bc_num % 4 != 0) {
 							bc_num += (4 - bc_num % 4);
@@ -2104,9 +2105,16 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						printf("(DEBUG)%6s}", " ");
 						// end
 						bc_num = ptr - 1;	// 别忘了循环结束之后 bc_num 默认 +1.
-					} else {
-						std::cerr << "didn't support -3!" << std::endl;
-						assert(false);
+					} else {		// [wide] bytecode instruction
+						// 1. iinc_w
+						if (bccode_map[code[bc_num+1]].first == "iinc") {	// 如果是扩展的 iinc 指令，那么一共占据 6 个 bytecode 位。
+							int indexbyte = ((code[bc_num+2] << 8) | (code[bc_num+3]));
+							int constbyte = ((code[bc_num+4] << 8) | (code[bc_num+5]));
+							printf("%3d: %-15s%d, %d", bc_num, (bccode_map[code[bc_num]].first + "--iinc_w").c_str(), indexbyte, constbyte);
+						} else {
+							std::cerr << "didn't support -3!" << std::endl;
+							assert(false);
+						}
 					}
 				}
 				std::cout << std::endl;		// ....... 还有其他的参数没有输出......????
