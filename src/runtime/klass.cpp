@@ -257,8 +257,8 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
 	// search in this->methods
-		std::wcout << "finding at: " << this->name << " find: " << signature << " and get method: " << std::endl;	// delete
-		std::cout << &this->methods << "  size:" << this->methods.size() << std::endl;
+//		std::wcout << "finding at: " << this->name << " find: " << signature << " and get method: " << std::endl;	// delete
+//		std::cout << &this->methods << "  size:" << this->methods.size() << std::endl;
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	{
 		return (*iter).second;
@@ -284,12 +284,11 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	// search in this->methods
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	return (*iter).second;
-	// search in parent interface
-	if (this->name != L"java/lang/Object")
-		assert(this->interfaces.size() == 0 || this->interfaces.size() == 1);		// 这里画蛇添足一下。因为接口最多只有一个父接口，且不能 implements 只能 extends。因而应该只有一个 parent Object 而只能有一个 interfaces。因为虽然接口间继承是用 extends 的，但是那也算作接口而不算做父类。
-	for (auto iter : this->interfaces) {		// actually at most one element in interfaces.
-		std::wcout << this->name << " has interface: " << iter.first << std::endl;	// delete
-		std::wcout << this->name << "'s father: " << this->parent->get_name() << std::endl;	// delete
+	// search in parent interfaceS
+	// 注意：接口使用 extends 代替 implements 关键字，可以有**多个父接口**！！
+	for (auto iter : this->interfaces) {
+//		std::wcout << this->name << " has interface: " << iter.first << std::endl;	// delete
+//		std::wcout << this->name << "'s father: " << this->parent->get_name() << std::endl;	// delete
 		target = iter.second->get_interface_method(signature);
 		if (target != nullptr)	return target;
 	}

@@ -309,7 +309,9 @@ void print_constant_pool(cp_info **bufs, int length) {	// constant pool length
 				CONSTANT_Utf8_info* target = (CONSTANT_Utf8_info*)bufs[i];
 				printf("(DEBUG) #%4d = Utf8 %16s ", i+1, "");
 				// std::wcout.imbue(locale(""));
-				std::wcout << target->convert_to_Unicode() << std::endl;
+				std::wcout << target->convert_to_Unicode() /*<< std::endl*/;
+				std::cout << std::endl;		// 单独开一排是为了防止恶心的 java.lang.CharacterDataLatin1 拉丁文......因为如果在 wcout 之后输出的话...... 会把后边的 endl 一起吃掉... 然后会输出一坨屎（逃
+				std::wcout.clear();			// 而且这时 wcout 已经检测到错误，因此置了错误位。我们要进行清空标志位。另，因为是 wcout 检测是错误的语句，所以整个语句会全部跳过。因此也没有清除缓冲区的选项。因为根本不需要清空。
 				break;
 			}
 			case CONSTANT_MethodHandle:{

@@ -25,8 +25,10 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)
 				std::cerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
+			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
 			shared_ptr<ClassFile> cf(new ClassFile);
 			f >> *cf;
+			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, nullptr);
 			system_classmap.insert(make_pair(target, newklass));	// 插入之后就可以 parse 运行时常量池了...
@@ -92,8 +94,10 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 				std::cerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
+			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
 			shared_ptr<ClassFile> cf(new ClassFile);
 			f >> *cf;
+			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this);
 			classmap.insert(make_pair(target, newklass));	// 插入之后就可以 parse 运行时常量池了...

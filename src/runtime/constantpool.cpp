@@ -15,7 +15,7 @@ using std::make_pair;
 using std::wstring;
 using std::make_shared;
 
-int counter = 0;
+//int counter = 0;
 
 shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
@@ -68,7 +68,6 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				assert(bufs[target->name_and_type_index-1]->tag == CONSTANT_NameAndType);
 				// get class name
 				wstring class_name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
-	std::wcout << "class_name is : ---> " << class_name << std::endl;
 				// load class
 				shared_ptr<Klass> new_class = std::static_pointer_cast<Klass>(if_didnt_load_then_load(loader, class_name));		// [—— 这里不可能得到数组类]。错！！卧槽...... 这里调试了一天...... 太武断了！比如这里，就要从 一个数组类中去寻找 java.lang.Object::clone 方法！！！
 				assert(new_class != nullptr);
