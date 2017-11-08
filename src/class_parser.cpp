@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <utility>
 #include <map>
+#include <climits>
+#include <cstring>
 #include "class_parser.hpp"
 
 using namespace std;

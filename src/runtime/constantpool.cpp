@@ -15,6 +15,8 @@ using std::make_pair;
 using std::wstring;
 using std::make_shared;
 
+int counter = 0;
+
 shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
 	if (loader == nullptr) {
@@ -66,8 +68,9 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				assert(bufs[target->name_and_type_index-1]->tag == CONSTANT_NameAndType);
 				// get class name
 				wstring class_name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
+	std::wcout << "class_name is : ---> " << class_name << std::endl;
 				// load class
-				shared_ptr<InstanceKlass> new_class = std::static_pointer_cast<InstanceKlass>(if_didnt_load_then_load(loader, class_name));		// 这里不可能得到数组类。
+				shared_ptr<Klass> new_class = std::static_pointer_cast<Klass>(if_didnt_load_then_load(loader, class_name));		// [—— 这里不可能得到数组类]。错！！卧槽...... 这里调试了一天...... 太武断了！比如这里，就要从 一个数组类中去寻找 java.lang.Object::clone 方法！！！
 				assert(new_class != nullptr);
 				// get field/method/interface_method name
 				auto name_type_ptr = (CONSTANT_NameAndType_info *)bufs[target->name_and_type_index-1];
@@ -77,18 +80,36 @@ rt_constant_pool::rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLo
 				// Methodref 和 InterfaceMethodref 的信息丢失了。他俩混杂在一块了。不知道会有什么样的后果？其实也没丢失。在 this->pool 的 pair.second.first 里边存着（逃
 				// 上边问题的解决：因为 解析 的方式不同，看下文方法的实现也不同。一个调用 get_class_method，另一个调用 get_interface_method。因此可以解除上边的疑惑。
 				if (target->tag == CONSTANT_Fieldref) {
-					shared_ptr<Field_info> target = new_class->get_field(name + L":" + descriptor);
 					std::wcout << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+					assert(new_class->get_type() == ClassType::InstanceClass);
+					shared_ptr<Field_info> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_field(name + L":" + descriptor);		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
 					assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
 					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
 				} else if (target->tag == CONSTANT_Methodref) {
-					shared_ptr<Method> target = new_class->get_class_method(name + L":" + descriptor);
 					std::wcout << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+//	counter ++ ;
+//	std::wcout << __FILE__ << " " << __LINE__ << " " << counter << std::endl;
+//	assert(new_class->get_methods().size() < 500);
+//	std::wcout << __FILE__ << " " << __LINE__ << std::endl;
+//	std::wcout << new_class->get_name() << " " << new_class->get_methods().size() << std::endl;
+//	for (auto ll : new_class->get_methods()) {
+//		std::wcout << ll.first << std::endl;
+//	}
+					shared_ptr<Method> target;
+					if (new_class->get_type() == ClassType::ObjArrayClass || new_class->get_type() == ClassType::TypeArrayClass) {
+						target = std::static_pointer_cast<ArrayKlass>(new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。
+					} else if (new_class->get_type() == ClassType::InstanceClass){
+						target = std::static_pointer_cast<InstanceKlass>(new_class)->get_class_method(name + L":" + descriptor);
+					} else {
+						std::cerr << "only support ArrayKlass and InstanceKlass now!" << std::endl;
+						assert(false);
+					}
 					assert(target != nullptr);
 					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 				} else {	// InterfaceMethodref
-					shared_ptr<Method> target = new_class->get_interface_method(name + L":" + descriptor);
 					std::wcout << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+					assert(new_class->get_type() == ClassType::InstanceClass);
+					shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
 					assert(target != nullptr);
 					this->pool.push_back(make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 				}

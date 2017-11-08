@@ -190,8 +190,9 @@ void InstanceKlass::parse_constantpool(const ClassFile & cf, ClassLoader *loader
 #endif
 }
 
-InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader) : loader(loader), Klass()
+InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType classtype) : loader(loader), Klass()/*, classtype(classtype)*/
 {
+	this->classtype = classtype;
 	// this_class (only name)
 	assert(cf->constant_pool[cf->this_class-1]->tag == CONSTANT_Class);
 	this->name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->this_class-1])->index-1])->convert_to_Unicode();
@@ -252,11 +253,16 @@ shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
 
 shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 {
+	assert(methods.size() < 1000);
 	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
 	// search in this->methods
+		std::wcout << "finding at: " << this->name << " find: " << signature << " and get method: " << std::endl;	// delete
+		std::cout << &this->methods << "  size:" << this->methods.size() << std::endl;
 	auto iter = this->methods.find(signature);
-	if (iter != this->methods.end())	return (*iter).second;
+	if (iter != this->methods.end())	{
+		return (*iter).second;
+	}
 	// search in parent class (parent 既可以代表接口，又可以代表类。如果此类是接口，那么 parent 是接口。如果此类是个类，那么 parent 也是类。parent 完全按照 this 而定。)
 	if (this->parent != nullptr)	// not java.lang.Object
 		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
@@ -271,22 +277,39 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 
 shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature)
 {
-	assert(this->is_interface() == true);		// TODO: 此处的 verify 应该改成抛出异常。
+	std::wcout << this->name << std::endl;
+	if (this->name != L"java/lang/Object")			// 如果此类是 Object 类的话，默认也算作接口。	// 注意内部的分隔符变成了 '/' ！！
+		assert(this->is_interface() == true);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
 	// search in this->methods
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	return (*iter).second;
 	// search in parent interface
-	if (this->parent != nullptr)	// not java.lang.Object
+	if (this->name != L"java/lang/Object")
+		assert(this->interfaces.size() == 0 || this->interfaces.size() == 1);		// 这里画蛇添足一下。因为接口最多只有一个父接口，且不能 implements 只能 extends。因而应该只有一个 parent Object 而只能有一个 interfaces。因为虽然接口间继承是用 extends 的，但是那也算作接口而不算做父类。
+	for (auto iter : this->interfaces) {		// actually at most one element in interfaces.
+		std::wcout << this->name << " has interface: " << iter.first << std::endl;	// delete
+		std::wcout << this->name << "'s father: " << this->parent->get_name() << std::endl;	// delete
+		target = iter.second->get_interface_method(signature);
+		if (target != nullptr)	return target;
+	}
+	// search in parent... Big probability is java.lang.Object...
+	if (this->parent != nullptr)	// this is not java.lang.Object
 		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_interface_method(signature);
 	if (target != nullptr)	return target;
-	assert(this->interfaces.size() == 0);		// 这里画蛇添足一下。因为接口最多只有一个父接口，且不能 implements 只能 extends。因而应该只有一个 parent 而不能有 interfaces。
+
 	return nullptr;
 }
 
+/*===---------------    ArrayKlass    --------------------===*/
+ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, ClassType classtype)  : dimension(dimension), loader(loader), Klass()/*, classtype(classtype)*/ {
+	this->classtype = classtype;		// 这个变量不能放在初始化列表中初始化，即【不能用初始化列表直接初始化 不在基类构造函数参数列表 中的 基类的 protected 成员。】。会提示：error: member initializer 'classtype' does not name a non-static data member or base class
+	// set super class
+	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Object"));
+}
 
 /*===---------------  TypeArrayKlass  --------------------===*/
-TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader) : type(type), ArrayKlass(dimension, loader)
+TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, ClassType classtype) : type(type), ArrayKlass(dimension, loader, classtype)
 {	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
@@ -332,12 +355,10 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader) : 
 		}
 	}
 	this->name = ss.str();
-	// 2. set super class
-	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java.lang.Object"));
 	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
 }
 
-ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader) : element_klass(element_klass), ArrayKlass(dimension, loader)
+ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, classtype)
 {
 	// 1. set name
 	wstringstream ss;
@@ -346,8 +367,6 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	}
 	ss << element_klass->get_name();
 	this->name = ss.str();
-	// 2. set super class
-	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java.lang.Object"));
 }
 
 

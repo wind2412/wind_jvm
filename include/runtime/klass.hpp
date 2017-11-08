@@ -37,6 +37,12 @@ enum Type {		// TODO: 如果这里发生了变动，那么 TypeArrayKlass 可能
 	VOID,		// emmm. most puzzled...	// ...	// got it. Please see [hotspot/src/cpu/x86/vm/sharedRuntime_x86_32.cpp:460 in OpenJDK8.] We will get the answer that T_VOID is for the `missing half` of Long and Double in constant_pool.
 };
 
+enum ClassType {
+	InstanceClass,
+	ObjArrayClass,
+	TypeArrayClass,
+};
+
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
@@ -45,6 +51,8 @@ public:
 protected:
 	State cur = Zero;	// TODO: 需不需要？
 protected:
+	ClassType classtype;
+
 	wstring name;		// this class's name		// use constant_pool single string but not copy.
 	u2 access_flags;	// this class's access flags
 
@@ -63,6 +71,7 @@ public:
 	int get_access_flags() { return access_flags; }
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
 	wstring get_name() { return name; }
+	ClassType get_type() { return classtype; }
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 protected:
@@ -109,10 +118,11 @@ public:
 	shared_ptr<Field_info> get_field(const wstring & signature);				// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
+	unordered_map<wstring, shared_ptr<Method>> get_methods() { return methods; }		// delete
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
-	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader);
+	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
 	~InstanceKlass() {};
 };
 
@@ -135,7 +145,13 @@ public:
 private:
 	ArrayKlass(const ArrayKlass &);
 public:
-	ArrayKlass(int dimension, ClassLoader *loader) : dimension(dimension), loader(loader) {}
+	shared_ptr<Method> get_class_method(const wstring & signature) {	// 这里其实就是直接去 java.lang.Object 中去查找。
+		shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
+		assert(target != nullptr);
+		return target;
+	}
+public:
+	ArrayKlass(int dimension, ClassLoader *loader, ClassType classtype);
 	~ArrayKlass() {};
 };
 
@@ -147,7 +163,7 @@ public:
 private:
 	TypeArrayKlass(const TypeArrayKlass &);
 public:
-	TypeArrayKlass(Type type, int dimension, ClassLoader *loader);
+	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, ClassType classtype = ClassType::TypeArrayClass);
 	~TypeArrayKlass() {};
 };
 
@@ -159,7 +175,7 @@ public:
 private:
 	ObjArrayKlass(const ObjArrayKlass &);
 public:
-	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader);
+	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, ClassType classtype = ClassType::ObjArrayClass);
 	~ObjArrayKlass() {};
 };
 
