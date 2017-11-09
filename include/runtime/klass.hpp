@@ -108,12 +108,12 @@ private:
 	// 其他的 attributes 稍后再加
 	attribute_info *attributes;
 private:
-	void parse_methods(const ClassFile & cf);
-	void parse_fields(const ClassFile & cf);
-	void parse_superclass(const ClassFile & cf, ClassLoader *loader);
-	void parse_interfaces(const ClassFile & cf, ClassLoader *loader);
+	void parse_methods(shared_ptr<ClassFile> cf);
+	void parse_fields(shared_ptr<ClassFile> cf);
+	void parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *loader);
+	void parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *loader);
 public:
-	void parse_constantpool(const ClassFile & cf, ClassLoader *loader);
+	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);
 public:
 	shared_ptr<Field_info> get_field(const wstring & signature);				// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
