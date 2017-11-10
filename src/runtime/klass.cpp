@@ -68,7 +68,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 {
 	wstringstream ss;
 	for(int i = 0; i < cf->methods_count; i ++) {
-		shared_ptr<Method> method = make_shared<Method>(this, cf->methods[i], cf->constant_pool);
+		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
 		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
 		this->methods.insert(make_pair(ss.str(), method));	// add into
 		ss.str(L"");		// make empty
@@ -190,12 +190,55 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 #endif
 }
 
+void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
+{
+	// TODO:
+	for(int i = 0; i < this->attributes_count; i ++) {
+		int attribute_tag = peek_attribute(this->attributes[i]->attribute_name_index, cf->constant_pool);
+		switch (attribute_tag) {	// must be 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21
+			case 4: {	// InnerClasses
+				inner_classes = (InnerClasses_attribute *)this->attributes[i];
+				break;
+			}
+			case 3: {	// Exception
+				enclosing_method = (EnclosingMethod_attribute *)this->attributes[i];
+				break;
+			}
+			case 7: {	// Signature
+				signature_index = ((Signature_attribute *)this->attributes[i])->signature_index;
+				break;
+			}
+			case 8: {	// SourceFile
+				source_file_index = ((SourceFile_attribute *)this->attributes[i])->sourcefile_index;
+				break;
+			}
+
+
+			// TODO: 支持更多 attributes
+
+			default:{
+				std::cerr << "Annotations are TODO! attribute_tag == " << attribute_tag << std::endl;
+				assert(false);
+			}
+		}
+
+	}
+}
+
 InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType classtype) : loader(loader), Klass()/*, classtype(classtype)*/
 {
 	this->classtype = classtype;
 	// this_class (only name)
 	assert(cf->constant_pool[cf->this_class-1]->tag == CONSTANT_Class);
 	this->name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->this_class-1])->index-1])->convert_to_Unicode();
+
+	// move!!! important!!! move out Attributes.
+	this->attributes = cf->attributes;
+	cf->attributes = nullptr;
+
+	// set to 0!!! important!!!
+	this->attributes_count = cf->attributes_count;
+	cf->attributes_count = 0;
 
 	// become Runtime methods
 	parse_methods(cf);
@@ -209,7 +252,9 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	// become Runtime interfaces
 	parse_interfaces(cf, loader);
 	// become Runtime constant pool	// 必须放在构造函数之外！因为比如我加载 java.lang.Object，然后经由常量池加载了 java.lang.StringBuilder，注意此时 java.lang.Object 没被放到 system_classmap 中！然后又会加载 java.lang.Object，回来的时候会加载两遍 Object ！这是肯定不对的。于是设计成了丑恶的由 classloader 调用...QAQ
-//	parse_constantpool(cf, loader);
+	parse_constantpool(cf, loader);
+	// become Runtime Attributes
+	parse_attributes(cf);
 
 	// TODO: enum status, Loaded, Parsed...
 	// TODO: Runtime constant pool and remove Non-Dynamic cp_pool.
@@ -219,6 +264,12 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	// TODO: ReferenceKlass......
 	// TODO: Inner Class!!
 	// TODO: 补全 oop 的 Fields.
+
+	// 收尾工作：清理即将死去的 cf，把好东西全都移动出来。(constant_pool)
+	this->constant_pool = cf->constant_pool;
+	cf->constant_pool = nullptr;
+	this->constant_pool_count = cf->constant_pool_count;
+	cf->constant_pool_count = 0;
 
 }
 

@@ -35,14 +35,11 @@ private:
 public:
 	explicit rt_constant_pool(shared_ptr<InstanceKlass> this_class, ClassLoader *loader, shared_ptr<ClassFile> cf)
 			: this_class(this_class), loader(loader), this_class_index(cf->this_class), bufs(cf->constant_pool), pool(cf->constant_pool_count-1, std::make_pair(0, boost::any())) {}	// 别忘了 -1 啊！！！！		// bufs 前边加上 const 竟然会报错 ???
+private:
+	const pair<int, boost::any> & if_didnt_parse_then_parse(int index);		// 把 cp_info static 常量池中的元素(符号引用) 解析成为 引用。
 public:
-	pair<int, boost::any> if_didnt_parse_then_parse(int index);		// 把 cp_info static 常量池中的元素(符号引用) 解析成为 引用。
-	int type(int index) {
-		return pool[index].first;
-	}
-	boost::any at(int index) {
-		assert(index >= 0 && index < pool.size());
-		return pool[index].second;
+	pair<int, boost::any> operator[] (int index) {		// 可以直接用 operator[] 进行查找。
+		return if_didnt_parse_then_parse(index);
 	}
 public:
 	void print_debug();

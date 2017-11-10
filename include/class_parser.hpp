@@ -695,7 +695,7 @@ struct ClassFile {
 	u2 methods_count;
 	method_info *methods = nullptr;			// [methods_count];
 	u2 attributes_count;
-	attribute_info **attributes = nullptr;		// [attributes_count];
+	attribute_info **attributes = nullptr;	// [attributes_count];
 
 	void parse_header(std::ifstream & f);
 	void parse_constant_pool(std::ifstream & f);

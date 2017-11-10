@@ -91,6 +91,9 @@ private:
 //	ClassFile *cf;		// origin non-dynamic constant pool
 	ClassLoader *loader;
 
+	u2 constant_pool_count;
+	cp_info **constant_pool;			// 同样，留一个指针在这里。留作 rt_pool 的 parse 的参照标准用。
+
 	// interfaces
 	unordered_map<wstring, shared_ptr<InstanceKlass>> interfaces;
 	// fields (non-static / static)
@@ -104,16 +107,28 @@ private:
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
-	// TODO: attributes... 还在 ClassFile 中......
-	// 其他的 attributes 稍后再加
-	attribute_info *attributes;
+	// TODO: Inner Class!!!
+
+	// Attributes
+	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21
+	u2 attributes_count;
+	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
+
+	InnerClasses_attribute *inner_classes = nullptr;
+	EnclosingMethod_attribute *enclosing_method = nullptr;
+	u2 signature_index;
+	u2 source_file_index;
+
+	// TODO: Annotations
+
 private:
 	void parse_methods(shared_ptr<ClassFile> cf);
 	void parse_fields(shared_ptr<ClassFile> cf);
 	void parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *loader);
 	void parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *loader);
+	void parse_attributes(shared_ptr<ClassFile> cf);
 public:
-	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);
+	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
 public:
 	shared_ptr<Field_info> get_field(const wstring & signature);				// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
@@ -123,7 +138,12 @@ private:
 	InstanceKlass(const InstanceKlass &);
 public:
 	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
-	~InstanceKlass() {};
+	~InstanceKlass() {
+		for (int i = 0; i < attributes_count; i ++) {
+			delete attributes[i];
+		}
+		delete[] attributes;
+	};
 };
 
 class ArrayKlass : public Klass {

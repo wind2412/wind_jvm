@@ -3,9 +3,11 @@
 
 #include <string>
 #include <cassert>
+#include <memory>
 #include "class_parser.hpp"
 
 using std::wstring;
+using std::shared_ptr;
 
 class InstanceKlass;
 
@@ -15,53 +17,43 @@ class InstanceKlass;
 class Method {
 private:
 	// InstanceKlass
-	InstanceKlass *klass;
+	shared_ptr<InstanceKlass> klass;
 	// method basic
 	wstring name;
 	wstring descriptor;
+	u2 access_flags;
 
 	// constant pool ** use for <code> and so on
 //	cp_info **constant_pool;
 
-	// code attribute
-	Code_attribute *code;
+	// Attributes: 1, 3, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 22
+	u2 attributes_count;
+	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
 
-	// exception attribute
-	Exceptions_attribute *exceptions;
+	// TODO: code attribute
+	Code_attribute *code;
+	// TODO: exception attribute
+	Exceptions_attribute *exceptions = nullptr;
+	u2 signature_index;
 
 	// TODO: 支持更多 attributes, Annotations.
 
 public:
-	Method(InstanceKlass *klass, const method_info & mi, cp_info **constant_pool) : klass(klass) {
-		assert(constant_pool[mi.name_index-1]->tag == CONSTANT_Utf8);
-		name = ((CONSTANT_Utf8_info *)constant_pool[mi.name_index-1])->convert_to_Unicode();
-		assert(constant_pool[mi.descriptor_index-1]->tag == CONSTANT_Utf8);
-		descriptor = ((CONSTANT_Utf8_info *)constant_pool[mi.descriptor_index-1])->convert_to_Unicode();
-
-		for(int i = 0; i < mi.attributes_count; i ++) {
-			int attribute_tag = peek_attribute(mi.attributes[i]->attribute_name_index, constant_pool);
-			switch (attribute_tag) {	// must be 1, 3, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 22
-				case 1: {	// Code
-					code = (Code_attribute *)mi.attributes[i];
-					break;
-				}
-				case 3: {	// Exception
-					exceptions = (Exceptions_attribute *)mi.attributes[i];
-					break;
-				}
-
-				// TODO: 支持更多 attributes
-			}
-
-		}
-	}
-
+	bool is_static() { return (this->access_flags & ACC_STATIC) == ACC_STATIC; }
+	bool is_public() { return (this->access_flags & ACC_PUBLIC) == ACC_PUBLIC; }
+	bool is_void() { return descriptor[descriptor.size()-1] == L'V'; }
+	bool is_main() { return is_static() && is_public() && is_void(); }
+public:
+	Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
-//	bool operator< (const Method & m) {
-//		return (name < m.name) ? true : (name > m.name) ? false : descriptor < m.descriptor;		// 先比较 name 在比较 descriptor
-//	}
 	void print() { std::wcout << name << ":" << descriptor; }
+	~Method() {
+		for (int i = 0; i < attributes_count; i ++) {
+			delete attributes[i];
+		}
+		delete[] attributes;
+	}
 };
 
 

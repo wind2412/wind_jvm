@@ -27,8 +27,9 @@ shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader,
 }
 
 // 运行时常量池解析。包括解析类、字段以及方法属性。方法字节码的解析留到最后进行。
-pair<int, boost::any> rt_constant_pool::if_didnt_parse_then_parse(int i)		// 对 runtime constantpool 的第 i 项进行动态解析。
+const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)		// 对 runtime constantpool 的第 i 项进行动态解析。
 {
+	assert(i >= 0 && i < pool.size());
 	// 1. if has been parsed, then return
 	if (this->pool[i].first != 0)	return this->pool[i];
 	// 2. else, parse.

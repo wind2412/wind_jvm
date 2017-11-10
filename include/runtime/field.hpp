@@ -9,6 +9,15 @@
 #define INCLUDE_RUNTIME_FIELD_HPP_
 
 #include "utils.hpp"
+#include "class_parser.hpp"
+#include <vector>
+#include <string>
+#include <cassert>
+
+using std::wstring;
+using std::vector;
+
+class InstanceKlass;
 
 /**
  * all non-static fields [values]. save in oop object.
@@ -36,24 +45,30 @@ private:
 	int value_size;			// **this field's size**: parse descriptor to get it. See: Java SE 8 Specification $4.3.2
 
 	// attributes
+	// 0, 6, 7, 13, 14, 15, 18, 19	// synthetic, deprecated 两者都不需要。并没有保存任何信息。
+
 	u2 attributes_count;
-	attribute_info **attributes;
+	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
+
+	ConstantValue_attribute *constant_value = nullptr;	// only one
+	u2 signature_index;
+	// TODO: support Annotations
+
+
 public:
-	explicit Field_info(const field_info & fi, cp_info **constant_pool) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
-		this->access_flags = fi.access_flags;
-		assert(constant_pool[fi.name_index-1]->tag == CONSTANT_Utf8 && constant_pool[fi.descriptor_index-1]->tag == CONSTANT_Utf8);
-		this->name = ((CONSTANT_Utf8_info *)constant_pool[fi.name_index-1])->convert_to_Unicode();
-		this->descriptor = ((CONSTANT_Utf8_info *)constant_pool[fi.descriptor_index-1])->convert_to_Unicode();
-		this->attributes_count = fi.attributes_count;
-		this->attributes = fi.attributes;
-		value_size = parse_field_descriptor(descriptor);
-	}
+	explicit Field_info(field_info & fi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	int get_value_size() { return value_size; }
 	void print() { std::wcout << name << ":" << descriptor; }
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。
+	~Field_info () {
+		for (int i = 0; i < attributes_count; i ++) {
+			delete attributes[i];
+		}
+		delete[] attributes;
+	}
 };
 
 #endif /* INCLUDE_RUNTIME_FIELD_HPP_ */
