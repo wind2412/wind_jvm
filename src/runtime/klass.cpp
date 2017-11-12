@@ -102,7 +102,8 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.
-	this->static_fields = new uint8_t[total_static_fields_bytes];
+	if (total_static_fields_bytes != 0)		// be careful!!!!
+		this->static_fields = new uint8_t[total_static_fields_bytes];
 	memset(this->static_fields, 0, total_static_fields_bytes);	// bzero!!
 #ifdef DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
@@ -184,9 +185,10 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
 	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
 #ifdef DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
-	this->rt_pool->print_debug();
-	std::cout << "===------------------------------------------------------------===" << std::endl;
+	// this has been deleted because lazy parsing constant_pool...
+//	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
+//	this->rt_pool->print_debug();
+//	std::cout << "===------------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -218,7 +220,7 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 
 			default:{
 				std::cerr << "Annotations are TODO! attribute_tag == " << attribute_tag << std::endl;
-				assert(false);
+//				assert(false);		// TODO:
 			}
 		}
 
@@ -273,23 +275,23 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 
 }
 
-shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
+pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signature)
 {
-	shared_ptr<Field_info> target;
+	pair<int, shared_ptr<Field_info>> target = std::make_pair(-1, nullptr);
 	// search in this->fields_layout
 	auto iter = this->fields_layout.find(signature);
 	if (iter == this->fields_layout.end()) {
 		// search in this->static_fields_layout
 		iter = this->static_fields_layout.find(signature);
 	} else {
-		return (*iter).second.second;
+		return (*iter).second;
 	}
 	if (iter == this->static_fields_layout.end()) {
 		// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
 		for (auto iter : this->interfaces) {
 			// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
 			target = iter.second->get_field(signature);
-			if (target != nullptr)	return target;
+			if (target.second != nullptr)	return target;
 		}
 		// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
 		// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
@@ -297,9 +299,49 @@ shared_ptr<Field_info> InstanceKlass::get_field(const wstring & signature)
 			target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
 		return target;		// nullptr or Real result.
 	} else {
-		return (*iter).second.second;
+		return (*iter).second;
 	}
 
+}
+
+unsigned long InstanceKlass::get_static_field_value(int offset, int size)
+{
+	switch (size) {
+		case 1:
+			return *(uint8_t *)(this->static_fields + offset);
+		case 2:
+			return *(uint16_t *)(this->static_fields + offset);
+		case 4:
+			return *(uint32_t *)(this->static_fields + offset);
+		case 8:
+			return *(uint64_t *)(this->static_fields + offset);
+		default:{
+			std::cerr << "can't get here! size == " << size << std::endl;
+			assert(false);
+		}
+	}
+}
+
+void InstanceKlass::set_static_field_value(int offset, int size, unsigned long value)
+{
+	switch (size) {
+		case 1:
+			*(uint8_t *)(this->static_fields + offset) = value;
+			break;
+		case 2:
+			*(uint16_t *)(this->static_fields + offset) = value;
+			break;
+		case 4:
+			*(uint32_t *)(this->static_fields + offset) = value;
+			break;
+		case 8:
+			*(uint64_t *)(this->static_fields + offset) = value;
+			break;
+		default:{
+			std::cerr << "can't get here! size == " << size << std::endl;
+			assert(false);
+		}
+	}
 }
 
 shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
@@ -351,15 +393,25 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	return nullptr;
 }
 
+shared_ptr<Method> InstanceKlass::get_static_void_main()
+{
+	for (auto iter : this->methods) {
+		if (iter.second->is_main()) {
+			return iter.second;
+		}
+	}
+	return nullptr;
+}
+
 /*===---------------    ArrayKlass    --------------------===*/
-ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, ClassType classtype)  : dimension(dimension), loader(loader), Klass()/*, classtype(classtype)*/ {
+ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), Klass()/*, classtype(classtype)*/ {
 	this->classtype = classtype;		// 这个变量不能放在初始化列表中初始化，即【不能用初始化列表直接初始化 不在基类构造函数参数列表 中的 基类的 protected 成员。】。会提示：error: member initializer 'classtype' does not name a non-static data member or base class
 	// set super class
 	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Object"));
 }
 
 /*===---------------  TypeArrayKlass  --------------------===*/
-TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, ClassType classtype) : type(type), ArrayKlass(dimension, loader, classtype)
+TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype) : type(type), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, classtype)
 {	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
@@ -408,7 +460,7 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, Cl
 	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
 }
 
-ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, classtype)
+ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, classtype)
 {
 	// 1. set name
 	wstringstream ss;

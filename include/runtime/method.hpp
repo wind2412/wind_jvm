@@ -43,11 +43,15 @@ public:
 	bool is_public() { return (this->access_flags & ACC_PUBLIC) == ACC_PUBLIC; }
 	bool is_void() { return descriptor[descriptor.size()-1] == L'V'; }
 	bool is_main() { return is_static() && is_public() && is_void(); }
+	bool is_native() { return (this->access_flags & ACC_NATIVE) == ACC_NATIVE; }
+	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
 public:
 	Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
+	const Code_attribute *get_code() { return code; }
 	void print() { std::wcout << name << ":" << descriptor; }
+	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	~Method() {
 		for (int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];

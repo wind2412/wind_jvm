@@ -16,8 +16,8 @@ using std::wstring;
 using std::unordered_map;
 using std::shared_ptr;
 
-class InstanceKlass;
+class Klass;
 
-extern unordered_map<wstring, shared_ptr<InstanceKlass>> system_classmap;
+extern unordered_map<wstring, shared_ptr<Klass>> system_classmap;
 
 #endif /* INCLUDE_SYSTEM_DIRECTORY_HPP_ */

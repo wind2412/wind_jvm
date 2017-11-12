@@ -8,4 +8,4 @@
 #include "system_directory.hpp"
 #include "runtime/klass.hpp"
 
-unordered_map<wstring, shared_ptr<InstanceKlass>> system_classmap;
+unordered_map<wstring, shared_ptr<Klass>> system_classmap;

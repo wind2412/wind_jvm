@@ -21,16 +21,16 @@ class InstanceKlass;
 
 /**
  * all non-static fields [values]. save in oop object.
- */
-class Fields {
-private:
-	InstanceKlass *klass;		// search [static field / non-static field layout] via this klass
-	uint8_t *fields;				// non-static field <real values>
-public:
-	Fields(InstanceKlass *klass) : klass(klass) {		// 通过 运行时常量池来 parse ！ 不着急。最后再弄。
-//		for (int i = 0; i < klass->cf->)
-	}
-};
+// */
+//class Fields {
+//private:
+//	InstanceKlass *klass;		// search [static field / non-static field layout] via this klass
+//	uint8_t *fields;				// non-static field <real values>
+//public:
+//	Fields(InstanceKlass *klass) : klass(klass) {		// 通过 运行时常量池来 parse ！ 不着急。最后再弄。
+////		for (int i = 0; i < klass->cf->)
+//	}
+//};
 
 /**
  * all non-static/static fields [properties in field_info]. save in klass.cpp.
@@ -60,6 +60,7 @@ public:
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	int get_value_size() { return value_size; }
+	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
 	void print() { std::wcout << name << ":" << descriptor; }
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。

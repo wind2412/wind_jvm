@@ -39,26 +39,60 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)
 			return newklass;
 		}
 	} else if (boost::starts_with(classname, L"[")) {		// 一次剥离n层到最里边，加载数组类
-		int pos = 0;
-		for (; pos < classname.size(); pos ++) {
-			if (classname[pos] != L'[') 	break;
-		}
-		int layer = pos;
-		bool is_basic_type = (classname[pos] == L'L') ? false : true;
-		if (!is_basic_type) {
-			// a. recursively load the spliced class
-			wstring temp = classname.substr(layer + 1);		// java.lang.Object;
-			wstring _true = temp.substr(0, temp.size()-1);
-			std::wcout << layer << " " << _true << std::endl;
-			shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
-			if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
-			return make_shared<ObjArrayKlass>(inner, layer, nullptr);
-		} else {
-			assert(classname.size() == (layer + 1));	// because it is basic type, so like '[[[C', it must be [layer + 1].
-			wstring type_name = classname.substr(pos);
-			// b. parse type array
-			Type type = get_type(type_name);
-			return make_shared<TypeArrayKlass>(type, layer, nullptr);
+		if (system_classmap.find(target) != system_classmap.end()) {	// 已经 load 过
+			return system_classmap[target];
+		} else {	// 进行 load
+			int pos = 0;
+			for (; pos < classname.size(); pos ++) {
+				if (classname[pos] != L'[') 	break;
+			}
+			int layer = pos;
+			bool is_basic_type = (classname[pos] == L'L') ? false : true;
+			if (!is_basic_type) {
+				// a. load the spliced class
+				wstring temp = classname.substr(layer + 1);		// "Ljava.lang.Object;" --> "java.lang.Object;"
+				wstring _true = temp.substr(0, temp.size()-1);	// "java.lang.Object;" --> "java.lang.Object"
+				std::wcout << layer << " " << _true << std::endl;
+				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
+				std::cout << (inner == nullptr) << std::endl;
+				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
+
+				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
+				if (layer == 1) {
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
+					system_classmap.insert(make_pair(target, newklass));
+					return newklass;
+				} else {
+					wstring temp_inner = classname.substr(1);		// strip one '[' only
+					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
+					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
+					assert(last_dimension_array->get_higher_dimension() == nullptr);
+					last_dimension_array->set_higher_dimension(newklass);
+					system_classmap.insert(make_pair(target, newklass));
+					return newklass;
+				}
+			} else {
+				assert(classname.size() == (layer + 1));	// because it is basic type, so like '[[[C', it must be [layer + 1].
+				wstring type_name = classname.substr(pos);
+				// b. parse type array
+				Type type = get_type(type_name);
+
+				// c. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
+				if (layer == 1) {
+					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
+					system_classmap.insert(make_pair(target, newklass));
+					return newklass;
+				} else {
+					wstring temp_inner = classname.substr(1);
+					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
+					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, last_dimension_array, nullptr);
+					assert(last_dimension_array->get_higher_dimension() == nullptr);
+					last_dimension_array->set_higher_dimension(newklass);
+					system_classmap.insert(make_pair(target, newklass));
+					return newklass;
+				}
+			}
 		}
 	} else {		// BootStrap 无法加载: 1. 正在加载一个非 java 类库的类；2. 正在加载一个数组类，而经过层层剥离之后发现它是一个普通类型。
 		// throw ClassNotFoundExcpetion(ERRMSG, target);	// 不应该抛异常...
@@ -107,18 +141,61 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 			return newklass;
 		}
 	} else {	// e.g. '[[Lcom.zxl.Haha.   because if it is '[[Ljava.lang.Object', BootStrapClassLoader will load it already at the beginning of this method.
-		int pos = 0;
-		for (; pos < classname.size(); pos ++) {
-			if (classname[pos] != L'[') 	break;
+		wstring target = classname + L".class";
+		if (classmap.find(target) != classmap.end()) {	// 已经 load 过
+			return classmap[target];
+		} else {	// 进行 load
+			int pos = 0;
+			for (; pos < classname.size(); pos ++) {
+				if (classname[pos] != L'[') 	break;
+			}
+			int layer = pos;
+			bool is_basic_type = (classname[pos] == L'L') ? false : true;
+			if (!is_basic_type) {
+				// a. load the spliced class
+				wstring temp = classname.substr(layer+1);		// java.lang.Object;
+				wstring _true = temp.substr(0, temp.size()-1);
+				std::wcout << layer << " " << _true << std::endl;
+				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
+				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
+
+				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
+				if (layer == 1) {
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
+					classmap.insert(make_pair(target, newklass));
+					return newklass;
+				} else {
+					wstring temp_inner = classname.substr(1);		// strip one '[' only
+					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
+					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
+					assert(last_dimension_array->get_higher_dimension() == nullptr);
+					last_dimension_array->set_higher_dimension(newklass);
+					classmap.insert(make_pair(target, newklass));
+					return newklass;
+				}
+			} else {
+				assert(classname.size() == (layer + 1));	// because it is basic type, so like '[[[C', it must be [layer + 1].
+				wstring type_name = classname.substr(pos);
+				// b. parse type array
+				Type type = get_type(type_name);
+
+				// c. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
+				if (layer == 1) {
+					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
+					classmap.insert(make_pair(target, newklass));
+					return newklass;
+				} else {
+					wstring temp_inner = classname.substr(1);
+					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
+					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, last_dimension_array, nullptr);
+					assert(last_dimension_array->get_higher_dimension() == nullptr);
+					last_dimension_array->set_higher_dimension(newklass);
+					classmap.insert(make_pair(target, newklass));
+					return newklass;
+				}
+			}
 		}
-		int layer = pos;
-		// recursively load the spliced class
-		wstring temp = classname.substr(layer + 1);		// java.lang.Object;
-		wstring _true = temp.substr(0, temp.size()-1);
-		std::wcout << layer << " " << _true << std::endl;
-		shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));
-		assert(inner != nullptr);		// must not be nullptr.
-		return make_shared<ObjArrayKlass>(inner, layer, this);
 	}
 }
 

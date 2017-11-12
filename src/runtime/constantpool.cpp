@@ -80,7 +80,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			if (target->tag == CONSTANT_Fieldref) {
 				std::wcout << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 				assert(new_class->get_type() == ClassType::InstanceClass);
-				shared_ptr<Field_info> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_field(name + L":" + descriptor);		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
+				shared_ptr<Field_info> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
 				assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
 			} else if (target->tag == CONSTANT_Methodref) {

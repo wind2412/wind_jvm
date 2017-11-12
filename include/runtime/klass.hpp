@@ -101,7 +101,7 @@ private:
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_bytes = 0;
 	int total_static_fields_bytes = 0;
-	uint8_t *static_fields;													// static field values. [non-static field values are in oop].
+	uint8_t *static_fields = nullptr;												// static field values. [non-static field values are in oop].
 	// methods
 	unordered_map<wstring, shared_ptr<Method>> methods;
 	// constant pool
@@ -130,10 +130,15 @@ private:
 public:
 	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
 public:
-	shared_ptr<Field_info> get_field(const wstring & signature);				// [name + ':' + descriptor]
+	shared_ptr<Method> get_static_void_main();
+public:
+	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);				// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 	unordered_map<wstring, shared_ptr<Method>> get_methods() { return methods; }		// delete
+	int non_static_field_bytes() { return total_non_static_fields_bytes; }
+	unsigned long get_static_field_value(int offset, int size);
+	void set_static_field_value(int offset, int size, unsigned long value);
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
@@ -151,16 +156,16 @@ private:
 	ClassLoader *loader;
 
 	int dimension;			// (n) dimension (this)
-//	shared_ptr<Klass> higher_dimension;	// (n+1) dimension		// TODO: don't know what they use for????
-//	shared_ptr<Klass> lower_dimension;	// (n-1) dimension
+	shared_ptr<Klass> higher_dimension;	// (n+1) dimension
+	shared_ptr<Klass> lower_dimension;	// (n-1) dimension
 	// TODO: vtable
 	// TODO: mirror: reflection support
 
 public:
-//	shared_ptr<Klass> get_higher_dimension() { return higher_dimension; }
-//	void set_higher_dimension(shared_ptr<Klass> higher) { higher_dimension = higher; }
-//	shared_ptr<Klass> get_lower_dimension() { return lower_dimension; }
-//	void set_lower_dimension(shared_ptr<Klass> lower) { lower_dimension = lower; }
+	shared_ptr<Klass> get_higher_dimension() { return higher_dimension; }
+	void set_higher_dimension(shared_ptr<Klass> higher) { higher_dimension = higher; }
+	shared_ptr<Klass> get_lower_dimension() { return lower_dimension; }
+	void set_lower_dimension(shared_ptr<Klass> lower) { lower_dimension = lower; }
 	int get_dimension() { return dimension; }
 private:
 	ArrayKlass(const ArrayKlass &);
@@ -171,7 +176,7 @@ public:
 		return target;
 	}
 public:
-	ArrayKlass(int dimension, ClassLoader *loader, ClassType classtype);
+	ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype);
 	~ArrayKlass() {};
 };
 
@@ -183,7 +188,7 @@ public:
 private:
 	TypeArrayKlass(const TypeArrayKlass &);
 public:
-	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, ClassType classtype = ClassType::TypeArrayClass);
+	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype = ClassType::TypeArrayClass);
 	~TypeArrayKlass() {};
 };
 
@@ -195,7 +200,7 @@ public:
 private:
 	ObjArrayKlass(const ObjArrayKlass &);
 public:
-	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, ClassType classtype = ClassType::ObjArrayClass);
+	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype = ClassType::ObjArrayClass);
 	~ObjArrayKlass() {};
 };
 

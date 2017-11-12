@@ -40,7 +40,7 @@ public:
 class MyClassLoader : public ClassLoader {
 private:
 	BootStrapClassLoader & bs = BootStrapClassLoader::get_bootstrap();
-	map<wstring, shared_ptr<InstanceKlass>> classmap;
+	map<wstring, shared_ptr<Klass>> classmap;
 private:
 	MyClassLoader() {};
 	MyClassLoader(const MyClassLoader &);

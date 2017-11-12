@@ -35,7 +35,7 @@ Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **cons
 
 			default:{
 				std::cerr << "Annotations are TODO! attribute_tag == " << attribute_tag << std::endl;
-				assert(false);
+//				assert(false);		// TODO:
 			}
 		}
 
