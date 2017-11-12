@@ -11,6 +11,7 @@
 #include <vector>
 #include <stack>
 #include <memory>
+#include <initializer_list>
 #include "oop.hpp"
 
 using std::vector;
@@ -21,8 +22,13 @@ class Method;
 
 struct BytecodeEngine {
 public:
-	static uint64_t execute(stack<uint64_t> & op_stack, vector<uint64_t> & localVariableTable, uint8_t *pc) {
+	static Oop * execute(stack<uint64_t> & op_stack, vector<uint64_t> & localVariableTable, uint8_t *pc, uint32_t code_length) {
+		uint8_t *code_begin = pc;
+//		while (pc < code_begin + code_length) {
+//
+//		}
 
+		return nullptr;
 	}
 };
 
@@ -35,10 +41,9 @@ public:
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 public:
-	StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev) : method(method), return_pc(return_pc), prev(prev) {
-		// TODO: set localVariableTable...
+	StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const std::initializer_list<uint64_t> & list) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是没有类型的 uint64_t。因此，在**执行 code**的时候才会有类型提升～
 		// TODO: set this pointer...
-		// TODO: set arguments...
+		localVariableTable.insert(localVariableTable.end(), list.begin(), list.end());
 	}
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
@@ -52,7 +57,7 @@ public:
 	}
 	void reset_method(shared_ptr<Method> new_method) { this->method = new_method; }
 	void reset_return_pc(uint8_t *return_pc) { this->return_pc = return_pc; }
-	void execute_method(uint8_t * & pc) {	// 此 StackFrame 的 locals 中的 this, args... 应该在此方法执行前就已经放入了。即，应该交给要 “create this StackFrame” 的 callee 执行！
+	Oop * execute_method(uint8_t * & pc) {	// 此 StackFrame 的 locals 中的 this, args... 应该在此方法执行前就已经放入了。即，应该交给要 “create this StackFrame” 的 callee 执行！
 		if (method->is_native()) {
 			pc = nullptr;
 			// TODO: native.
@@ -66,14 +71,12 @@ public:
 				assert(false);		// for test. Is empty method valid ??? I dont know...
 			}
 			pc = code->code;
-			while (pc < code->code + code->code_length) {
-				uint64_t return_val = BytecodeEngine::execute(this->op_stack, this->localVariableTable, pc);
-				if (method->is_void()) {
-					return;		// TODO: is here right ???
-				} else {
-
-				}
+			Oop * return_val = BytecodeEngine::execute(this->op_stack, this->localVariableTable, pc, code->code_length);
+			if (method->is_void()) {		// TODO: in fact, this can be delete. Because It is of no use.
+				assert(return_val == nullptr);
+				return nullptr;
 			}
+			return return_val;
 		}
 	}
 };

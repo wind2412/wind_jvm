@@ -11,17 +11,54 @@
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
 
+#include <cstdlib>
+#include <cstring>
 #include <memory>
+
+template <typename Tp, typename Arg1>
+void __constructor(Tp *ptr, const Arg1 & arg1)		// 适配一个参数
+{
+	::new ((void *)ptr) Tp(arg1);
+}
+
+template <typename Tp, typename Arg1, typename Arg2>
+void __constructor(Tp *ptr, const Arg1 & arg1, const Arg2 & arg2)		// 适配两个参数
+{
+	::new ((void *)ptr) Tp(arg1, arg2);
+}
+
+template <typename Tp, typename Arg1, typename Arg2, typename Arg3>
+void __constructor(Tp *ptr, const Arg1 & arg1, const Arg2 & arg2, const Arg3 & arg3)		// 适配三个参数
+{
+	::new ((void *)ptr) Tp(arg1, arg2, arg3);
+}
+
+template <typename Tp, typename ...Args>
+void constructor(Tp *ptr, Args &&...args)		// placement new.
+{
+	__constructor(ptr, std::forward<Args>(args)...);		// 完美转发变长参数
+}
+
+template <typename Tp>
+void destructor(Tp *ptr)
+{
+	ptr->~Tp();
+}
 
 class MemPool {
 public:
-	// TODO: use MemPool!!! 而且这 new new[] delete delete[] 的 throw() 声明要搞明白啊....QAQ
-	void *operator new (size_t size) throw() { return malloc(size); }
-	void *operator new (size_t size, const std::nothrow_t & nothrow_constant) throw() { return malloc(size); }
-	void *operator new[] (size_t size) throw() { return malloc(size); }
-	void *operator new[] (size_t size, const std::nothrow_t & nothrow_constant) throw() { return malloc(size); }
-	void operator delete (void *p) throw() { free(p); }
-	void operator delete[] (void *p) throw() { free(p); }
+	static void *allocate(size_t size) {		// TODO: change to real Mem Pool (Heap)
+		void *ptr = malloc(size);
+		memset(ptr, 0, size);		// default bzero!
+		return ptr;
+	}
+	static void deallocate(void *ptr) { free(ptr); }
+	void *operator new(size_t size) throw() { return allocate(size); }
+	void *operator new(size_t size, const std::nothrow_t &) throw() { return allocate(size); }
+	void *operator new[](size_t size) throw() { return allocate(size); }
+	void *operator new[](size_t size, const std::nothrow_t &) throw() { return allocate(size); }
+	void operator delete(void *ptr) { return deallocate(ptr); }
+	void operator delete[](void *ptr) { return deallocate(ptr); }
 };
 
 
@@ -50,11 +87,42 @@ public:
 	void set_value(const wstring & signature, unsigned long value);
 };
 
-class TypeArrayOop : public Oop {
+class BasicTypeOop : public Oop {
 private:
-	int length;
+	Type type;	// only allow for BYTE, BOOLEAN, CHAR, SHORT, INT, FLOAT, LONG, DOUBLE.
+	uint64_t value;
 public:
-	TypeArrayOop(shared_ptr<TypeArrayKlass> klass);
+	BasicTypeOop(Type type, uint64_t value) : Oop(nullptr), type(type), value(value) {}
+	Type get_type() { return type; }
+	uint64_t get_value() { return value; }
+};
+
+class ArrayOop : public Oop {
+protected:
+	int length;
+	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
+public:
+	ArrayOop(shared_ptr<ArrayKlass> klass, int length) : Oop(klass), length(length), buf((Oop **)MemPool::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
+	int get_length() { return length; }
+	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
+	Oop * operator[] (int index) {
+		assert(index >= 0 && index < length);	// TODO: please replace with ArrayIndexOutofBound...
+		return buf[index];
+	}
+	const Oop * operator[] (int index) const {
+		return this->operator[](index);
+	}
+};
+
+class ObjArrayOop : public ArrayOop {
+public:		// Most inner type of `buf` is InstanceOop.
+	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length) {}
+public:
+};
+
+class TypeArrayOop : public ArrayOop {
+public:		// Most inner type of `buf` is BasicTypeOop.
+	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length) {}
 public:
 };
 
