@@ -145,6 +145,44 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x1a:{		// iload_0
+				op_stack.push(localVariableTable[0]);
+				break;
+			}
+			case 0x1b:{		// iload_1
+				op_stack.push(localVariableTable[1]);
+				break;
+			}
+			case 0x1c:{		// iload_2
+				op_stack.push(localVariableTable[2]);
+				break;
+			}
+			case 0x1d:{		// iload_3
+				op_stack.push(localVariableTable[3]);
+				break;
+			}
+
+			case 0x57:{		// pop
+				op_stack.pop();
+				break;
+			}
+
+			case 0x60:{		// iadd
+				int val1 = op_stack.top(); op_stack.pop();
+				int val2 = op_stack.top(); op_stack.pop();
+				op_stack.push(val1 + val2);
+				break;
+			}
+
+
+			case 0xac:{		// ireturn
+				// TODO: monitor...
+				jvm.pc = backup_pc;
+				return new BasicTypeOop(Type::INT, op_stack.top());	// boolean, short, char, int
+			}
+
+
+
 			case 0xb1:{		// return
 				// TODO: monitor...
 				jvm.pc = backup_pc;
@@ -165,14 +203,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(new_method->is_static() && !new_method->is_abstract());
 				if (!klass->is_initialized()) {
 					// initialize a class... <clinit>
-					std::wcout << klass->get_name() << "::<clinit>" << std::endl;		// msg
+					std::wcout << "(DEBUG) " << klass->get_name() << "::<clinit>" << std::endl;		// msg
 					shared_ptr<Method> clinit = klass->get_class_method(klass->get_name() + L":<clinit>");
 					if (clinit != nullptr) {
-						jvm.add_frame_and_execute(clinit, {});
+						jvm.add_frame_and_execute(clinit, {});		// no return value
 					}		// TODO: 这里 clinit 不知道会如何执行。
 					klass->set_initialized();
 				}
-				std::wcout << klass->get_name() << "::" << new_method->get_name() << ":" << new_method->get_descriptor() << std::endl;	// msg
+				std::wcout << "(DEBUG) " << klass->get_name() << "::" << new_method->get_name() << ":" << new_method->get_descriptor() << std::endl;	// msg
 				// TODO: synchronized !!!!!!
 				if (new_method->is_synchronized()) {
 					std::cerr << "can't suppose synchronized now..." << std::endl;
@@ -183,7 +221,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					std::cerr << "can't suppose native now..." << std::endl;
 				} else {
 					int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
-					std::cout << "arg size: " << size << std::endl;	// delete
+					std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
 					// TODO: 参数应该是倒着入栈的吧...?
 					list<uint64_t> arg_list;
 					assert(op_stack.size() >= size);
@@ -192,7 +230,10 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 						op_stack.pop();
 						size --;
 					}
-					jvm.add_frame_and_execute(new_method, arg_list);
+					Oop *result = jvm.add_frame_and_execute(new_method, arg_list);
+					if (!new_method->is_void()) {
+						op_stack.push((uint64_t)result);
+					}
 				}
 				break;
 			}

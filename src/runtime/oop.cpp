@@ -8,7 +8,7 @@
 #include "runtime/oop.hpp"
 
 /*===----------------  InstanceOop  -----------------===*/
-InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass) {
+InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.
 	this->field_length = klass->non_static_field_bytes();
 	if (this->field_length != 0)

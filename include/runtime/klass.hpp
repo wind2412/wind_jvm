@@ -43,6 +43,13 @@ enum ClassType {
 	TypeArrayClass,
 };
 
+enum OopType {
+	_InstanceOop,
+	_BasicTypeOop,
+	_ObjArrayOop,
+	_TypeArrayOop,
+};
+
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.

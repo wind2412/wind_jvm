@@ -69,12 +69,13 @@ public:
 class Oop : public MemAlloc {		// 注意：Oop 必须只能使用 new ( = ::operator new + constructor-->::operator new(pointer p) )来分配！！因为要放在堆中。
 protected:
 	// TODO: HashCode .etc
+	OopType ooptype;
 	shared_ptr<Klass> klass;
 public:
 	// TODO: HashCode .etc
 	shared_ptr<Klass> get_klass() { return klass; }
 public:
-	explicit Oop(shared_ptr<Klass> klass) : klass(klass) {}
+	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
@@ -96,7 +97,7 @@ private:
 	Type type;	// only allow for BYTE, BOOLEAN, CHAR, SHORT, INT, FLOAT, LONG, DOUBLE.
 	uint64_t value;
 public:
-	BasicTypeOop(Type type, uint64_t value) : Oop(nullptr), type(type), value(value) {}
+	BasicTypeOop(Type type, uint64_t value) : Oop(nullptr, OopType::_BasicTypeOop), type(type), value(value) {}
 	Type get_type() { return type; }
 	uint64_t get_value() { return value; }
 };
@@ -106,7 +107,7 @@ protected:
 	int length;
 	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
 public:
-	ArrayOop(shared_ptr<ArrayKlass> klass, int length) : Oop(klass), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
+	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
 	int get_length() { return length; }
 	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
 	Oop * operator[] (int index) {
@@ -120,13 +121,13 @@ public:
 
 class ObjArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is InstanceOop.
-	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length) {}
+	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
 public:
 };
 
 class TypeArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is BasicTypeOop.
-	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length) {}
+	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_TypeArrayOop) {}
 public:
 };
 
