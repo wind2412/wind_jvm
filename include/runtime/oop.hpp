@@ -45,7 +45,11 @@ void destructor(Tp *ptr)
 	ptr->~Tp();
 }
 
-class MemPool {
+class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
+
+};
+
+class MemAlloc {
 public:
 	static void *allocate(size_t size) {		// TODO: change to real Mem Pool (Heap)
 		void *ptr = malloc(size);
@@ -62,7 +66,7 @@ public:
 };
 
 
-class Oop : public MemPool {		// 注意：Oop 必须只能使用 new ( = ::operator new + constructor-->::operator new(pointer p) )来分配！！因为要放在堆中。
+class Oop : public MemAlloc {		// 注意：Oop 必须只能使用 new ( = ::operator new + constructor-->::operator new(pointer p) )来分配！！因为要放在堆中。
 protected:
 	// TODO: HashCode .etc
 	shared_ptr<Klass> klass;
@@ -102,7 +106,7 @@ protected:
 	int length;
 	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
 public:
-	ArrayOop(shared_ptr<ArrayKlass> klass, int length) : Oop(klass), length(length), buf((Oop **)MemPool::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
+	ArrayOop(shared_ptr<ArrayKlass> klass, int length) : Oop(klass), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
 	int get_length() { return length; }
 	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
 	Oop * operator[] (int index) {
