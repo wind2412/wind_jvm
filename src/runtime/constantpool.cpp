@@ -176,6 +176,8 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 	return this->pool[i];
 }
 
+/*
+
 void rt_constant_pool::print_debug()
 {
 	std::cout << "rt_pool: total " << this->pool.size() << std::endl;
@@ -276,3 +278,4 @@ void rt_constant_pool::print_debug()
 		}
 	}
 }
+*/

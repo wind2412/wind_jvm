@@ -47,9 +47,9 @@ Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
-	enum State{Zero, Loaded, Parsed, Initialized};
+//	enum State{Zero, Loaded, Parsed, Initialized};
 protected:
-	State cur = Zero;	// TODO: 需不需要？
+	bool initialized = false;	// TODO: 需不需要？
 protected:
 	ClassType classtype;
 
@@ -60,8 +60,8 @@ protected:
 	shared_ptr<Klass> next_sibling;
 	shared_ptr<Klass> child;
 public:
-	State get_state() { return cur; }
-	void set_state(State s) { cur = s; }
+	bool is_initialized() { return initialized; }
+	void set_initialized() { initialized = true; }
 	shared_ptr<Klass> get_parent() { return parent; }
 	void set_parent(shared_ptr<Klass> parent) { this->parent = parent; }
 	shared_ptr<Klass> get_next_sibling() { return next_sibling; }
@@ -139,6 +139,7 @@ public:
 	int non_static_field_bytes() { return total_non_static_fields_bytes; }
 	unsigned long get_static_field_value(int offset, int size);
 	void set_static_field_value(int offset, int size, unsigned long value);
+	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

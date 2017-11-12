@@ -250,7 +250,6 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	parse_superclass(cf, loader);
 	// this_class
 	this->access_flags = cf->access_flags;
-	cur = Loaded;
 	// become Runtime interfaces
 	parse_interfaces(cf, loader);
 	// become Runtime constant pool	// 必须放在构造函数之外！因为比如我加载 java.lang.Object，然后经由常量池加载了 java.lang.StringBuilder，注意此时 java.lang.Object 没被放到 system_classmap 中！然后又会加载 java.lang.Object，回来的时候会加载两遍 Object ！这是肯定不对的。于是设计成了丑恶的由 classloader 调用...QAQ

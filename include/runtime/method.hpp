@@ -44,6 +44,8 @@ public:
 	bool is_void() { return descriptor[descriptor.size()-1] == L'V'; }
 	bool is_main() { return is_static() && is_public() && is_void(); }
 	bool is_native() { return (this->access_flags & ACC_NATIVE) == ACC_NATIVE; }
+	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }
+	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
 public:
 	Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool);

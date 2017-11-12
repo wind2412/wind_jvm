@@ -11,7 +11,7 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
-shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)
+shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// TODO: ... 如果我恶意删掉 java.lang.Object 会怎样......
 {
 	assert(jl.find_file(L"java/lang/Object.class")==1);	// 这句是上边 static 模块之间初始化顺序不定实验的残留物。留着吧。
 	wstring target = classname + L".class";

@@ -11,17 +11,17 @@
 #include "runtime/bytecodeEngine.hpp"
 #include "classloader.hpp"
 #include <string>
-#include <vector>
+#include <list>
 
 using std::wstring;
-using std::vector;
+using std::list;
 
 class wind_jvm {
 	friend BytecodeEngine;
 private:
 	// TODO: pthread
 	wstring main_class_name;
-	vector<StackFrame> vm_stack;
+	list<StackFrame> vm_stack;	// 改成了 list...... 因为 vector 的扩容会导致内部迭代器失效......把 vector 作为栈的话，扩容是经常性的...... 故而选用伸缩性更好的 list......
 	int rsp;			// offset in [current, valid] vm_stack		// TODO: NEED ?????
 	uint8_t *pc;		// pc, pointing to the code segment: inside the Method->code.
 public:
@@ -42,7 +42,7 @@ public:
 					assert(false);		// for test. Is empty method valid ??? I dont know...
 				}
 				pc = code->code;
-				Oop * return_val = BytecodeEngine::execute(*this);
+				Oop * return_val = BytecodeEngine::execute(*this, vm_stack.back());
 				if (cur_frame.method->is_void()) {		// TODO: in fact, this can be delete. Because It is of no use.
 					assert(return_val == nullptr);
 					// do nothing
@@ -50,7 +50,14 @@ public:
 					cur_frame.op_stack.push((uint64_t)return_val);
 				}
 			}
+			vm_stack.pop_back();	// another half push_back() is in wind_jvm() constructor.
 		}
+	}
+	Oop * add_frame_and_execute(shared_ptr<Method> new_method, const std::list<uint64_t> & list) {
+		this->vm_stack.push_back(StackFrame(nullptr, new_method, nullptr, nullptr, list));
+		Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
+		this->vm_stack.pop_back();
+		return result;
 	}
 };
 

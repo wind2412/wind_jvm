@@ -11,9 +11,12 @@
 #include <vector>
 #include <stack>
 #include <memory>
-#include <initializer_list>
+#include <string>
+#include <list>
 #include "oop.hpp"
 
+using std::list;
+using std::wstring;
 using std::vector;
 using std::stack;
 using std::shared_ptr;
@@ -29,7 +32,7 @@ public:
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 public:
-	StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const std::initializer_list<uint64_t> & list);
+	StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<uint64_t> & list);
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
 	void clear_all();
@@ -41,7 +44,9 @@ class wind_jvm;
 
 struct BytecodeEngine {
 public:
-	static Oop * execute(wind_jvm & jvm);
+	static Oop * execute(wind_jvm & jvm, StackFrame & cur_frame);
+public:	// aux
+	static vector<Type> parse_arg_list(const wstring & descriptor);
 };
 
 
