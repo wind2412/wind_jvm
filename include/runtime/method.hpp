@@ -41,12 +41,17 @@ private:
 public:
 	bool is_static() { return (this->access_flags & ACC_STATIC) == ACC_STATIC; }
 	bool is_public() { return (this->access_flags & ACC_PUBLIC) == ACC_PUBLIC; }
+	bool is_private() { return (this->access_flags & ACC_PRIVATE) == ACC_PRIVATE; }
 	bool is_void() { return descriptor[descriptor.size()-1] == L'V'; }
 	bool is_main() { return is_static() && is_public() && is_void(); }
 	bool is_native() { return (this->access_flags & ACC_NATIVE) == ACC_NATIVE; }
 	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }
 	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
+public:
+	bool operator== (const Method & rhs) const {
+		return this->name == rhs.name && this->descriptor == rhs.descriptor;
+	}
 public:
 	Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }

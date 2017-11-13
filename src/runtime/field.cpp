@@ -7,7 +7,7 @@
 
 #include "runtime/field.hpp"
 
-Field_info::Field_info(field_info & fi, cp_info **constant_pool) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
+Field_info::Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool) : klass(klass) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
 	this->access_flags = fi.access_flags;
 	assert(constant_pool[fi.name_index-1]->tag == CONSTANT_Utf8 && constant_pool[fi.descriptor_index-1]->tag == CONSTANT_Utf8);
 	this->name = ((CONSTANT_Utf8_info *)constant_pool[fi.name_index-1])->convert_to_Unicode();

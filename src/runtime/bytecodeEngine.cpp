@@ -115,7 +115,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	pc = code_begin;
 
 	while (pc < code_begin + code_length) {
-		std::wcout << L"(DEBUG) " << klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
+		std::wcout << L"(DEBUG) <bytecode> " << klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 		int occupied = bccode_map[*pc].second + 1;		// the bytecode takes how many bytes.(include itself)		// TODO: tableswitch, lookupswitch, wide is NEGATIVE!!!
 		switch(*pc) {
 
@@ -190,8 +190,23 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 			case 0xb2:{		// getStatic
-
-
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
+				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				// initialize the new_class... <clinit>
+				shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
+				if (new_klass->get_state() == Klass::State::NotInitialized) {
+					std::wcout << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;		// msg
+					shared_ptr<Method> clinit = new_klass->get_class_method(L"<clinit>:()V");
+					if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。
+						new_klass->set_state(Klass::State::Initializing);		// important.
+						jvm.add_frame_and_execute(clinit, {});		// no return value
+					} else {
+						std::cout << "(DEBUG) no <clinit>." << std::endl;
+					}
+					new_klass->set_state(Klass::State::Initialized);
+				}
+				assert(false);
 
 				break;
 			}
@@ -201,16 +216,20 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
 				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);
 				assert(new_method->is_static() && !new_method->is_abstract());
-				if (!klass->is_initialized()) {
-					// initialize a class... <clinit>
-					std::wcout << "(DEBUG) " << klass->get_name() << "::<clinit>" << std::endl;		// msg
-					shared_ptr<Method> clinit = klass->get_class_method(klass->get_name() + L":<clinit>");
-					if (clinit != nullptr) {
+				// initialize the new_class... <clinit>
+				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+				if (new_klass->get_state() == Klass::State::NotInitialized) {
+					std::wcout << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;		// msg
+					shared_ptr<Method> clinit = new_klass->get_class_method(L"<clinit>:()V");
+					if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。
+						new_klass->set_state(Klass::State::Initializing);		// important.
 						jvm.add_frame_and_execute(clinit, {});		// no return value
-					}		// TODO: 这里 clinit 不知道会如何执行。
-					klass->set_initialized();
+					} else {
+						std::cout << "(DEBUG) no <clinit>." << std::endl;
+					}
+					new_klass->set_state(Klass::State::Initialized);
 				}
-				std::wcout << "(DEBUG) " << klass->get_name() << "::" << new_method->get_name() << ":" << new_method->get_descriptor() << std::endl;	// msg
+				std::wcout << "(DEBUG) " << new_klass->get_name() << "::" << new_method->get_name() << ":" << new_method->get_descriptor() << std::endl;	// msg
 				// TODO: synchronized !!!!!!
 				if (new_method->is_synchronized()) {
 					std::cerr << "can't suppose synchronized now..." << std::endl;
@@ -219,6 +238,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				if (new_method->is_native()) {
 					// TODO: native
 					std::cerr << "can't suppose native now..." << std::endl;
+					assert(false);
 				} else {
 					int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
 					std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete

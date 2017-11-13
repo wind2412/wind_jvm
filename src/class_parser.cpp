@@ -2030,8 +2030,25 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			for (int bc_num = 0; bc_num < code_ptr->code_length; bc_num ++) {
 				auto *code = code_ptr->code;
 				std::cout << "(DEBUG)     ";
-				if (bccode_map[code[bc_num]].second != -3)		// wide 指令集由我在后边自行输出。
-					printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
+				// print
+				switch (code[bc_num]) {
+					case 0xb2:{		// getstatic
+						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
+						break;
+					}
+
+					case 0xb8:{		// invokestatic
+						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
+						break;
+					}
+
+					default:{
+						if (bccode_map[code[bc_num]].second != -3) {		// wide 指令集由我在后边自行输出。
+							printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.
+						}
+					}
+				}
+
 				if (bccode_map[code[bc_num]].second >= 0) {
 					bc_num += bccode_map[code[bc_num]].second;
 				} else {		// 变长参数 以及 扩展局部变量索引 分别被定义为 -1 -2。 这里需要改进 !!!!!

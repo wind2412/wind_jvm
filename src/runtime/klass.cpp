@@ -12,6 +12,7 @@
 #include <utility>
 #include <cstring>
 #include <sstream>
+#include <algorithm>
 
 using std::make_pair;
 using std::make_shared;
@@ -64,32 +65,12 @@ Type get_type(const wstring & name)
 }
 
 /*===----------------  InstanceKlass  ------------------===*/
-void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
-{
-	wstringstream ss;
-	for(int i = 0; i < cf->methods_count; i ++) {
-		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
-		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
-		this->methods.insert(make_pair(ss.str(), method));	// add into
-		ss.str(L"");		// make empty
-	}
-#ifdef DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
-	std::cout << "methods: total " << this->methods.size() << std::endl;
-	int counter = 0;
-	for (auto iter : this->methods) {
-		std::wcout << "  #" << counter++ << "  " << iter.first << std::endl;
-	}
-	std::cout << "===---------------------------------------------------------===" << std::endl;
-#endif
-}
-
 void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 {
 	wstringstream ss;
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf->fields_count; i ++) {
-		shared_ptr<Field_info> metaField = make_shared<Field_info>(cf->fields[i], cf->constant_pool);
+		shared_ptr<Field_info> metaField = make_shared<Field_info>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->fields[i], cf->constant_pool);
 		ss << metaField->get_name() << L":" << metaField->get_descriptor();
 		if((cf->fields[i].access_flags & 0x08) != 0) {	// static field
 			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_bytes, metaField)));
@@ -180,6 +161,43 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 #endif
 }
 
+void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
+{
+	// copy vtable from parent
+	if (this->parent != nullptr) {	// if this class is not java.lang.Object
+		shared_ptr<InstanceKlass> the_parent = std::static_pointer_cast<InstanceKlass>(parent);
+		this->vtable.insert(this->vtable.end(), the_parent->vtable.begin(), the_parent->vtable.end());
+	}
+
+	// traverse all this.Methods
+	wstringstream ss;
+	for(int i = 0; i < cf->methods_count; i ++) {
+		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
+		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
+		// add method into [all methods]
+		this->methods.insert(make_pair(ss.str(), method));
+		// override method into [vtable]
+		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });
+		if (iter == vtable.end()) {
+			if (!method->is_static() && !method->is_private())
+				vtable.push_back(method);
+		} else {
+			*iter = method;		// override parent's method
+		}
+
+		ss.str(L"");		// make empty
+	}
+#ifdef DEBUG
+	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
+	std::cout << "methods: total " << this->methods.size() << std::endl;
+	int counter = 0;
+	for (auto iter : this->methods) {
+		std::wcout << "  #" << counter++ << "  " << iter.first << std::endl;
+	}
+	std::cout << "===---------------------------------------------------------===" << std::endl;
+#endif
+}
+
 void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader)
 {
 	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
@@ -242,8 +260,6 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	this->attributes_count = cf->attributes_count;
 	cf->attributes_count = 0;
 
-	// become Runtime methods
-	parse_methods(cf);
 	// become Runtime fields
 	parse_fields(cf);
 	// super_class
@@ -252,6 +268,8 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	this->access_flags = cf->access_flags;
 	// become Runtime interfaces
 	parse_interfaces(cf, loader);
+	// become Runtime methods
+	parse_methods(cf);
 	// become Runtime constant pool	// 必须放在构造函数之外！因为比如我加载 java.lang.Object，然后经由常量池加载了 java.lang.StringBuilder，注意此时 java.lang.Object 没被放到 system_classmap 中！然后又会加载 java.lang.Object，回来的时候会加载两遍 Object ！这是肯定不对的。于是设计成了丑恶的由 classloader 调用...QAQ
 	parse_constantpool(cf, loader);
 	// become Runtime Attributes

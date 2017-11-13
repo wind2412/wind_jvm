@@ -11,10 +11,12 @@
 #include "method.hpp"
 #include "class_parser.hpp"
 #include <unordered_map>
+#include <vector>
 #include <memory>
 #include <utility>
 
 using std::unordered_map;
+using std::vector;
 using std::shared_ptr;
 using std::pair;
 
@@ -54,9 +56,9 @@ Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
-//	enum State{Zero, Loaded, Parsed, Initialized};
+	enum State{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
 protected:
-	bool initialized = false;	// TODO: 需不需要？
+	State state = State::NotInitialized;	// TODO: 需不需要？
 protected:
 	ClassType classtype;
 
@@ -67,8 +69,8 @@ protected:
 	shared_ptr<Klass> next_sibling;
 	shared_ptr<Klass> child;
 public:
-	bool is_initialized() { return initialized; }
-	void set_initialized() { initialized = true; }
+	State get_state() { return state; }
+	void set_state(State s) { state = s; }
 	shared_ptr<Klass> get_parent() { return parent; }
 	void set_parent(shared_ptr<Klass> parent) { this->parent = parent; }
 	shared_ptr<Klass> get_next_sibling() { return next_sibling; }
@@ -92,6 +94,15 @@ class Fields;
 class Field_info;
 class rt_constant_pool;
 
+/**
+ * 对于类中的各种函数：有如下几条规则：
+ * 1. 对于 <clinit> 方法，不会有任何 bytecode 能够调用到它；它只能算是 invoke 系列指令的副作用。因为 invoke 指令检查到类没有初始化的时候，会自动调用它。因而不能算是显式调用。
+ * 2. 对于 <init> 方法，this 类的 private but not static(this 的 private static 由 invokestatic 来) 方法，以及 super 父类的 non-private 方法 ([x] 会通过 parent ptr 上溯到父类去查找。这说明父类除了 vtable 以外，还是要维护一个排序的 all 方法列表 ----- [√] 好像不太对...其实好像是通过 constant_pool 直接查找。因为这样比较快。)，这三种情况对应 invokespecial 指令。
+ * 3. 对于 static 方法，由 invokestatic 指令调用。
+ * 4. 对于其他的成员方法，只要不是有接口句柄调用，即便覆盖了接口方法，也是 invokevirtual 指令调用。这时会用到 vtable.
+ * 5. 直接在接口句柄上调用，是 invokeinterface 指令调用。这时会用到 itable。
+ * 6. 对于 invokedynamic 方法，等用到的时候再说。
+ */
 class InstanceKlass : public Klass {
 	friend Fields;
 private:
@@ -109,8 +120,10 @@ private:
 	int total_non_static_fields_bytes = 0;
 	int total_static_fields_bytes = 0;
 	uint8_t *static_fields = nullptr;												// static field values. [non-static field values are in oop].
-	// methods
-	unordered_map<wstring, shared_ptr<Method>> methods;
+	// static methods + vtable + itable
+	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
+	vector<shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
+	unordered_map<wstring, shared_ptr<Method>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !!
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
@@ -142,11 +155,12 @@ public:
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);				// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
-	unordered_map<wstring, shared_ptr<Method>> get_methods() { return methods; }		// delete
 	int non_static_field_bytes() { return total_non_static_fields_bytes; }
 	unsigned long get_static_field_value(int offset, int size);
 	void set_static_field_value(int offset, int size, unsigned long value);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
+public:
+	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

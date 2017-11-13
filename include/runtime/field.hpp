@@ -13,9 +13,11 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <memory>
 
 using std::wstring;
 using std::vector;
+using std::shared_ptr;
 
 class InstanceKlass;
 
@@ -39,6 +41,8 @@ class InstanceKlass;
 class Field_info {
 private:
 	// field basic
+	shared_ptr<InstanceKlass> klass;
+
 	u2 access_flags;
 	wstring name;			// variable name
 	wstring descriptor;		// type descripror: I, [I, java.lang.String etc.
@@ -56,9 +60,10 @@ private:
 
 
 public:
-	explicit Field_info(field_info & fi, cp_info **constant_pool);
+	explicit Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
+	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	int get_value_size() { return value_size; }
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
 	void print() { std::wcout << name << ":" << descriptor; }
