@@ -35,7 +35,9 @@ private:
 	wstring name;
 	shared_ptr<set<shared_ptr<RtJarDirectory>>> subdir;		// sub directory.
 public:
-	explicit RtJarDirectory(const wstring & filename) : name(filename) {
+	explicit RtJarDirectory(const wstring & filename, bool only_name = false) : name(filename) {
+//		std::wcout << name << std::endl;	// delete
+		if (only_name == true)	return;
 		if (boost::ends_with(filename, L".class"))	subdir = nullptr;
 		else subdir.reset(new set<shared_ptr<RtJarDirectory>>);	// why shared_ptr cancelled the openator = ... emmmm...
 	}

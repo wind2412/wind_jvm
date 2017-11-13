@@ -14,6 +14,7 @@
 #include <string>
 #include <cassert>
 #include <memory>
+#include "runtime/klass.hpp"
 
 using std::wstring;
 using std::vector;
@@ -39,9 +40,16 @@ class InstanceKlass;
  * all Field in constant_pool is only belong to *this* class, the same as Method.
  */
 class Field_info {
+public:
+	enum FieldState { NotParsed, Parsing, Parsed };
 private:
+	FieldState state = NotParsed;
+
 	// field basic
-	shared_ptr<InstanceKlass> klass;
+	shared_ptr<InstanceKlass> klass;		// the klass This Field_info is in.
+
+	Type type;
+	shared_ptr<Klass> true_type;			// the klass which is This Field_info 's type ! which is the `descriptor`...
 
 	u2 access_flags;
 	wstring name;			// variable name
@@ -61,11 +69,18 @@ private:
 
 public:
 	explicit Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool);
+	FieldState get_state() { return state; }
+	void set_state(FieldState s) { state = s; }
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
+	Type get_type() { return type; }
+	shared_ptr<Klass> get_type_klass() { assert(get_state() == Parsed); return true_type; }	// small lock to keep safe.
 	int get_value_size() { return value_size; }
+	void if_didnt_parse_then_parse();			// **VERY IMPORTANT**!!!
+public:
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
+public:
 	void print() { std::wcout << name << ":" << descriptor; }
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。

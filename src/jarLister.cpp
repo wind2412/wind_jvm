@@ -27,7 +27,7 @@ shared_ptr<RtJarDirectory> RtJarDirectory::findFolderInThis(const wstring & fdr_
 {
 	if (this->subdir == nullptr) return nullptr;
 
-	auto iter = this->subdir->find(make_shared<RtJarDirectory>(fdr_name));
+	auto iter = this->subdir->find(make_shared<RtJarDirectory>(fdr_name, true));
 	if (iter != this->subdir->end()) return *iter;
 	else return nullptr;
 }

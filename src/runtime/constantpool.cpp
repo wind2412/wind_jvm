@@ -15,8 +15,6 @@ using std::make_pair;
 using std::wstring;
 using std::make_shared;
 
-//int counter = 0;
-
 shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
 	if (loader == nullptr) {
@@ -85,14 +83,6 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
 			} else if (target->tag == CONSTANT_Methodref) {
 				std::wcout << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
-//	counter ++ ;
-//	std::wcout << __FILE__ << " " << __LINE__ << " " << counter << std::endl;
-//	assert(new_class->get_methods().size() < 500);
-//	std::wcout << __FILE__ << " " << __LINE__ << std::endl;
-//	std::wcout << new_class->get_name() << " " << new_class->get_methods().size() << std::endl;
-//	for (auto ll : new_class->get_methods()) {
-//		std::wcout << ll.first << std::endl;
-//	}
 				shared_ptr<Method> target;
 				if (new_class->get_type() == ClassType::ObjArrayClass || new_class->get_type() == ClassType::TypeArrayClass) {
 					target = std::static_pointer_cast<ArrayKlass>(new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。

@@ -47,6 +47,7 @@ public:
 	static Oop * execute(wind_jvm & jvm, StackFrame & cur_frame);
 public:	// aux
 	static vector<Type> parse_arg_list(const wstring & descriptor);
+	static void initial_clinit(shared_ptr<InstanceKlass>, wind_jvm & jvm);
 };
 
 

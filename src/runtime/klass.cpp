@@ -321,8 +321,16 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signa
 
 }
 
-unsigned long InstanceKlass::get_static_field_value(int offset, int size)
+unsigned long InstanceKlass::get_static_field_value(shared_ptr<Field_info> field)
 {
+	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	auto iter = this->static_fields_layout.find(signature);
+	if (iter == this->static_fields_layout.end()) {
+		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	int size = iter->second.second->get_value_size();
 	switch (size) {
 		case 1:
 			return *(uint8_t *)(this->static_fields + offset);
@@ -339,8 +347,16 @@ unsigned long InstanceKlass::get_static_field_value(int offset, int size)
 	}
 }
 
-void InstanceKlass::set_static_field_value(int offset, int size, unsigned long value)
+void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, unsigned long value)
 {
+	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	auto iter = this->static_fields_layout.find(signature);
+	if (iter == this->static_fields_layout.end()) {
+		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	int size = iter->second.second->get_value_size();
 	switch (size) {
 		case 1:
 			*(uint8_t *)(this->static_fields + offset) = value;
@@ -361,9 +377,17 @@ void InstanceKlass::set_static_field_value(int offset, int size, unsigned long v
 	}
 }
 
+shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
+{
+	auto iter = this->methods.find(signature);
+	if (iter != this->methods.end())	{
+		return (*iter).second;
+	} else
+		return nullptr;
+}
+
 shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 {
-	assert(methods.size() < 1000);
 	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
 	// search in this->methods

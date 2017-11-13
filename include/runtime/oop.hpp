@@ -85,8 +85,8 @@ private:
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
 private:
-	unsigned long get_field_value(int offset, int size);
-	void set_field_value(int offset, int size, unsigned long value);
+	unsigned long get_field_value(shared_ptr<Field_info> field);
+	void set_field_value(shared_ptr<Field_info> field, unsigned long value);
 public:
 	unsigned long get_value(const wstring & signature);
 	void set_value(const wstring & signature, unsigned long value);
@@ -116,6 +116,14 @@ public:
 	}
 	const Oop * operator[] (int index) const {
 		return this->operator[](index);
+	}
+	~ArrayOop() {
+		if (buf != nullptr) {
+			for (int i = 0; i < length; i ++) {
+				delete buf[i];
+			}
+			delete[] buf;
+		}
 	}
 };
 

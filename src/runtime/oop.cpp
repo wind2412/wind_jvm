@@ -15,7 +15,17 @@ InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::
 		fields = new uint8_t[this->field_length];
 }
 
-unsigned long InstanceOop::get_field_value(int offset, int size) {
+unsigned long InstanceOop::get_field_value(shared_ptr<Field_info> field)
+{
+	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
+	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	auto iter = instance_klass->fields_layout.find(signature);
+	if (iter == instance_klass->fields_layout.end()) {
+		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	int size = iter->second.second->get_value_size();
 	switch (size) {
 		case 1:
 			return *(uint8_t *)(this->fields + offset);
@@ -32,7 +42,17 @@ unsigned long InstanceOop::get_field_value(int offset, int size) {
 	}
 }
 
-void InstanceOop::set_field_value(int offset, int size, unsigned long value) {
+void InstanceOop::set_field_value(shared_ptr<Field_info> field, unsigned long value)
+{
+	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
+	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	auto iter = instance_klass->fields_layout.find(signature);
+	if (iter == instance_klass->fields_layout.end()) {
+		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	int size = iter->second.second->get_value_size();
 	switch (size) {
 		case 1:
 			*(uint8_t *)(this->fields + offset) = value;
@@ -59,9 +79,9 @@ unsigned long InstanceOop::get_value(const wstring & signature) {	// 注意.....
 	auto target = this_klass->get_field(signature);
 	assert(target.first != -1);	// valid field
 	if (target.second->is_static()) {
-		return this_klass->get_static_field_value(target.first, target.second->get_value_size());
+		return this_klass->get_static_field_value(target.second);
 	} else {
-		return this->get_field_value(target.first, target.second->get_value_size());
+		return this->get_field_value(target.second);
 	}
 }
 
@@ -70,9 +90,9 @@ void InstanceOop::set_value(const wstring & signature, unsigned long value) {
 	auto target = this_klass->get_field(signature);
 	assert(target.first != -1);	// valid field
 	if (target.second->is_static()) {
-		this_klass->set_static_field_value(target.first, target.second->get_value_size(), value);
+		this_klass->set_static_field_value(target.second, value);
 	} else {
-		this->set_field_value(target.first, target.second->get_value_size(), value);
+		this->set_field_value(target.second, value);
 	}
 }
 

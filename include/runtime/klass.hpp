@@ -56,9 +56,9 @@ Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
-	enum State{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
+	enum KlassState{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
 protected:
-	State state = State::NotInitialized;	// TODO: 需不需要？
+	KlassState state = KlassState::NotInitialized;	// TODO: 需不需要？
 protected:
 	ClassType classtype;
 
@@ -69,8 +69,8 @@ protected:
 	shared_ptr<Klass> next_sibling;
 	shared_ptr<Klass> child;
 public:
-	State get_state() { return state; }
-	void set_state(State s) { state = s; }
+	KlassState get_state() { return state; }
+	void set_state(KlassState s) { state = s; }
 	shared_ptr<Klass> get_parent() { return parent; }
 	void set_parent(shared_ptr<Klass> parent) { this->parent = parent; }
 	shared_ptr<Klass> get_next_sibling() { return next_sibling; }
@@ -90,9 +90,9 @@ public:
 	Klass() {}
 };
 
-class Fields;
 class Field_info;
 class rt_constant_pool;
+class InstanceOop;
 
 /**
  * 对于类中的各种函数：有如下几条规则：
@@ -104,7 +104,7 @@ class rt_constant_pool;
  * 6. 对于 invokedynamic 方法，等用到的时候再说。
  */
 class InstanceKlass : public Klass {
-	friend Fields;
+	friend InstanceOop;
 private:
 //	ClassFile *cf;		// origin non-dynamic constant pool
 	ClassLoader *loader;
@@ -153,12 +153,14 @@ public:
 	shared_ptr<Method> get_static_void_main();
 public:
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);				// [name + ':' + descriptor]
-	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]
+	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool!!!
+	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 	int non_static_field_bytes() { return total_non_static_fields_bytes; }
-	unsigned long get_static_field_value(int offset, int size);
-	void set_static_field_value(int offset, int size, unsigned long value);
+	unsigned long get_static_field_value(shared_ptr<Field_info> field);
+	void set_static_field_value(shared_ptr<Field_info> field, unsigned long value);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
+	ClassLoader *get_classloader() { return this->loader; }
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 private:

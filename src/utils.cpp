@@ -19,21 +19,15 @@ int parse_field_descriptor(const std::wstring & descriptor)
 	if(descriptor.size() == 1) {
 		switch(descriptor[0]) {
 			case L'B':	// byte
-				return 1;
 			case L'C':	// char
-				return 2;
-			case L'D':	// double
-				return 8;
 			case L'F':	// float
-				return 4;
 			case L'I':	// int
-				return 4;
+			case L'S':	// short
+			case L'Z':	// boolean
+//				return 4;					// 可耻地全部设成 8 字节了......
+			case L'D':	// double
 			case L'J':	// long
 				return 8;
-			case L'S':	// short
-				return 2;
-			case L'Z':	// boolean
-				return 1;
 			default:
 				std::cerr << "can't get here in <utils.cpp>::parse_field_descriptor!" << std::endl;
 				assert(false);
