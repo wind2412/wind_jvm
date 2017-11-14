@@ -22,12 +22,49 @@ using std::make_shared;
 	wstring splitter(L"\\");
 #endif
 
+/*===--------------- Comparator -----------------===*/
+struct shared_RtJarDirectory_compare
+{
+	using is_transparent = void;		// C++ 14	// TODO: 虽然我并不理解这个到底是什么意思...... // https://stackoverflow.com/questions/32610446/find-a-value-in-a-set-of-shared-ptr
+
+	bool operator() (const shared_ptr<RtJarDirectory> & lhs, const shared_ptr<RtJarDirectory> & rhs) const
+	{
+		return *lhs < *rhs;
+	}
+
+	bool operator() (const shared_ptr<RtJarDirectory> & lhs, const RtJarDirectory & rhs) const
+	{
+		return *lhs < rhs;
+	}
+
+	bool operator() (const RtJarDirectory & lhs, const shared_ptr<RtJarDirectory> & rhs) const
+	{
+		return lhs < *rhs;
+	}
+
+	bool operator() (const shared_ptr<RtJarDirectory> & lhs, const wstring & rhs) const
+	{
+		return *lhs < rhs;
+	}
+
+	bool operator() (const wstring & lhs, const shared_ptr<RtJarDirectory> & rhs) const
+	{
+		return lhs < *rhs;
+	}
+};
+
 /*===---------------- RtJarDirectory --------------------*/
+RtJarDirectory::RtJarDirectory(const wstring & filename) : name(filename) {
+//	std::wcout << name << std::endl;	// delete
+	if (boost::ends_with(filename, L".class"))	subdir = nullptr;
+	else subdir.reset(new set<shared_ptr<RtJarDirectory>, shared_RtJarDirectory_compare>);	// why shared_ptr cancelled the openator = ... emmmm...
+}
+
 shared_ptr<RtJarDirectory> RtJarDirectory::findFolderInThis(const wstring & fdr_name) const	// fdr --> folder 
 {
 	if (this->subdir == nullptr) return nullptr;
 
-	auto iter = this->subdir->find(make_shared<RtJarDirectory>(fdr_name, true));
+	auto iter = this->subdir->find(fdr_name);		// the total `shared_RtJarDirectory_compare` and lots of `operator <` only works for here......
 	if (iter != this->subdir->end()) return *iter;
 	else return nullptr;
 }

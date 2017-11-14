@@ -30,17 +30,14 @@ public:
 	int & counter() { return cur; }
 };
 
+struct shared_RtJarDirectory_compare;
+
 class RtJarDirectory {
 private:
 	wstring name;
-	shared_ptr<set<shared_ptr<RtJarDirectory>>> subdir;		// sub directory.
+	shared_ptr<set<shared_ptr<RtJarDirectory>, shared_RtJarDirectory_compare>> subdir;		// sub directory.
 public:
-	explicit RtJarDirectory(const wstring & filename, bool only_name = false) : name(filename) {
-//		std::wcout << name << std::endl;	// delete
-		if (only_name == true)	return;
-		if (boost::ends_with(filename, L".class"))	subdir = nullptr;
-		else subdir.reset(new set<shared_ptr<RtJarDirectory>>);	// why shared_ptr cancelled the openator = ... emmmm...
-	}
+	explicit RtJarDirectory(const wstring & filename);
 private:
 	shared_ptr<RtJarDirectory> findFolderInThis(const wstring &s) const;
 	void print(int level) const;
@@ -51,8 +48,14 @@ public:
 	bool find_file(StringSplitter && ss) const;
 	void print() const;
 public:
-	bool operator < (const RtJarDirectory & rhs) {	// for set sort
+	bool operator < (const RtJarDirectory & rhs) const {	// for set sort
 		return this->name < rhs.name;
+	}
+	bool operator < (const wstring & rhs) const {	// for C++14 subdir.find(wstring)
+		return this->name < rhs;
+	}
+	friend bool operator < (const wstring & lhs, const RtJarDirectory & rhs) {
+		return lhs < rhs.name;
 	}
 	friend bool operator < (const shared_ptr<RtJarDirectory> &lhs, const shared_ptr<RtJarDirectory> &rhs) {
 		return *lhs < *rhs;

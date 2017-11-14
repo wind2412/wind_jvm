@@ -9,6 +9,7 @@
 #include "classloader.hpp"
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
+#include "runtime/string_table.hpp"
 #include <string>
 
 using std::make_pair;
@@ -52,7 +53,10 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		case CONSTANT_String:{	// TODO: 我认为最后形成的 String 类内部应该封装一个 std::wstring & 才好。这样能够保证常量池唯一！～
 			CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 			assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
-			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
+			// TODO: 由于变成了惰性的解析，正常情况下我认为应该会先索引到 CONSTANT_String，但是这个时候 CONSTANT_utf8 还没有被解析，即字符串还没有被放入到 string_table 中。因此我认为可以【改用】在这里递归先解析 utf_8，然后先把 utf_8 修改成为放到 string_table 这样的形式。由此一来，这里的 boost::any 就可以改变成真的放置 shared_ptr<wstring> 这个情况了～～
+			this->pool[i] = (make_pair(target->tag, this->pool[target->index - 1]));		// shared_ptr<wstring>	// 强制先使用 operator[] 隐式调用 if_didnt_parse_then_parse 这个函数！！
+
+//			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// wstring
 			break;
 		}
@@ -139,7 +143,15 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		}
 		case CONSTANT_Utf8:{
 			CONSTANT_Utf8_info* target = (CONSTANT_Utf8_info*)bufs[i];
-			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(make_shared<wstring>(target->convert_to_Unicode()))));		// shared_ptr<wstring> 类型。这样能够保证常量唯一。
+			// TODO: use string_table !!!!
+			shared_ptr<wstring> ptr = make_shared<wstring>(target->convert_to_Unicode());		// TODO: 注意！！这里用了 new，但是没有放到 GC 堆当中............
+			auto iter = string_table.find(ptr);
+			if (iter == string_table.end()) {
+				string_table.insert(ptr);
+				this->pool[i] = (make_pair(bufs[i]->tag, ptr));		// shared_ptr<wstring> 类型。这样能够保证常量唯一。
+			} else {
+				this->pool[i] = (make_pair(bufs[i]->tag, *iter));
+			}
 			break;
 		}
 		case CONSTANT_MethodHandle:{
