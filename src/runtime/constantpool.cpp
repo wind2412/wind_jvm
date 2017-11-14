@@ -10,6 +10,7 @@
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
 #include "runtime/string_table.hpp"
+#include "runtime/bytecodeEngine.hpp"
 #include <string>
 
 using std::make_pair;
@@ -53,11 +54,27 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		case CONSTANT_String:{	// TODO: 我认为最后形成的 String 类内部应该封装一个 std::wstring & 才好。这样能够保证常量池唯一！～
 			CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
 			assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
-			// TODO: 由于变成了惰性的解析，正常情况下我认为应该会先索引到 CONSTANT_String，但是这个时候 CONSTANT_utf8 还没有被解析，即字符串还没有被放入到 string_table 中。因此我认为可以【改用】在这里递归先解析 utf_8，然后先把 utf_8 修改成为放到 string_table 这样的形式。由此一来，这里的 boost::any 就可以改变成真的放置 shared_ptr<wstring> 这个情况了～～
-			this->pool[i] = (make_pair(target->tag, this->pool[target->index - 1]));		// shared_ptr<wstring>	// 强制先使用 operator[] 隐式调用 if_didnt_parse_then_parse 这个函数！！
-
-//			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
-//				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// wstring
+			// TODO: [x] 由于变成了惰性的解析，正常情况下我认为应该会先索引到 CONSTANT_String，但是这个时候 CONSTANT_utf8 还没有被解析，即字符串还没有被放入到 string_table 中。因此我认为可以【改用】在这里递归先解析 utf_8，然后先把 utf_8 修改成为放到 string_table 这样的形式。由此一来，这里的 boost::any 就可以改变成真的放置 shared_ptr<wstring> 这个情况了～～
+//			this->pool[i] = (make_pair(target->tag, this->pool[target->index - 1]));		// [x] shared_ptr<wstring>	// 强制先使用 operator[] 隐式调用 if_didnt_parse_then_parse 这个函数！！
+			// [√] 需要使用 new 来 new 一个 oop String。见 Spec $4.4.3：CONSTANT_String_info 表示一个 【java/lang/String **对象**】 ！！！因此这里就应该 new 出来！
+			// 而且 String a = new String("haha") 的字节码也显示，这会调用 String(String lhs) 的构造函数。也就是说， "haha" 自身就必须是 java/lang/String ！！
+			// 但是，openjdk8 没有使用字节码来 new。而是直接建立了一个 oop，然后把 TypeArrayOop(char []) 写入 InstanceOop 的挂在 class 外部的 fields 中。[x] 我的话，还是采用 new 的策略了。因为我没法确定 String 内部到底有几个 fields......
+			// [√] 不过果然......如果我们要在这里直接调用字节码的话，需要 BytecodeEngine。BytecodeEngine 又需要得到 jvm 句柄......然而这个 rt_pool 依赖于 InstanceKlass，我并不希望 Klass 和 Jvm 之间有联系。那才是糟糕的设计。所以只能和 openjdk 一样，用 TypeArrayOop 占位符来假装有一个 string oop 了......
+			// make a String Oop...
+			wstring result = *boost::any_cast<shared_ptr<wstring>>(this->pool[target->index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
+			TypeArrayOop * charsequence = new TypeArrayOop(std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[C")), result.size());
+			assert(charsequence->get_klass() != nullptr);
+			// 虽然设计悲伤就在于，每个基本类型都封装了一层......不过胜在统一......QAQ
+			for (int pos = 0; pos < result.size(); pos ++) {
+				(*charsequence)[pos] = new CharOop((uint32_t)result[pos]);		// 在这里，32 bits 的 wchar_t 转为 16 bits 的 uint16_t 会失去精度...... 因此我改成了 32 bits 储存 char..... java 的设计真有意思。明明在表层 char 是 16 bits，unicode 根本存不全不说，到了 jvm 竟然会全被提升到 32 bits。这设计简直太糟糕了。（吐槽
+			}
+			InstanceOop *stringoop = new InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String")));
+			assert(stringoop != nullptr);
+			stringoop->set_field_value(L"value:[C", (uint64_t)charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
+			// set!
+			this->pool[i] = (make_pair((target->tag), boost::any(stringoop)));	// InstanceOop* ~~
+//			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// [x] int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
+//			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// [x] wstring
 			break;
 		}
 		case CONSTANT_Fieldref:

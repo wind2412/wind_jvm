@@ -9,6 +9,7 @@
 #include "runtime/field.hpp"
 #include "classloader.hpp"
 #include "runtime/constantpool.hpp"
+#include "runtime/oop.hpp"
 #include <utility>
 #include <cstring>
 #include <sstream>
@@ -324,6 +325,17 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signa
 unsigned long InstanceKlass::get_static_field_value(shared_ptr<Field_info> field)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	return get_static_field_value(signature);
+}
+
+void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, unsigned long value)
+{
+	wstring signature = field->get_name() + L":" + field->get_descriptor();
+	set_static_field_value(signature, value);
+}
+
+unsigned long InstanceKlass::get_static_field_value(const wstring & signature)				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+{
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
 		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
@@ -347,9 +359,8 @@ unsigned long InstanceKlass::get_static_field_value(shared_ptr<Field_info> field
 	}
 }
 
-void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, unsigned long value)
+void InstanceKlass::set_static_field_value(const wstring & signature, unsigned long value)
 {
-	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
 		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
@@ -375,6 +386,7 @@ void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, unsigne
 			assert(false);
 		}
 	}
+
 }
 
 shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
@@ -442,6 +454,10 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 		}
 	}
 	return nullptr;
+}
+
+shared_ptr<Oop> InstanceKlass::new_instance() {
+	return make_shared<InstanceOop>(shared_ptr<InstanceKlass>(this, [](auto *){}));
 }
 
 /*===---------------    ArrayKlass    --------------------===*/

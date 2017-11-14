@@ -20,7 +20,11 @@ wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv
 	// first execute <clinit> if has
 	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);
 	// second execute [public static void main].
+	// TODO: 这里的设计也有问题！！......argv 完全没有传递进去......
 	ObjArrayOop *stringoop = new ObjArrayOop(std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;")), argv.size());			// 手动调用
+	for (int i = 0; i < argv.size(); i ++) {
+
+	}
 	this->vm_stack.push_back(StackFrame(nullptr, main_method, nullptr, nullptr, {(uint64_t)stringoop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 }

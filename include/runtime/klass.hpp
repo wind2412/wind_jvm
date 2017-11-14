@@ -92,6 +92,7 @@ public:
 
 class Field_info;
 class rt_constant_pool;
+class Oop;
 class InstanceOop;
 
 /**
@@ -159,8 +160,11 @@ public:
 	int non_static_field_bytes() { return total_non_static_fields_bytes; }
 	unsigned long get_static_field_value(shared_ptr<Field_info> field);
 	void set_static_field_value(shared_ptr<Field_info> field, unsigned long value);
+	unsigned long get_static_field_value(const wstring & signature);				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+	void set_static_field_value(const wstring & signature, unsigned long value);	// as above.
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
+	shared_ptr<Oop> new_instance();
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 private:

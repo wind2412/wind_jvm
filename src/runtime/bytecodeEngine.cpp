@@ -221,7 +221,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 			case 0xac:{		// ireturn
 				// TODO: monitor...
 				jvm.pc = backup_pc;
-				return new BasicTypeOop(Type::INT, op_stack.top());	// boolean, short, char, int
+				return new IntOop(op_stack.top());	// boolean, short, char, int
 			}
 
 

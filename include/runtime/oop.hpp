@@ -76,6 +76,7 @@ public:
 	shared_ptr<Klass> get_klass() { return klass; }
 public:
 	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
+	OopType get_ooptype() { return ooptype; }
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
@@ -84,22 +85,18 @@ private:
 	uint8_t *fields = nullptr;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
-private:
+public:		// 以下 8 个方法全部用来赋值。
 	unsigned long get_field_value(shared_ptr<Field_info> field);
 	void set_field_value(shared_ptr<Field_info> field, unsigned long value);
-public:
-	unsigned long get_value(const wstring & signature);
-	void set_value(const wstring & signature, unsigned long value);
-};
-
-class BasicTypeOop : public Oop {
-private:
-	Type type;	// only allow for BYTE, BOOLEAN, CHAR, SHORT, INT, FLOAT, LONG, DOUBLE.
-	uint64_t value;
-public:
-	BasicTypeOop(Type type, uint64_t value) : Oop(nullptr, OopType::_BasicTypeOop), type(type), value(value) {}
-	Type get_type() { return type; }
-	uint64_t get_value() { return value; }
+	unsigned long get_field_value(const wstring & signature);				// use for forging String Oop at parsing constant_pool.
+	void set_field_value(const wstring & signature, unsigned long value);	// same as above...
+	unsigned long get_static_field_value(shared_ptr<Field_info> field) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field); }
+	void set_static_field_value(shared_ptr<Field_info> field, unsigned long value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
+	unsigned long get_static_field_value(const wstring & signature) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature); }
+	void set_static_field_value(const wstring & signature, unsigned long value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
+//public:	// deprecated.
+//	unsigned long get_value(const wstring & signature);
+//	void set_value(const wstring & signature, unsigned long value);
 };
 
 class ArrayOop : public Oop {
@@ -110,25 +107,25 @@ public:
 	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
 	int get_length() { return length; }
 	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
-	Oop * operator[] (int index) {
+	Oop* & operator[] (int index) {
 		assert(index >= 0 && index < length);	// TODO: please replace with ArrayIndexOutofBound...
 		return buf[index];
 	}
-	const Oop * operator[] (int index) const {
+	const Oop* operator[] (int index) const {
 		return this->operator[](index);
 	}
 	~ArrayOop() {
 		if (buf != nullptr) {
 			for (int i = 0; i < length; i ++) {
-				delete buf[i];
+				MemAlloc::deallocate(buf[i]);
 			}
-			delete[] buf;
+			MemAlloc::deallocate(buf);
 		}
 	}
 };
 
 class ObjArrayOop : public ArrayOop {
-public:		// Most inner type of `buf` is InstanceOop.
+public:		// Most inner type of `buf` is InstanceOop.		// 注意：维度要由自己负责！！并不会进行检查。
 	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
 public:
 };
@@ -137,8 +134,57 @@ class TypeArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is BasicTypeOop.
 	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_TypeArrayOop) {}
 public:
+
 };
 
+// Basic Type...
 
+class BasicTypeOop : public Oop {
+private:
+	Type type;	// only allow for BYTE, BOOLEAN, CHAR, SHORT, INT, FLOAT, LONG, DOUBLE.
+public:
+	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
+	Type get_type() { return type; }
+};
+
+struct ByteOop : public BasicTypeOop {
+	uint8_t value;		// data
+	ByteOop(uint8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
+};
+
+struct BooleanOop : public BasicTypeOop {
+	uint8_t value;		// data
+	BooleanOop(uint8_t value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
+};
+
+struct CharOop : public BasicTypeOop {
+	uint32_t value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......
+	CharOop(uint32_t value) : BasicTypeOop(Type::CHAR), value(value) {}
+};
+
+struct ShortOop : public BasicTypeOop {
+	uint16_t value;		// data
+	ShortOop(uint16_t value) : BasicTypeOop(Type::SHORT), value(value) {}
+};
+
+struct IntOop : public BasicTypeOop {
+	uint32_t value;		// data
+	IntOop(uint32_t value) : BasicTypeOop(Type::INT), value(value) {}
+};
+
+struct FloatOop : public BasicTypeOop {
+	float value;		// data
+	FloatOop(uint32_t value) : BasicTypeOop(Type::FLOAT), value(value) {}
+};
+
+struct LongOop : public BasicTypeOop {
+	uint64_t value;		// data
+	LongOop(uint64_t value) : BasicTypeOop(Type::LONG), value(value) {}
+};
+
+struct DoubleOop : public BasicTypeOop {
+	double value;		// data
+	DoubleOop(uint64_t value) : BasicTypeOop(Type::DOUBLE), value(value) {}
+};
 
 #endif /* INCLUDE_RUNTIME_OOP_HPP_ */
