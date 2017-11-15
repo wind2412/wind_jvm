@@ -15,24 +15,24 @@ InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::
 		fields = new uint8_t[this->field_length];
 }
 
-unsigned long InstanceOop::get_field_value(shared_ptr<Field_info> field)
+bool InstanceOop::get_field_value(shared_ptr<Field_info> field, uint64_t *result)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
-	return get_field_value(signature);
+	return get_field_value(signature, result);
 }
 
-void InstanceOop::set_field_value(shared_ptr<Field_info> field, unsigned long value)
+void InstanceOop::set_field_value(shared_ptr<Field_info> field, uint64_t value)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	set_field_value(signature, value);
 }
 
-unsigned long InstanceOop::get_field_value(const wstring & signature) 				// use for forging String Oop at parsing constant_pool.
+bool InstanceOop::get_field_value(const wstring & signature, uint64_t *result) 				// use for forging String Oop at parsing constant_pool.
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	auto iter = instance_klass->fields_layout.find(signature);
+	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 	if (iter == instance_klass->fields_layout.end()) {
 		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
 		assert(false);
@@ -55,7 +55,7 @@ unsigned long InstanceOop::get_field_value(const wstring & signature) 				// use
 	}
 }
 
-void InstanceOop::set_field_value(const wstring & signature, unsigned long value)
+void InstanceOop::set_field_value(const wstring & signature, uint64_t value)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	auto iter = instance_klass->fields_layout.find(signature);

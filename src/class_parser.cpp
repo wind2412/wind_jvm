@@ -2278,10 +2278,14 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 				// print
 				// verify:	inner_name_index 和 outer_class_info_index 要为 0 必须全都为 0
 				if (inner_name_index == 0) {
-					assert(outer_class_info_index == 0);
+//					assert(outer_class_info_index == 0);		// *** 这里去掉了，并且加上了下方的 else if！！因为 openjdk 的 java/lang/String 特别诡异，parse 不了！！这个文件不符合 Spec 规范！！！但是 Oracle 的 Java SE 8 的能够 parse！！！
 				}
 				if (inner_name_index == 0 && outer_class_info_index == 0) {
 					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_class_info_index << "  //<class:> " << inner_class_info << endl;	// wcout 只能输出 char * 和 wstring，但是不能输出 string！！
+				} else if (inner_name_index == 0 && outer_class_info_index != 0) {
+					wstring outer_class_info = (outer_class_info_index != 0) ? ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[outer_class_info_index-1])->index-1])->convert_to_Unicode()
+																			: L"";		// *** 防止 openjdk 8 java/lang/String parse 不了，会被 assert 给停止！
+					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_class_info_index << "  //<class:> " << outer_class_info << endl;
 				} else {
 					// extra: 但是这时，虽然能够保证 inner_name_index 不为 0，但是却不能保证 outer_class_info_index 不为 0！
 					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_name_index << "= #" << inner_class_info_index << " of #" << outer_class_info_index;

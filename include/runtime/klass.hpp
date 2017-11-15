@@ -115,7 +115,11 @@ private:
 
 	// interfaces
 	unordered_map<wstring, shared_ptr<InstanceKlass>> interfaces;
-	// fields (non-static / static)
+	// fields (non-static / static)					// TODO: 这些 layout...... 要加上父类的啊！！！！QAQQAQ 可以直接把父类的 copy 下来......不用递归 OWO.
+													// TODO: 父类有 static，子类不会去继承......但是会共用。 所以 static_field_layout 不用 copy 下来，只 copy fields_layout 就好......不过，如果查找 set_static_field 的话。【如果本类没有，就必须去 父类去查找...... 这时两个类共用 static。。。】
+													// TODO: 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
+													// TODO: 而且，请把 oop 的 get_static 和 set_static 改成一样的逻辑......QAQ
+													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_bytes = 0;
@@ -153,15 +157,15 @@ public:
 public:
 	shared_ptr<Method> get_static_void_main();
 public:
-	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);				// [name + ':' + descriptor]
+	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);	// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool!!!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 	int non_static_field_bytes() { return total_non_static_fields_bytes; }
-	unsigned long get_static_field_value(shared_ptr<Field_info> field);
-	void set_static_field_value(shared_ptr<Field_info> field, unsigned long value);
-	unsigned long get_static_field_value(const wstring & signature);				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
-	void set_static_field_value(const wstring & signature, unsigned long value);	// as above.
+	bool get_static_field_value(shared_ptr<Field_info> field, uint64_t *result);		// self-maintain a ptr to pass in...
+	void set_static_field_value(shared_ptr<Field_info> field, uint64_t value);
+	bool get_static_field_value(const wstring & signature, uint64_t *result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+	void set_static_field_value(const wstring & signature, uint64_t value);		// as above.
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
 	shared_ptr<Oop> new_instance();

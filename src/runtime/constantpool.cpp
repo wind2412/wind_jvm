@@ -72,7 +72,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			assert(stringoop != nullptr);
 			stringoop->set_field_value(L"value:[C", (uint64_t)charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
 			// set!
-			this->pool[i] = (make_pair((target->tag), boost::any(stringoop)));	// InstanceOop* ~~
+			this->pool[i] = (make_pair((target->tag), boost::any(stringoop)));	// InstanceOop * ~~
 //			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// [x] int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// [x] wstring
 			break;

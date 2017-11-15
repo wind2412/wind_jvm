@@ -175,10 +175,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 					op_stack.push(value);
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Float) {
 					float value = boost::any_cast<float>(rt_pool[rtpool_index-1].second);
+					op_stack.push(value);
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_String) {
-
+					InstanceOop *stringoop = boost::any_cast<InstanceOop *>(rt_pool[rtpool_index-1].second);
+#ifdef DEBUG
+	// for string:
+	uint64_t result;
+	bool temp = stringoop->get_field_value(L"value:[C", &result);
+	assert(temp == true);
+	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
+		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
+	}
+	std::wcout << std::endl;
+#endif
+					op_stack.push((uint64_t)stringoop);
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
 
+
+					assert(false);
 				} else {
 					std::cerr << "can't get here!" << std::endl;
 					assert(false);
@@ -246,7 +260,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), jvm);
 				}
 				// get the [static Field] value and save to the stack top
-				uint64_t new_top = new_klass->get_static_field_value(new_field);
+				uint64_t new_top;
+				bool temp = new_klass->get_static_field_value(new_field, &new_top);
+				assert(temp == true);
 				op_stack.push(new_top);
 				break;
 			}

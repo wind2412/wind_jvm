@@ -71,7 +71,7 @@ public:
 	explicit Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool);
 	FieldState get_state() { return state; }
 	void set_state(FieldState s) { state = s; }
-	const wstring & get_name() { return name; }
+	const wstring & get_name() { return name; }						// TODO: 重要！！......忘了给 父类的 fields 留空间了......子类肯定要继承的啊！！！QAQQAQQAQ
 	const wstring & get_descriptor() { return descriptor; }
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	Type get_type() { return type; }

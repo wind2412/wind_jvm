@@ -68,6 +68,24 @@ Type get_type(const wstring & name)
 /*===----------------  InstanceKlass  ------------------===*/
 void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 {
+	// ** first copy parent's non-static fields / interfaces' non-static fields here ** (don't copy static fields !!)
+	// 1. super_klass
+	if (this->parent != nullptr) {		// if this_klass is **NOT** java.lang.Object
+		auto & super_map = std::static_pointer_cast<InstanceKlass>(this->parent)->fields_layout;
+		for (auto iter : super_map) {
+			this->fields_layout[iter.first] = iter.second;
+		}
+		this->total_non_static_fields_bytes = std::static_pointer_cast<InstanceKlass>(this->parent)->total_non_static_fields_bytes;
+	}
+	// 2. interfaces
+	for (auto iter : this->interfaces) {
+		auto layout = iter.second->fields_layout;
+		for (auto field_iter : layout) {
+			this->fields_layout[iter.first] = make_pair(total_non_static_fields_bytes, field_iter.second.second);
+			total_non_static_fields_bytes += field_iter.second.second->get_value_size();
+		}
+	}
+	// 3. this_klass
 	wstringstream ss;
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf->fields_count; i ++) {
@@ -261,10 +279,10 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	this->attributes_count = cf->attributes_count;
 	cf->attributes_count = 0;
 
-	// become Runtime fields
-	parse_fields(cf);
 	// super_class
 	parse_superclass(cf, loader);
+	// become Runtime fields
+	parse_fields(cf);			// fields must parse after the superclass. because it will copy super's fields.
 	// this_class
 	this->access_flags = cf->access_flags;
 	// become Runtime interfaces
@@ -293,7 +311,7 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 
 }
 
-pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signature)
+pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signature)		// 字段解析时的查找
 {
 	pair<int, shared_ptr<Field_info>> target = std::make_pair(-1, nullptr);
 	// search in this->fields_layout
@@ -322,24 +340,24 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signa
 
 }
 
-unsigned long InstanceKlass::get_static_field_value(shared_ptr<Field_info> field)
+bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, uint64_t *result)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
-	return get_static_field_value(signature);
+	return get_static_field_value(signature, result);
 }
 
-void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, unsigned long value)
+void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, uint64_t value)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	set_static_field_value(signature, value);
 }
 
-unsigned long InstanceKlass::get_static_field_value(const wstring & signature)				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+bool InstanceKlass::get_static_field_value(const wstring & signature, uint64_t *result)				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
 {
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
-		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
-		assert(false);
+		// ** search in parent for static !! **
+		return std::static_pointer_cast<InstanceKlass>(this->parent)->get_static_field_value(signature, result);
 	}
 	int offset = iter->second.first;
 	int size = iter->second.second->get_value_size();
@@ -359,12 +377,11 @@ unsigned long InstanceKlass::get_static_field_value(const wstring & signature)		
 	}
 }
 
-void InstanceKlass::set_static_field_value(const wstring & signature, unsigned long value)
+void InstanceKlass::set_static_field_value(const wstring & signature, uint64_t value)
 {
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
-		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << this->name << std::endl;
-		assert(false);
+		std::static_pointer_cast<InstanceKlass>(this->parent)->set_static_field_value(signature, value);
 	}
 	int offset = iter->second.first;
 	int size = iter->second.second->get_value_size();

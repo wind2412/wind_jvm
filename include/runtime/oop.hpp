@@ -86,14 +86,14 @@ private:
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
 public:		// 以下 8 个方法全部用来赋值。
-	unsigned long get_field_value(shared_ptr<Field_info> field);
-	void set_field_value(shared_ptr<Field_info> field, unsigned long value);
-	unsigned long get_field_value(const wstring & signature);				// use for forging String Oop at parsing constant_pool.
-	void set_field_value(const wstring & signature, unsigned long value);	// same as above...
-	unsigned long get_static_field_value(shared_ptr<Field_info> field) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field); }
-	void set_static_field_value(shared_ptr<Field_info> field, unsigned long value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
-	unsigned long get_static_field_value(const wstring & signature) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature); }
-	void set_static_field_value(const wstring & signature, unsigned long value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
+	bool get_field_value(shared_ptr<Field_info> field, uint64_t *result);
+	void set_field_value(shared_ptr<Field_info> field, uint64_t value);
+	bool get_field_value(const wstring & signature, uint64_t *result);				// use for forging String Oop at parsing constant_pool.
+	void set_field_value(const wstring & signature, uint64_t value);	// same as above...
+	bool get_static_field_value(shared_ptr<Field_info> field, uint64_t *result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field, result); }
+	void set_static_field_value(shared_ptr<Field_info> field, uint64_t value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
+	bool get_static_field_value(const wstring & signature, uint64_t *result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
+	void set_static_field_value(const wstring & signature, uint64_t value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);
