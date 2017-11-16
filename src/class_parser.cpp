@@ -2042,6 +2042,11 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						break;
 					}
 
+					case 0xc7:{		// ifnonnull
+						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
+						break;
+					}
+
 					default:{
 						if (bccode_map[code[bc_num]].second != -3) {		// wide 指令集由我在后边自行输出。
 							printf("%3d: %-15s", bc_num, bccode_map[code[bc_num]].first.c_str()); 		// other message is to big, I dont want to save them.

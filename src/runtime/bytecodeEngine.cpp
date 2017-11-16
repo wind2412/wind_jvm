@@ -396,7 +396,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				uint64_t new_value = op_stack.top();	op_stack.pop();
 				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
-				assert(ref->get_klass() == new_field->get_klass());
+//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
+//				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
 				((InstanceOop *)ref)->set_field_value(new_field, new_value);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) put a non-static value (unknown value type): " << new_value << " from stack, to <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
@@ -456,7 +457,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 
-			case 0xbb:{	// new // 仅仅分配了内存！
+			case 0xbb:{		// new // 仅仅分配了内存！
 				// TODO: 这里不是很明白。规范中写：new 的后边可能会跟上一个常量池索引，这个索引指向类或接口......接口是什么鬼???? 还能被实例化吗 ???
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
@@ -473,7 +474,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 
-			case 0xbd:{	// anewarray		// 创建引用(对象)的[一维]数组。
+			case 0xbd:{		// anewarray		// 创建引用(对象)的[一维]数组。
 				/**
 				 * java 的数组十分神奇。在这里需要有所解释。
 				 * String[][] x = new String[2][3]; 调用的是 mulanewarray. 这样初始化出来的 ArrayOop 是 [二维] 的。即 dimension == 2.
@@ -525,6 +526,26 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+
+			case 0xbf:{		// athrow
+
+				assert(false);
+
+				break;
+			}
+
+			case 0xc7:{		// ifnonnull
+				int branch_pc = ((pc[1] << 8) | pc[2]);
+				uint64_t ref_value = op_stack.top();	op_stack.pop();
+				if (ref_value != 0) {	// if not null, jump to the branch_pc.
+					pc = (code_begin) + branch_pc;
+					pc -= occupied;		// 因为最后设置了 pc += occupied 这个强制增加，因而这里强制减少。
+				} else {		// if null, go next.
+					// do nothing
+				}
+				break;
+			}
+
 
 			default:
 				std::cerr << "doesn't support bytecode " << bccode_map[*pc].first << " now..." << std::endl;
