@@ -10,6 +10,7 @@
 #include "classloader.hpp"
 #include "runtime/constantpool.hpp"
 #include "runtime/oop.hpp"
+#include "runtime/java_lang_class.hpp"
 #include <utility>
 #include <cstring>
 #include <sstream>
@@ -279,6 +280,9 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	this->attributes_count = cf->attributes_count;
 	cf->attributes_count = 0;
 
+	// set java_mirror
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}));
+
 	// super_class
 	parse_superclass(cf, loader);
 	// become Runtime fields
@@ -473,8 +477,13 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	return nullptr;
 }
 
-shared_ptr<Oop> InstanceKlass::new_instance() {
-	return make_shared<InstanceOop>(shared_ptr<InstanceKlass>(this, [](auto *){}));
+InstanceOop * InstanceKlass::new_instance() {
+	return new InstanceOop(shared_ptr<InstanceKlass>(this, [](auto *){}));
+}
+
+/*===---------------    MirrorKlass (aux)    --------------------===*/
+MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who) {
+	return new MirrorOop(mirrored_who);
 }
 
 /*===---------------    ArrayKlass    --------------------===*/
@@ -495,34 +504,50 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 	switch (type) {
 		case Type::BOOLEAN:{
 			ss << L"Z";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::BYTE:{
 			ss << L"B";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::CHAR:{
 			ss << L"C";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::SHORT:{
 			ss << L"S";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::INT:{
 			ss << L"I";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::FLOAT:{
 			ss << L"F";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::LONG:{
 			ss << L"J";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		case Type::DOUBLE:{
 			ss << L"D";
+			// set java_mirror
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 			break;
 		}
 		default:{
@@ -543,6 +568,9 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	}
 	ss << element_klass->get_name();
 	this->name = ss.str();
+	// 2. set java_mirror
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+
 }
 
 

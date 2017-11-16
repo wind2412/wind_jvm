@@ -6,13 +6,15 @@
  */
 
 #include "runtime/oop.hpp"
+#include "classloader.hpp"
 
 /*===----------------  InstanceOop  -----------------===*/
 InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.
 	this->field_length = klass->non_static_field_bytes();
+	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
 	if (this->field_length != 0)
-		fields = new uint8_t[this->field_length];
+		fields = new uint8_t[this->field_length];			// TODO: not gc control......
 }
 
 bool InstanceOop::get_field_value(shared_ptr<Field_info> field, uint64_t *result)
@@ -107,5 +109,9 @@ void InstanceOop::set_field_value(const wstring & signature, uint64_t value)
 //		this->set_field_value(target.second, value);
 //	}
 //}
+
+/*===----------------  MirrorOop  -------------------===*/
+MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who) : mirrored_who(mirrored_who),
+					InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))) {}
 
 /*===----------------  TypeArrayOop  -------------------===*/

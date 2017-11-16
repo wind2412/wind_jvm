@@ -41,6 +41,7 @@ enum Type {		// TODO: 如果这里发生了变动，那么 TypeArrayKlass 可能
 
 enum ClassType {
 	InstanceClass,
+	MirrorClass,
 	ObjArrayClass,
 	TypeArrayClass,
 };
@@ -52,18 +53,22 @@ enum OopType {
 	_TypeArrayOop,
 };
 
+class Oop;
+
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
 	enum KlassState{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
 protected:
-	KlassState state = KlassState::NotInitialized;	// TODO: 需不需要？
+	KlassState state = KlassState::NotInitialized;
 protected:
 	ClassType classtype;
 
-	wstring name;		// this class's name		// use constant_pool single string but not copy.
-	u2 access_flags;	// this class's access flags
+	wstring name;		// this class's name		// use constant_pool single string but not copy.	// java/lang/Object
+	u2 access_flags;		// this class's access flags
+
+	Oop *java_mirror = nullptr;	// java.lang.Class's object oop!!	// A `MirrorOop` object.
 
 	shared_ptr<Klass> parent;
 	shared_ptr<Klass> next_sibling;
@@ -81,6 +86,8 @@ public:
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
 	wstring get_name() { return name; }
 	ClassType get_type() { return classtype; }
+	Oop *get_mirror() { return java_mirror; }
+	void set_mirror(Oop *mirror) { java_mirror = mirror; }
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 protected:
@@ -92,7 +99,6 @@ public:
 
 class Field_info;
 class rt_constant_pool;
-class Oop;
 class InstanceOop;
 
 /**
@@ -115,10 +121,10 @@ private:
 
 	// interfaces
 	unordered_map<wstring, shared_ptr<InstanceKlass>> interfaces;
-	// fields (non-static / static)					// TODO: 这些 layout...... 要加上父类的啊！！！！QAQQAQ 可以直接把父类的 copy 下来......不用递归 OWO.
-													// TODO: 父类有 static，子类不会去继承......但是会共用。 所以 static_field_layout 不用 copy 下来，只 copy fields_layout 就好......不过，如果查找 set_static_field 的话。【如果本类没有，就必须去 父类去查找...... 这时两个类共用 static。。。】
-													// TODO: 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
-													// TODO: 而且，请把 oop 的 get_static 和 set_static 改成一样的逻辑......QAQ
+	// fields (non-static / static)					// 这些 layout...... 要加上父类的啊！！！！QAQQAQ 可以直接把父类的 copy 下来......不用递归 OWO.
+													// 父类有 static，子类不会去继承......但是会共用。 所以 static_field_layout 不用 copy 下来，只 copy fields_layout 就好......不过，如果查找 set_static_field 的话。【如果本类没有，就必须去 父类去查找...... 这时两个类共用 static。。。】
+													// 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
+													// 而且，也要把 oop 的 get_static 和 set_static 改成一样的逻辑......QAQ
 													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
@@ -168,7 +174,7 @@ public:
 	void set_static_field_value(const wstring & signature, uint64_t value);		// as above.
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
-	shared_ptr<Oop> new_instance();
+	InstanceOop* new_instance();
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 private:
@@ -181,6 +187,15 @@ public:
 		}
 		delete[] attributes;
 	};
+};
+
+class MirrorOop;
+
+class MirrorKlass : public InstanceKlass {		// this class, only used to static_cast an InstanceKlass to get the method in MirrorKlass. can't be instantiationed.
+private:
+	MirrorKlass();
+public:
+	MirrorOop *new_mirror(shared_ptr<InstanceKlass> mirrored_who);
 };
 
 class ArrayKlass : public Klass {

@@ -99,6 +99,15 @@ public:		// 以下 8 个方法全部用来赋值。
 //	void set_value(const wstring & signature, unsigned long value);
 };
 
+class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.
+private:
+	shared_ptr<Klass> mirrored_who;		// this Oop being instantiation, must after java.lang.Class loaded !!!
+public:
+	MirrorOop(shared_ptr<Klass> mirrored_who);
+public:
+	shared_ptr<Klass> get_mirrored_who() { return mirrored_who; }
+};
+
 class ArrayOop : public Oop {
 protected:
 	int length;
