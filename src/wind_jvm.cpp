@@ -12,12 +12,12 @@
 #include "system_directory.hpp"
 #include <boost/regex.hpp>
 
-wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), rsp(-1), pc(0) {
+wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), rsp(-1), pc(0)
+{
 	{
 		java_lang_class::init();		// must init !!!
 		BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class");
 		java_lang_class::fixup_mirrors();	// only [basic types] + java.lang.Class + java.lang.Object
-
 	}
 	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(main_class_name);		// this time, "java.lang.Object" has been convert to "java/lang/Object".
 	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();

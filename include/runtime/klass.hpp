@@ -54,6 +54,7 @@ enum OopType {
 };
 
 class Oop;
+class MirrorOop;
 
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
@@ -68,7 +69,7 @@ protected:
 	wstring name;		// this class's name		// use constant_pool single string but not copy.	// java/lang/Object
 	u2 access_flags;		// this class's access flags
 
-	Oop *java_mirror = nullptr;	// java.lang.Class's object oop!!	// A `MirrorOop` object.
+	MirrorOop *java_mirror = nullptr;	// java.lang.Class's object oop!!	// A `MirrorOop` object.
 
 	shared_ptr<Klass> parent;
 	shared_ptr<Klass> next_sibling;
@@ -86,8 +87,8 @@ public:
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
 	wstring get_name() { return name; }
 	ClassType get_type() { return classtype; }
-	Oop *get_mirror() { return java_mirror; }
-	void set_mirror(Oop *mirror) { java_mirror = mirror; }
+	MirrorOop *get_mirror() { return java_mirror; }
+	void set_mirror(MirrorOop *mirror) { java_mirror = mirror; }
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 protected:
