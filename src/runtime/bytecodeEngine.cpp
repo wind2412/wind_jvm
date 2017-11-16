@@ -177,15 +177,18 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					float value = boost::any_cast<float>(rt_pool[rtpool_index-1].second);
 					op_stack.push(value);
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_String) {
-					InstanceOop *stringoop = boost::any_cast<InstanceOop *>(rt_pool[rtpool_index-1].second);
+					InstanceOop *stringoop = (InstanceOop *)boost::any_cast<Oop *>(rt_pool[rtpool_index-1].second);
 #ifdef DEBUG
 	// for string:
 	uint64_t result;
 	bool temp = stringoop->get_field_value(L"value:[C", &result);
 	assert(temp == true);
+	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
+	std::cout << "the string is: --> ";
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
 		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
 	}
+	std::wcout.clear();
 	std::wcout << std::endl;
 #endif
 					op_stack.push((uint64_t)stringoop);
@@ -223,6 +226,12 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.pop();
 				break;
 			}
+
+			case 0x59:{		// dup
+				op_stack.push(op_stack.top());
+				break;
+			}
+
 
 			case 0x60:{		// iadd
 				int val1 = op_stack.top(); op_stack.pop();
@@ -319,6 +328,70 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					if (!new_method->is_void()) {
 						op_stack.push((uint64_t)result);
 					}
+				}
+				break;
+			}
+
+			case 0xbb:{	// new // 仅仅分配了内存！
+				// TODO: 这里不是很明白。规范中写：new 的后边可能会跟上一个常量池索引，这个索引指向类或接口......接口是什么鬼???? 还能被实例化吗 ???
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
+				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				assert(klass->get_type() == ClassType::InstanceClass);		// TODO: 并不知道对不对...猜的.
+				auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+				// if didnt init then init
+				initial_clinit(real_klass, jvm);
+				auto oop = real_klass->new_instance();
+				op_stack.push((uint64_t)oop);
+				break;
+			}
+
+			case 0xbd:{	// anewarray		// 创建引用(对象)的[一维]数组。
+				/**
+				 * java 的数组十分神奇。在这里需要有所解释。
+				 * String[][] x = new String[2][3]; 调用的是 mulanewarray. 这样初始化出来的 ArrayOop 是 [二维] 的。即 dimension == 2.
+				 * String[][] x = new String[2][]; x[0] = new String[2]; x[1] = new String[3]; 调用的是 anewarray. 这样初始化出来的 ArrayOop [全部] 都是 [一维] 的。即 dimension == 1.
+				 * 虽然句柄的表示 String[][] 都是这个格式，但是 dimension 不同！前者，x 仅仅是一个 二维的 ArrayOop，element 是 java.lang.String。
+				 * 而后者的 x 是一个 一维的 ArrayOop，element 是 [Ljava.lang.String;。
+				 * 实现时千万要注意。
+				 * 而且。别忘了可以有 String[] x = new String[0]。
+				 * ** 产生这种表示法的根本原因在于：jvm 根本就不关心句柄是怎么表示的。它只关心的是真正的对象。句柄的表示是由编译器来关注并 parse 的！！**
+				 */
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				int length = op_stack.top();	op_stack.pop();
+				if (length < 0) {	// TODO: 最后要全部换成异常！
+					std::cerr << "array length can't be negative!!" << std::endl;
+					assert(false);
+				}
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
+				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				if (klass->get_type() == ClassType::InstanceClass) {			// java/lang/Class
+					auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+					// 由于仅仅是创建一维数组：所以仅仅需要把高一维的数组类加载就好。
+					if (real_klass->get_classloader() == nullptr) {
+						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
+						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+						op_stack.push((uint64_t)arr_klass->new_instance(length));
+					} else {
+						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
+						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+						op_stack.push((uint64_t)arr_klass->new_instance(length));
+					}
+				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// [Ljava/lang/Class
+					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
+					// 创建数组的数组。不过也和 if 中的逻辑相同。
+					// 不过由于数组类没有设置 classloader，需要从 element 中去找。
+					if (real_klass->get_element_type()->get_classloader() == nullptr) {
+						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
+						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+						op_stack.push((uint64_t)arr_klass->new_instance(length));
+					} else {
+						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_type()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
+						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+						op_stack.push((uint64_t)arr_klass->new_instance(length));
+					}
+				} else {
+					assert(false);
 				}
 				break;
 			}

@@ -60,7 +60,8 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			// 但是，openjdk8 没有使用字节码来 new。而是直接建立了一个 oop，然后把 TypeArrayOop(char []) 写入 InstanceOop 的挂在 class 外部的 fields 中。[x] 我的话，还是采用 new 的策略了。因为我没法确定 String 内部到底有几个 fields......
 			// [√] 不过果然......如果我们要在这里直接调用字节码的话，需要 BytecodeEngine。BytecodeEngine 又需要得到 jvm 句柄......然而这个 rt_pool 依赖于 InstanceKlass，我并不希望 Klass 和 Jvm 之间有联系。那才是糟糕的设计。所以只能和 openjdk 一样，用 TypeArrayOop 占位符来假装有一个 string oop 了......
 			// make a String Oop...
-			wstring result = boost::any_cast<wstring>(this->pool[target->index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
+			wstring result = boost::any_cast<wstring>((*this)[target->index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
+//			wstring result = boost::any_cast<wstring>(this->pool[target->index - 1].second);	// 应该用 (*this).operator[]... 才能强制解析。
 			Oop *stringoop = java_lang_string::intern(result);			// StringTable 中有没有就往里加。有就直接返回。
 			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(stringoop)));		// Oop* 类型。这样能够保证常量唯一。
 //			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// [x] int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。

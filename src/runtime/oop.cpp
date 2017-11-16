@@ -43,13 +43,17 @@ bool InstanceOop::get_field_value(const wstring & signature, uint64_t *result) 	
 	int size = iter->second.second->get_value_size();
 	switch (size) {
 		case 1:
-			return *(uint8_t *)(this->fields + offset);
+			*result = *(uint8_t *)(this->fields + offset);
+			return true;
 		case 2:
-			return *(uint16_t *)(this->fields + offset);
+			*result = *(uint16_t *)(this->fields + offset);
+			return true;
 		case 4:
-			return *(uint32_t *)(this->fields + offset);
+			*result = *(uint32_t *)(this->fields + offset);
+			return true;
 		case 8:
-			return *(uint64_t *)(this->fields + offset);
+			*result = *(uint64_t *)(this->fields + offset);
+			return true;
 		default:{
 			std::cerr << "can't get here! size == " << size << std::endl;
 			assert(false);

@@ -71,6 +71,19 @@ Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	InstanceOop *stringoop = new InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String")));
 	assert(stringoop != nullptr);
 	stringoop->set_field_value(L"value:[C", (uint64_t)charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
+#ifdef DEBUG
+	uint64_t result;
+	bool temp = stringoop->get_field_value(L"value:[C", &result);
+	assert(result == (uint64_t)charsequence);
+	assert(temp == true);
+	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
+	std::cout << "the string is: --> ";
+	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
+		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
+	}
+	std::wcout.clear();
+	std::wcout << std::endl;
+#endif
 	return stringoop;
 }
 

@@ -52,6 +52,9 @@ class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用�
 class MemAlloc {
 public:
 	static void *allocate(size_t size) {		// TODO: change to real Mem Pool (Heap)
+		if (size == 0) {
+			return nullptr;		// 这里！！
+		}
 		void *ptr = malloc(size);
 		memset(ptr, 0, size);		// default bzero!
 		return ptr;

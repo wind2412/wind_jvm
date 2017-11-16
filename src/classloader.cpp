@@ -62,6 +62,10 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 				} else {
 					wstring temp_inner = classname.substr(1);		// strip one '[' only
 					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
@@ -70,6 +74,10 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 					return newklass;
 				}
 			} else {
@@ -83,6 +91,10 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 				} else {
 					wstring temp_inner = classname.substr(1);
 					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
@@ -90,6 +102,10 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 					return newklass;
 				}
 			}
@@ -164,6 +180,10 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 				} else {
 					wstring temp_inner = classname.substr(1);		// strip one '[' only
 					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
@@ -172,6 +192,10 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 					return newklass;
 				}
 			} else {
@@ -185,6 +209,10 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 				} else {
 					wstring temp_inner = classname.substr(1);
 					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
@@ -192,6 +220,10 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
+#ifdef DEBUG
+	BootStrapClassLoader::get_bootstrap().print();
+	MyClassLoader::get_loader().print();
+#endif
 					return newklass;
 				}
 			}
