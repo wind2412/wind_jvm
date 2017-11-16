@@ -18,6 +18,6 @@ using std::shared_ptr;
 
 class Klass;
 
-extern unordered_map<wstring, shared_ptr<Klass>> system_classmap;
+extern unordered_map<wstring, shared_ptr<Klass>> system_classmap;		// java/lang/Object.class
 
 #endif /* INCLUDE_SYSTEM_DIRECTORY_HPP_ */

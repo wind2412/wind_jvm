@@ -190,6 +190,7 @@ public:
 };
 
 class MirrorOop;
+class ArrayOop;
 
 class MirrorKlass : public InstanceKlass {		// this class, only used to static_cast an InstanceKlass to get the method in MirrorKlass. can't be instantiationed.
 private:
@@ -214,6 +215,7 @@ public:
 	shared_ptr<Klass> get_lower_dimension() { return lower_dimension; }
 	void set_lower_dimension(shared_ptr<Klass> lower) { lower_dimension = lower; }
 	int get_dimension() { return dimension; }
+	ArrayOop* new_instance(int length);
 private:
 	ArrayKlass(const ArrayKlass &);
 public:

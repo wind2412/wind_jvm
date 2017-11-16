@@ -48,12 +48,22 @@ public:
 		delay_mirrors.push(L"F");
 		delay_mirrors.push(L"J");
 		delay_mirrors.push(L"D");
+		delay_mirrors.push(L"[I");
+		delay_mirrors.push(L"[Z");
+		delay_mirrors.push(L"[B");
+		delay_mirrors.push(L"[C");
+		delay_mirrors.push(L"[S");
+		delay_mirrors.push(L"[F");
+		delay_mirrors.push(L"[J");
+		delay_mirrors.push(L"[D");
 		// set state
 		state() = Inited;
 	}
 	static void fixup_mirrors() {	// must execute this after java.lang.Class load!!!
 		assert(state() == Inited);
 		assert(system_classmap.find(L"java/lang/Class.class") != system_classmap.end());		// java.lang.Class must be loaded !!
+		// set state
+		state() = Fixed;
 		// do fix-up
 		auto & delay_mirrors = get_single_delay_mirrors();		// 别忘了加上 & ！！否则会复制！！auto 的类型推导仅仅能推导出类型，但是不会给你加上引用！！！
 		while(!delay_mirrors.empty()) {
@@ -68,8 +78,26 @@ public:
 					case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
 						// insert into.
 						get_single_basic_type_mirrors().insert(make_pair(name, std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr)));
+						break;
+					}
+					default:{
+						assert(false);
 					}
 				}
+			else if (name.size() == 2 && name[0] == L'[') {
+				switch (name[1]) {
+					case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
+						auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
+						auto basic_type_mirror_iter = get_single_basic_type_mirrors().find(wstring(1, name[1]));
+						assert(basic_type_mirror_iter != get_single_basic_type_mirrors().end());
+						std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
+						break;
+					}
+					default:{
+						assert(false);
+					}
+				}
+			}
 			else {
 				// I set java.lang.Class load at the first of jvm. So there can't be any user-loaded-klass. So find in the system_map.
 				auto iter = system_classmap.find(name);
@@ -78,8 +106,6 @@ public:
 				(*iter).second->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>((*iter).second)));
 			}
 		}
-		// set state
-		state() = Fixed;
 	}
 	static Oop *get_basic_type_mirror(const wstring & signature) {	// "I", "Z", "D", "J" ......	// must execute this after `fixup_mirrors()` called !!
 		assert(state() == Fixed);

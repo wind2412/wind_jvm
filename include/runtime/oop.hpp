@@ -133,18 +133,19 @@ public:
 	}
 };
 
-class ObjArrayOop : public ArrayOop {
-public:		// Most inner type of `buf` is InstanceOop.		// 注意：维度要由自己负责！！并不会进行检查。
-	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
-public:
-};
-
 class TypeArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is BasicTypeOop.
 	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_TypeArrayOop) {}
 public:
 
 };
+
+class ObjArrayOop : public ArrayOop {
+public:		// Most inner type of `buf` is InstanceOop.		// 注意：维度要由自己负责！！并不会进行检查。
+	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
+public:
+};
+
 
 // Basic Type...
 

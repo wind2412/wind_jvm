@@ -190,9 +190,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 #endif
 					op_stack.push((uint64_t)stringoop);
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
-
-
-					assert(false);
+					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+					assert(klass->get_mirror() != nullptr);
+					op_stack.push((uint64_t)klass->get_mirror());		// push into [Oop*] type.
 				} else {
 					std::cerr << "can't get here!" << std::endl;
 					assert(false);

@@ -8,6 +8,8 @@
 #include "wind_jvm.hpp"
 #include "runtime/klass.hpp"
 #include "runtime/java_lang_class.hpp"
+#include "runtime/java_lang_string.hpp"
+#include "system_directory.hpp"
 #include <boost/regex.hpp>
 
 wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), rsp(-1), pc(0) {
@@ -27,12 +29,16 @@ wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv
 	// first execute <clinit> if has
 	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);
 	// second execute [public static void main].
-	// TODO: 这里的设计也有问题！！......argv 完全没有传递进去......
-	ObjArrayOop *stringoop = new ObjArrayOop(std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;")), argv.size());			// 手动调用
-	for (int i = 0; i < argv.size(); i ++) {
 
+	// new a String[].
+	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(argv.size());
+	auto iter = system_classmap.find(L"java/lang/String.class");
+	assert(iter != system_classmap.end());
+	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
+	for (int i = 0; i < argv.size(); i ++) {
+		(*string_arr_oop)[i] = java_lang_string::intern(argv[i]);
 	}
-	this->vm_stack.push_back(StackFrame(nullptr, main_method, nullptr, nullptr, {(uint64_t)stringoop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(nullptr, main_method, nullptr, nullptr, {(uint64_t)string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 }
 

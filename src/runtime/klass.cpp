@@ -488,9 +488,23 @@ MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who) {
 
 /*===---------------    ArrayKlass    --------------------===*/
 ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), Klass()/*, classtype(classtype)*/ {
+	assert(dimension > 0);
 	this->classtype = classtype;		// 这个变量不能放在初始化列表中初始化，即【不能用初始化列表直接初始化 不在基类构造函数参数列表 中的 基类的 protected 成员。】。会提示：error: member initializer 'classtype' does not name a non-static data member or base class
 	// set super class
 	this->set_parent(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Object"));
+}
+
+ArrayOop* ArrayKlass::new_instance(int length)
+{
+	ArrayOop *oop;
+	if (this->get_type() == ClassType::TypeArrayClass)
+		oop = new TypeArrayOop(shared_ptr<TypeArrayKlass>((TypeArrayKlass*)this, [](auto*){}), length);
+	else
+		oop = new ObjArrayOop(shared_ptr<ObjArrayKlass>((ObjArrayKlass*)this, [](auto*){}), length);
+	for (int i = 0; i < length; i ++) {
+		(*oop)[i] = nullptr;		// nullptr is the best !
+	}
+	return oop;
 }
 
 /*===---------------  TypeArrayKlass  --------------------===*/
@@ -572,7 +586,4 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
 
 }
-
-
-
 

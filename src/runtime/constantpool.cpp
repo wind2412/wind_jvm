@@ -5,11 +5,11 @@
  *      Author: zhengxiaolin
  */
 
+#include <runtime/java_lang_string.hpp>
 #include "runtime/constantpool.hpp"
 #include "classloader.hpp"
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
-#include "runtime/string_table.hpp"
 #include "runtime/bytecodeEngine.hpp"
 #include <string>
 
@@ -47,7 +47,6 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				shared_ptr<Klass> new_class = if_didnt_load_then_load(loader, name);	// TODO: 这里可能得到数组类！需要额外判断一下！
 				assert(new_class != nullptr);
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(new_class))));			// shared_ptr<Klass> ，不过可能可以是 InstanceKlass 或者 TypeArrayKlass 或者 ObjArrayKlass......
-																												// TODO: 所以必须要有一种方法来判断型别......明天试试 traits??????
 			}
 			break;
 		}
@@ -61,18 +60,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			// 但是，openjdk8 没有使用字节码来 new。而是直接建立了一个 oop，然后把 TypeArrayOop(char []) 写入 InstanceOop 的挂在 class 外部的 fields 中。[x] 我的话，还是采用 new 的策略了。因为我没法确定 String 内部到底有几个 fields......
 			// [√] 不过果然......如果我们要在这里直接调用字节码的话，需要 BytecodeEngine。BytecodeEngine 又需要得到 jvm 句柄......然而这个 rt_pool 依赖于 InstanceKlass，我并不希望 Klass 和 Jvm 之间有联系。那才是糟糕的设计。所以只能和 openjdk 一样，用 TypeArrayOop 占位符来假装有一个 string oop 了......
 			// make a String Oop...
-			wstring result = *boost::any_cast<shared_ptr<wstring>>(this->pool[target->index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
-			TypeArrayOop * charsequence = new TypeArrayOop(std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[C")), result.size());
-			assert(charsequence->get_klass() != nullptr);
-			// 虽然设计悲伤就在于，每个基本类型都封装了一层......不过胜在统一......QAQ
-			for (int pos = 0; pos < result.size(); pos ++) {
-				(*charsequence)[pos] = new CharOop((uint32_t)result[pos]);		// 在这里，32 bits 的 wchar_t 转为 16 bits 的 uint16_t 会失去精度...... 因此我改成了 32 bits 储存 char..... java 的设计真有意思。明明在表层 char 是 16 bits，unicode 根本存不全不说，到了 jvm 竟然会全被提升到 32 bits。这设计简直太糟糕了。（吐槽
-			}
-			InstanceOop *stringoop = new InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String")));
-			assert(stringoop != nullptr);
-			stringoop->set_field_value(L"value:[C", (uint64_t)charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
-			// set!
-			this->pool[i] = (make_pair((target->tag), boost::any(stringoop)));	// InstanceOop * ~~
+			wstring result = boost::any_cast<wstring>(this->pool[target->index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
+			Oop *stringoop = java_lang_string::intern(result);			// StringTable 中有没有就往里加。有就直接返回。
+			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(stringoop)));		// Oop* 类型。这样能够保证常量唯一。
 //			this->pool[i] = (make_pair(target->tag, boost::any((int)target->index)));			// [x] int 索引。因为在 CONSTANT_utf8 中已经保存了一份。所以这里保存一个索引就可以了。
 //			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode())));	// [x] wstring
 			break;
@@ -160,15 +150,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		}
 		case CONSTANT_Utf8:{
 			CONSTANT_Utf8_info* target = (CONSTANT_Utf8_info*)bufs[i];
-			// TODO: use string_table !!!!
-			shared_ptr<wstring> ptr = make_shared<wstring>(target->convert_to_Unicode());		// TODO: 注意！！这里用了 new，但是没有放到 GC 堆当中............
-			auto iter = string_table.find(ptr);
-			if (iter == string_table.end()) {
-				string_table.insert(ptr);
-				this->pool[i] = (make_pair(bufs[i]->tag, ptr));		// shared_ptr<wstring> 类型。这样能够保证常量唯一。
-			} else {
-				this->pool[i] = (make_pair(bufs[i]->tag, *iter));
-			}
+			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target->convert_to_Unicode())));		// wstring 类型。
 			break;
 		}
 		case CONSTANT_MethodHandle:{
