@@ -13,8 +13,10 @@ InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::
 	// alloc non-static-field memory.
 	this->field_length = klass->non_static_field_bytes();
 	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
-	if (this->field_length != 0)
+	if (this->field_length != 0) {
 		fields = new uint8_t[this->field_length];			// TODO: not gc control......
+		memset(fields, 0, this->field_length);		// 啊啊啊啊全部清空别忘了！！
+	}
 }
 
 bool InstanceOop::get_field_value(shared_ptr<Field_info> field, uint64_t *result)

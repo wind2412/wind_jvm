@@ -344,15 +344,105 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x60:{		// iadd
-				int val1 = op_stack.top(); op_stack.pop();
 				int val2 = op_stack.top(); op_stack.pop();
-				op_stack.push(val1 + val2);
+				int val1 = op_stack.top(); op_stack.pop();
+				op_stack.push(val2 + val1);
 #ifdef DEBUG
-	std::cout << "(DEBUG) add int value from stack: "<< val1 << "+" << val2 << " and put " << (val1+val2) << " on stack." << std::endl;
+	std::cout << "(DEBUG) add int value from stack: "<< val2 << " + " << val1 << " and put " << (val2+val1) << " on stack." << std::endl;
 #endif
 				break;
 			}
 
+
+			case 0x64:{		// isub
+				int val2 = op_stack.top(); op_stack.pop();
+				int val1 = op_stack.top(); op_stack.pop();
+				op_stack.push(val1 - val2);
+#ifdef DEBUG
+	std::cout << "(DEBUG) sub int value from stack: "<< val1 << " - " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
+
+
+
+
+
+			case 0x99:		// ifeq
+			case 0x9a:		// ifne
+			case 0x9b:		// iflt
+			case 0x9c:		// ifge
+			case 0x9d:		// ifgt
+			case 0x9e:{		// ifle
+				int branch_pc = ((pc[1] << 8) | pc[2]);
+				int int_value = (int)op_stack.top();	op_stack.pop();
+				bool judge;
+				if (*pc == 0x99) {
+					judge = (int_value == 0);
+				} else if (*pc == 0x9a) {
+					judge = (int_value != 0);
+				} else if (*pc == 0x9b) {
+					judge = (int_value < 0);
+				} else if (*pc == 0x9c) {
+					judge = (int_value <= 0);
+				} else if (*pc == 0x9d) {
+					judge = (int_value > 0);
+				} else {
+					judge = (int_value >= 0);
+				}
+
+				if (judge) {	// if true, jump to the branch_pc.
+					pc += branch_pc;
+					pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) int value is " << int_value << ", so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
+				} else {		// if false, go next.
+					// do nothing
+#ifdef DEBUG
+	std::wcout << "(DEBUG) int value is " << int_value << ", so will go next." << std::endl;
+#endif
+				}
+				break;
+			}
+			case 0x9f:		// if_icmpeq
+			case 0xa0:		// if_icmpne
+			case 0xa1:		// if_icmplt
+			case 0xa2:		// if_icmpge
+			case 0xa3:		// if_icmpgt
+			case 0xa4:{		// if_icmple
+				int branch_pc = ((pc[1] << 8) | pc[2]);
+				int value2 = (int)op_stack.top();	op_stack.pop();
+				int value1 = (int)op_stack.top();	op_stack.pop();
+				bool judge;
+				if (*pc == 0x99) {
+					judge = (value1 == value2);
+				} else if (*pc == 0x9a) {
+					judge = (value1 != value2);
+				} else if (*pc == 0x9b) {
+					judge = (value1 < value2);
+				} else if (*pc == 0x9c) {
+					judge = (value1 <= value2);
+				} else if (*pc == 0x9d) {
+					judge = (value1 > value2);
+				} else {
+					judge = (value1 >= value2);
+				}
+
+				if (judge) {	// if true, jump to the branch_pc.
+					pc += branch_pc;
+					pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) int value compare from stack is " << value2 << " and " << value1 << ", so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
+				} else {		// if false, go next.
+					// do nothing
+#ifdef DEBUG
+	std::wcout << "(DEBUG) int value compare from stack is " << value2 << " and " << value1 << ", so will go next." << std::endl;
+#endif
+				}
+				break;
+			}
 
 			case 0xac:{		// ireturn
 				// TODO: monitor...
@@ -364,7 +454,19 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
-
+			case 0xb0:{		// areturn
+				// TODO: monitor...
+				jvm.pc = backup_pc;
+				Oop *oop = (Oop *)op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	if (oop != 0)
+		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << (uint64_t)oop << std::endl;
+	else
+		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
+#endif
+//				assert(method->return_type() == oop->get_klass()->get_name());
+				return oop;	// boolean, short, char, int
+			}
 			case 0xb1:{		// return
 				// TODO: monitor...
 				jvm.pc = backup_pc;
@@ -393,7 +495,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(temp == true);
 				op_stack.push(new_top);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get a static value (unknown value type): " << new_top << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
+	std::wcout << "(DEBUG) get a static value : " << new_top << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
 #endif
 				break;
 			}
@@ -433,7 +535,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
 				op_stack.push(new_value);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get a non-static value (unknown value type): " << new_value << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
+	std::wcout << "(DEBUG) get a non-static value : " << new_value << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
 #endif
 				break;
 			}
@@ -499,11 +601,18 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 					Oop *result = jvm.add_frame_and_execute(target_method, arg_list);
 					if (!target_method->is_void()) {
-						if (result->get_ooptype() == OopType::_BasicTypeOop) {
-							op_stack.push(((BasicTypeOop *)result)->get_value());
+						if (result == 0) {		// 防止 areturn 这种返回一个 null (0)，这样在下边 result->get_ooptype() 相当于对 nullptr 解引用...会崩溃。
+							op_stack.push(0);
 						} else {
-							op_stack.push((uint64_t)result);
+							if (result->get_ooptype() == OopType::_BasicTypeOop) {
+								op_stack.push(((BasicTypeOop *)result)->get_value());
+							} else {
+								op_stack.push((uint64_t)result);
+							}
 						}
+#ifdef DEBUG
+	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
 					}
 				}
 				break;
@@ -554,11 +663,18 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 					Oop *result = jvm.add_frame_and_execute(new_method, arg_list);
 					if (!new_method->is_void()) {
-						if (result->get_ooptype() == OopType::_BasicTypeOop) {
-							op_stack.push(((BasicTypeOop *)result)->get_value());
+						if (result == 0) {		// 防止 areturn 这种返回一个 null (0)，这样在下边 result->get_ooptype() 相当于对 nullptr 解引用...会崩溃。
+							op_stack.push(0);
 						} else {
-							op_stack.push((uint64_t)result);
+							if (result->get_ooptype() == OopType::_BasicTypeOop) {
+								op_stack.push(((BasicTypeOop *)result)->get_value());
+							} else {
+								op_stack.push((uint64_t)result);
+							}
 						}
+#ifdef DEBUG
+	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
 					}
 				}
 				break;
@@ -667,7 +783,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				} else {		// if null, go next.
 					// do nothing
 #ifdef DEBUG
-	std::wcout << "(DEBUG) ref is null. will go next." << branch_pc << std::endl;
+	std::wcout << "(DEBUG) ref is null. will go next." << std::endl;
 #endif
 				}
 				break;
