@@ -477,6 +477,17 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	return nullptr;
 }
 
+shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
+{
+	for (auto method : this->vtable) {
+		wstring method_signature = method->get_name() + L":" + method->get_descriptor();		// TODO: Optimise
+		if (method_signature == signature) {
+			return method;
+		}
+	}
+	return nullptr;
+}
+
 InstanceOop * InstanceKlass::new_instance() {
 	return new InstanceOop(shared_ptr<InstanceKlass>(this, [](auto *){}));
 }

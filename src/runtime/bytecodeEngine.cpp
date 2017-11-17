@@ -18,9 +18,11 @@ using std::function;
 using std::shared_ptr;
 
 /*===----------- StackFrame --------------===*/
-StackFrame::StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<uint64_t> & list) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是没有类型的 uint64_t。因此，在**执行 code**的时候才会有类型提升～
-	// TODO: set this pointer...
-	localVariableTable.insert(localVariableTable.end(), list.begin(), list.end());
+StackFrame::StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<uint64_t> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是没有类型的 uint64_t。因此，在**执行 code**的时候才会有类型提升～
+	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
+	for (uint64_t value : list) {
+		localVariableTable.at(i++) = value;	// 检查越界。
+	}
 }
 
 void StackFrame::clear_all() {					// used with `is_valid()`. if invalid, clear all to reuse this frame.
@@ -134,7 +136,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	pc = code_begin;
 
 	while (pc < code_begin + code_length) {
-		std::wcout << L"(DEBUG) <bytecode> " << klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
+		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 		int occupied = bccode_map[*pc].second + 1;		// the bytecode takes how many bytes.(include itself)		// TODO: tableswitch, lookupswitch, wide is NEGATIVE!!!
 		switch(*pc) {
 
@@ -238,28 +240,28 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x1a:{		// iload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[0] << "on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[0] << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1b:{		// iload_1
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[0] << "on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[1] << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1c:{		// iload_2
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[1] << "on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[2] << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1d:{		// iload_3
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[2] << "on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[3] << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -292,6 +294,37 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+
+			case 0x3b:{		// istore_0
+				localVariableTable[0] = (int)op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[0] << " to localVariableTable[0] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x3c:{		// istore_1
+				localVariableTable[1] = (int)op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[1] << " to localVariableTable[1] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x3d:{		// istore_2
+				localVariableTable[2] = (int)op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[2] << " to localVariableTable[2] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x3e:{		// istore_3
+				localVariableTable[3] = (int)op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[3] << " to localVariableTable[3] and rewrite." << std::endl;
+#endif
+				break;
+			}
+
+
 
 			case 0x57:{		// pop
 				op_stack.pop();
@@ -386,7 +419,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
+			case 0xb4:{		// getField
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
+				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				// TODO: $2.8.3 的 FP_strict 浮点数转换！
+				new_field->if_didnt_parse_then_parse();		// **important!!!**
+				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
+				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
+//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
+//				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
+				uint64_t new_value;
+				assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
+				op_stack.push(new_value);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get a non-static value (unknown value type): " << new_value << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
+#endif
+				break;
+			}
 			case 0xb5:{		// putField
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
@@ -404,7 +454,60 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
+			case 0xb6:{		// invokeVirtual
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
+				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);		// 这个方法，在我的常量池中解析的时候是按照子类同名方法优先的原则。也就是，如果最子类有同样签名的方法，父类的不会被 parse。这在 invokeStatic 和 invokeSpecial 是成立的，不过在 invokeVirtual 和 invokeInterface 中是不准的。因为后两者是动态绑定。
+				// 因此，得到此方法的目的只有一个，得到方法签名。
+				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
+				// TODO: 可以 verify 一下。按照 Spec
+				// 1. 先 parse 参数。因为 ref 在最下边。
+				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size() + 1;		// don't forget `this`!!!
+				std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
+				// TODO: 参数应该是倒着入栈的吧...?
+				Oop *ref;		// get ref. (this)	// same as invokespecial. but invokespecial didn't use `this` ref to get Klass.
+				list<uint64_t> arg_list;
+				assert(op_stack.size() >= size);
+				while (size > 0) {
+					if (size == 1) {
+						ref = (Oop *)op_stack.top();
+					}
+					arg_list.push_front(op_stack.top());
+					op_stack.pop();
+					size --;
+				}
+				// 2. get ref.
+				std::wcout << "(DEBUG) " << ref->get_klass()->get_name() << "::" << signature << std::endl;	// msg
+				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
+				shared_ptr<Method> target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+				assert(target_method != nullptr);
+				if (target_method->is_synchronized()) {
+					// TODO: synchronized !!!!!!
+					std::cerr << "can't suppose synchronized now..." << std::endl;
+//					assert(false);
+				}
+				if (target_method->is_native()) {
+					// TODO: native
+					std::cerr << "can't suppose native now..." << std::endl;
+//					assert(false);
+				} else {
+#ifdef DEBUG
+	if (*pc == 0xb7)
+		std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+	else if (*pc == 0xb8)
+		std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+#endif
+					Oop *result = jvm.add_frame_and_execute(target_method, arg_list);
+					if (!target_method->is_void()) {
+						if (result->get_ooptype() == OopType::_BasicTypeOop) {
+							op_stack.push(((BasicTypeOop *)result)->get_value());
+						} else {
+							op_stack.push((uint64_t)result);
+						}
+					}
+				}
+				break;
+			}
 			case 0xb7:		// invokeSpecial
 			case 0xb8:{		// invokeStatic
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
@@ -451,7 +554,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 					Oop *result = jvm.add_frame_and_execute(new_method, arg_list);
 					if (!new_method->is_void()) {
-						op_stack.push((uint64_t)result);
+						if (result->get_ooptype() == OopType::_BasicTypeOop) {
+							op_stack.push(((BasicTypeOop *)result)->get_value());
+						} else {
+							op_stack.push((uint64_t)result);
+						}
 					}
 				}
 				break;
@@ -526,10 +633,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
+			case 0xbe:{		// arraylength
+				ArrayOop *array = (ArrayOop *)op_stack.top();	op_stack.pop();
+				assert(array->get_ooptype() == OopType::_ObjArrayOop || array->get_ooptype() == OopType::_TypeArrayOop);
+				op_stack.push(array->get_length());
+#ifdef DEBUG
+	std::wcout << "(DEBUG) put array: (element type) " << array->get_klass()->get_name() << " (dimension) " << array->get_dimension() << " 's length: [" << array->get_length() << "] onto the stack." << std::endl;
+#endif
+				break;
+			}
 			case 0xbf:{		// athrow
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
+				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+
+				BootStrapClassLoader::get_bootstrap().print();	// 这个时候 Exception 类必须被加载！因为 op_stack 栈顶的引用是 Exception 的。(is_a() 函数)
 
 				assert(false);
+
 
 				break;
 			}
@@ -538,10 +659,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int branch_pc = ((pc[1] << 8) | pc[2]);
 				uint64_t ref_value = op_stack.top();	op_stack.pop();
 				if (ref_value != 0) {	// if not null, jump to the branch_pc.
-					pc = (code_begin) + branch_pc;
+					pc += branch_pc;		// 注意！！这里应该是 += ！ 因为 branch_pc 是根据此 ifnonnull 指令而产生的分支，基于此指令 pc 的位置！
 					pc -= occupied;		// 因为最后设置了 pc += occupied 这个强制增加，因而这里强制减少。
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref is not null. will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
 				} else {		// if null, go next.
 					// do nothing
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref is null. will go next." << branch_pc << std::endl;
+#endif
 				}
 				break;
 			}

@@ -158,6 +158,7 @@ private:
 public:
 	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
 	Type get_type() { return type; }
+	uint64_t get_value();
 };
 
 struct ByteOop : public BasicTypeOop {

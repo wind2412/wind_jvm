@@ -2043,7 +2043,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 					}
 
 					case 0xc7:{		// ifnonnull
-						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
+						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), (bc_num + ((code[bc_num+1] << 8) | code[bc_num+2])));
 						break;
 					}
 

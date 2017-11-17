@@ -119,3 +119,29 @@ MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who) : mirrored_who(mirrored_who
 					InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))) {}
 
 /*===----------------  TypeArrayOop  -------------------===*/
+
+/*===----------------  BasicTypeOop  -------------------===*/
+uint64_t BasicTypeOop::get_value() {
+	switch (type) {
+		case Type::BYTE:
+			return ((ByteOop *)this)->value;
+		case Type::BOOLEAN:
+			return ((BooleanOop *)this)->value;
+		case Type::CHAR:
+			return ((CharOop *)this)->value;
+		case Type::SHORT:
+			return ((ShortOop *)this)->value;
+		case Type::INT:
+			return ((IntOop *)this)->value;
+		case Type::FLOAT:
+			return ((FloatOop *)this)->value;
+		case Type::LONG:
+			return ((LongOop *)this)->value;
+		case Type::DOUBLE:
+			return ((DoubleOop *)this)->value;
+		default:{
+			std::cerr << "can't get here!" << std::endl;
+			assert(false);
+		}
+	}
+}

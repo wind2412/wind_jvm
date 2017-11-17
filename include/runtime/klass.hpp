@@ -173,6 +173,7 @@ public:
 	void set_static_field_value(shared_ptr<Field_info> field, uint64_t value);
 	bool get_static_field_value(const wstring & signature, uint64_t *result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
 	void set_static_field_value(const wstring & signature, uint64_t value);		// as above.
+	shared_ptr<Method> search_vtable(const wstring & signature);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
 	InstanceOop* new_instance();
