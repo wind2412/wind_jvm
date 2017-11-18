@@ -27,6 +27,12 @@ using std::shared_ptr;
  * 调 bug 要分析几万行的日志。。。。。。想死的心都有了QAQQAQQAQ
  */
 
+/**
+ * bug 手记：今天又一次触发 EXC_BAD_ACCESS (code=2, address=0x7fff5f3ff910) 错误。
+ * 错误点在于：前一步的函数 xxx(*this, ...) 在参数传递之后，*this 就变了......
+ * 找了半天错误，竟然惊人的发现是触发了无限循环？？为什么会这样......
+ */
+
 /*===----------- StackFrame --------------===*/
 StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
