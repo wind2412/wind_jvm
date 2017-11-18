@@ -269,28 +269,40 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 			case 0x2a:{		// aload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[0] << " on stack." << std::endl;
+	if (localVariableTable[0] != 0)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[0] << " on stack." << std::endl;
+	else
+		std::wcout << "(DEBUG) push <null> ref from localVariableTable[0], to stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x2b:{		// aload_1
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[1] << " on stack." << std::endl;
+	if (localVariableTable[1] != 0)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[1] << " on stack." << std::endl;
+	else
+		std::wcout << "(DEBUG) push <null> ref from localVariableTable[1], to stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x2c:{		// aload_2
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[2] << " on stack." << std::endl;
+	if (localVariableTable[2] != 0)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[2] << " on stack." << std::endl;
+	else
+		std::wcout << "(DEBUG) push <null> ref from localVariableTable[2], to stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x2d:{		// aload_3
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[3] << " on stack." << std::endl;
+	if (localVariableTable[3] != 0)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[3] << " on stack." << std::endl;
+	else
+		std::wcout << "(DEBUG) push <null> ref from localVariableTable[3], to stack." << std::endl;
 #endif
 				break;
 			}
@@ -320,6 +332,52 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 				localVariableTable[3] = (int)op_stack.top();	op_stack.pop();
 #ifdef DEBUG
 	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[3] << " to localVariableTable[3] and rewrite." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x4b:{		// astore_0
+				uint64_t ref = op_stack.top();
+				localVariableTable[0] = op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	if (ref != 0)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[0]." << std::endl;
+	else
+		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[0]." << std::endl;
+#endif
+				break;
+			}
+			case 0x4c:{		// astore_1
+				uint64_t ref = op_stack.top();
+				localVariableTable[1] = op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	if (ref != 0)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[1]." << std::endl;
+	else
+		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[1]." << std::endl;
+#endif
+				break;
+			}
+			case 0x4d:{		// astore_2
+				uint64_t ref = op_stack.top();
+				localVariableTable[2] = op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	if (ref != 0)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[2]." << std::endl;
+	else
+		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[2]." << std::endl;
+#endif
+				break;
+			}
+			case 0x4e:{		// astore_3
+				uint64_t ref = op_stack.top();
+				localVariableTable[3] = op_stack.top();	op_stack.pop();
+#ifdef DEBUG
+	if (ref != 0)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[3]." << std::endl;
+	else
+		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[3]." << std::endl;
 #endif
 				break;
 			}
@@ -441,6 +499,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 	std::wcout << "(DEBUG) int value compare from stack is " << value2 << " and " << value1 << ", so will go next." << std::endl;
 #endif
 				}
+				break;
+			}
+
+			case 0xa7:{		// goto
+				int branch_pc = ((pc[1] << 8) | pc[2]);
+				pc += branch_pc;
+				pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) will [goto]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
 				break;
 			}
 
