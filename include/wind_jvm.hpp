@@ -47,14 +47,14 @@ public:
 					assert(return_val == nullptr);
 					// do nothing
 				} else {
-					cur_frame.op_stack.push((uint64_t)return_val);
+					cur_frame.op_stack.push(return_val);
 				}
 			}
 			vm_stack.pop_back();	// another half push_back() is in wind_jvm() constructor.
 		}
 	}
-	Oop * add_frame_and_execute(shared_ptr<Method> new_method, const std::list<uint64_t> & list) {
-		this->vm_stack.push_back(StackFrame(nullptr, new_method, nullptr, nullptr, list));
+	Oop * add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
+		this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
 		Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
 		this->vm_stack.pop_back();
 		return result;

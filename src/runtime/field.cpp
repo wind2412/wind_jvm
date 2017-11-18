@@ -44,7 +44,6 @@ Field_info::Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info
 		}
 	}
 
-	value_size = parse_field_descriptor(descriptor);
 }
 
 void Field_info::if_didnt_parse_then_parse()

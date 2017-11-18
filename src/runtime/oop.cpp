@@ -11,30 +11,33 @@
 /*===----------------  InstanceOop  -----------------===*/
 InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.
-	this->field_length = klass->non_static_field_bytes();
+	this->field_length = klass->non_static_field_num();
 	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
 	if (this->field_length != 0) {
-		fields = new uint8_t[this->field_length];			// TODO: not gc control......
-		memset(fields, 0, this->field_length);		// 啊啊啊啊全部清空别忘了！！
+		fields = new Oop*[this->field_length];			// TODO: not gc control......
+		memset(fields, 0, this->field_length * sizeof(Oop *));		// 啊啊啊啊全部清空别忘了！！
 	}
+
+	// initialize BasicTypeOop...
+	klass->initialize_field(klass->fields_layout, this->fields);
 }
 
-bool InstanceOop::get_field_value(shared_ptr<Field_info> field, uint64_t *result)
+bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	return get_field_value(signature, result);
 }
 
-void InstanceOop::set_field_value(shared_ptr<Field_info> field, uint64_t value)
+void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	set_field_value(signature, value);
 }
 
-bool InstanceOop::get_field_value(const wstring & signature, uint64_t *result) 				// use for forging String Oop at parsing constant_pool.
-{
+bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				// use for forging String Oop at parsing constant_pool.
+{		// [bug发现] 在 ByteCodeEngine 中，getField 里边，由于我的设计，因此即便是读取 int 也会返回一个 IntOop 的 对象。因此这肯定是错误的... 改为在这里直接取引用，直接解除类型并且取出真值。
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 	if (iter == instance_klass->fields_layout.end()) {
@@ -42,28 +45,12 @@ bool InstanceOop::get_field_value(const wstring & signature, uint64_t *result) 	
 		assert(false);
 	}
 	int offset = iter->second.first;
-	int size = iter->second.second->get_value_size();
-	switch (size) {
-		case 1:
-			*result = *(uint8_t *)(this->fields + offset);
-			return true;
-		case 2:
-			*result = *(uint16_t *)(this->fields + offset);
-			return true;
-		case 4:
-			*result = *(uint32_t *)(this->fields + offset);
-			return true;
-		case 8:
-			*result = *(uint64_t *)(this->fields + offset);
-			return true;
-		default:{
-			std::cerr << "can't get here! size == " << size << std::endl;
-			assert(false);
-		}
-	}
+	// field value not 0, maybe basic type.
+	*result = this->fields[offset];
+	return true;
 }
 
-void InstanceOop::set_field_value(const wstring & signature, uint64_t value)
+void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	auto iter = instance_klass->fields_layout.find(signature);
@@ -72,49 +59,9 @@ void InstanceOop::set_field_value(const wstring & signature, uint64_t value)
 		assert(false);
 	}
 	int offset = iter->second.first;
-	int size = iter->second.second->get_value_size();
-	switch (size) {
-		case 1:
-			*(uint8_t *)(this->fields + offset) = value;
-			break;
-		case 2:
-			*(uint16_t *)(this->fields + offset) = value;
-			break;
-		case 4:
-			*(uint32_t *)(this->fields + offset) = value;
-			break;
-		case 8:
-			*(uint64_t *)(this->fields + offset) = value;
-			break;
-		default:{
-			std::cerr << "can't get here! size == " << size << std::endl;
-			assert(false);
-		}
-	}
+	// field value not 0, maybe basic type.
+	this->fields[offset] = value;
 }
-
-//unsigned long InstanceOop::get_value(const wstring & signature) {	// 注意......一个非常重要的问题就是，这里的类型系统是由字节码来提示的：也就是，根据字节码 istore, astore，你可以自动把它们转换为 int/Reference(Oop) 类型......也就是， 这里仅仅返回类型擦除后的 unsigned long(max 8 bytes, 64bits) 就可以。
-//	// static / non-static 的信息被我给抹去了。外边不知道调用的是 static 还是 non-static.
-//	auto this_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-//	auto target = this_klass->get_field(signature);
-//	assert(target.first != -1);	// valid field
-//	if (target.second->is_static()) {
-//		return this_klass->get_static_field_value(target.second);
-//	} else {
-//		return this->get_field_value(target.second);
-//	}
-//}
-//
-//void InstanceOop::set_value(const wstring & signature, unsigned long value) {
-//	auto this_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-//	auto target = this_klass->get_field(signature);
-//	assert(target.first != -1);	// valid field
-//	if (target.second->is_static()) {
-//		this_klass->set_static_field_value(target.second, value);
-//	} else {
-//		this->set_field_value(target.second, value);
-//	}
-//}
 
 /*===----------------  MirrorOop  -------------------===*/
 MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who) : mirrored_who(mirrored_who),
@@ -123,7 +70,8 @@ MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who) : mirrored_who(mirrored_who
 /*===----------------  TypeArrayOop  -------------------===*/
 
 /*===----------------  BasicTypeOop  -------------------===*/
-uint64_t BasicTypeOop::get_value() {
+uint64_t BasicTypeOop::get_value()
+{
 	switch (type) {
 		case Type::BYTE:
 			return ((ByteOop *)this)->value;
@@ -141,6 +89,40 @@ uint64_t BasicTypeOop::get_value() {
 			return ((LongOop *)this)->value;
 		case Type::DOUBLE:
 			return ((DoubleOop *)this)->value;
+		default:{
+			std::cerr << "can't get here!" << std::endl;
+			assert(false);
+		}
+	}
+}
+
+void BasicTypeOop::set_value(uint64_t value)
+{
+	switch (type) {
+		case Type::BYTE:
+			((ByteOop *)this)->value = value;
+			break;
+		case Type::BOOLEAN:
+			((BooleanOop *)this)->value = value;
+			break;
+		case Type::CHAR:
+			((CharOop *)this)->value = value;
+			break;
+		case Type::SHORT:
+			((ShortOop *)this)->value = value;
+			break;
+		case Type::INT:
+			((IntOop *)this)->value = value;
+			break;
+		case Type::FLOAT:
+			((FloatOop *)this)->value = value;
+			break;
+		case Type::LONG:
+			((LongOop *)this)->value = value;
+			break;
+		case Type::DOUBLE:
+			((DoubleOop *)this)->value = value;
+			break;
 		default:{
 			std::cerr << "can't get here!" << std::endl;
 			assert(false);

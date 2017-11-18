@@ -18,17 +18,17 @@ using std::function;
 using std::shared_ptr;
 
 /*===----------- StackFrame --------------===*/
-StackFrame::StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<uint64_t> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是没有类型的 uint64_t。因此，在**执行 code**的时候才会有类型提升～
+StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
-	for (uint64_t value : list) {
+	for (Oop * value : list) {		// 这里的 int 就是 int，不是 IntOop ！！因为在字节码范围内的 invoke 那里已经修改。
 		localVariableTable.at(i++) = value;	// 检查越界。
 	}
 }
 
 void StackFrame::clear_all() {					// used with `is_valid()`. if invalid, clear all to reuse this frame.
 	this->valid_frame = true;
-	stack<uint64_t>().swap(op_stack);				// empty. [Effective STL]
-	vector<uint64_t>().swap(localVariableTable);
+	stack<Oop *>().swap(op_stack);				// empty. [Effective STL]
+	vector<Oop *>().swap(localVariableTable);
 	method = nullptr;
 	return_pc = nullptr;
 	// prev not change.
@@ -100,6 +100,15 @@ vector<Type> BytecodeEngine::parse_arg_list(const wstring & descriptor)
 		recursive_arg(descriptor[i]);
 	}
 	return arg_list;
+}
+
+intptr_t BytecodeEngine::get_real_value(Oop *oop)
+{
+	if (oop == nullptr) return 0;
+	if (oop->get_klass() == nullptr) {		// basic type oop.
+		return ((BasicTypeOop *)oop)->get_value();
+	}
+	return (intptr_t)oop;		// if it is a ref, return itself.
 }
 
 bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
@@ -230,8 +239,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 	shared_ptr<Method> method = cur_frame.method;
 	uint32_t code_length = method->get_code()->code_length;
-	stack<uint64_t> & op_stack = cur_frame.op_stack;
-	vector<uint64_t> & localVariableTable = cur_frame.localVariableTable;
+	stack<Oop *> & op_stack = cur_frame.op_stack;
+	vector<Oop *> & localVariableTable = cur_frame.localVariableTable;
 	uint8_t *code_begin = method->get_code()->code;
 	shared_ptr<InstanceKlass> klass = method->get_klass();
 	rt_constant_pool & rt_pool = *klass->get_rtpool();
@@ -254,44 +263,53 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 			case 0x03:{		// iconst_0
-				op_stack.push(0);
+				op_stack.push(new IntOop(0));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 0 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x04:{		// iconst_1
-				op_stack.push(1);
+				op_stack.push(new IntOop(1));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 1 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x05:{		// iconst_2
-				op_stack.push(2);
+				op_stack.push(new IntOop(2));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 2 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x06:{		// iconst_3
-				op_stack.push(3);
+				op_stack.push(new IntOop(3));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 3 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x07:{		// iconst_4
-				op_stack.push(4);
+				op_stack.push(new IntOop(4));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 4 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x08:{		// iconst_5
-				op_stack.push(5);
+				op_stack.push(new IntOop(5));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int 5 on stack." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x10: {		// bipush
+				op_stack.push(new ByteOop(pc[1]));
+#ifdef DEBUG
+	std::cout << "(DEBUG) push byte " << (int)(((ByteOop *)op_stack.top())->value) << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -300,22 +318,22 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int rtpool_index = pc[1];
 				if (rt_pool[rtpool_index-1].first == CONSTANT_Integer) {
 					int value = boost::any_cast<int>(rt_pool[rtpool_index-1].second);
-					op_stack.push(value);
+					op_stack.push(new IntOop(value));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push int: "<< value << "on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Float) {
 					float value = boost::any_cast<float>(rt_pool[rtpool_index-1].second);
-					op_stack.push(value);
+					op_stack.push(new FloatOop(value));
 #ifdef DEBUG
 	std::cout << "(DEBUG) push float: "<< value << "on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_String) {
 					InstanceOop *stringoop = (InstanceOop *)boost::any_cast<Oop *>(rt_pool[rtpool_index-1].second);
-					op_stack.push((uint64_t)stringoop);
+					op_stack.push(stringoop);
 #ifdef DEBUG
 	// for string:
-	uint64_t result;
+	Oop *result;
 	bool temp = stringoop->get_field_value(L"value:[C", &result);
 	assert(temp == true);
 	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
@@ -329,7 +347,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
 					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
 					assert(klass->get_mirror() != nullptr);
-					op_stack.push((uint64_t)klass->get_mirror());		// push into [Oop*] type.
+					op_stack.push(klass->get_mirror());		// push into [Oop*] type.
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push class: "<< klass->get_name() << "'s mirror "<< "on stack." << std::endl;
 #endif
@@ -345,28 +363,28 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x1a:{		// iload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[0] << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1b:{		// iload_1
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[1] << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1c:{		// iload_2
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[2] << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1d:{		// iload_3
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< (int)localVariableTable[3] << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -374,8 +392,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x2a:{		// aload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	if (localVariableTable[0] != 0)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[0] << " on stack." << std::endl;
+	if (localVariableTable[0] != nullptr)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[0] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[0], to stack." << std::endl;
 #endif
@@ -384,8 +402,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x2b:{		// aload_1
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	if (localVariableTable[1] != 0)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[1] << " on stack." << std::endl;
+	if (localVariableTable[1] != nullptr)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[1] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[1], to stack." << std::endl;
 #endif
@@ -394,8 +412,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x2c:{		// aload_2
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	if (localVariableTable[2] != 0)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[2] << " on stack." << std::endl;
+	if (localVariableTable[2] != nullptr)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[2] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[2], to stack." << std::endl;
 #endif
@@ -404,8 +422,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x2d:{		// aload_3
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	if (localVariableTable[3] != 0)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< ((Oop *)localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << localVariableTable[3] << " on stack." << std::endl;
+	if (localVariableTable[3] != nullptr)
+		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[3] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[3], to stack." << std::endl;
 #endif
@@ -413,74 +431,74 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 			case 0x3b:{		// istore_0
-				localVariableTable[0] = (int)op_stack.top();	op_stack.pop();
+				localVariableTable[0] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[0] << " to localVariableTable[0] and rewrite." << std::endl;
+	std::cout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[0])->value << " to localVariableTable[0] and rewrite." << std::endl;
 #endif
 				break;
 			}
 			case 0x3c:{		// istore_1
-				localVariableTable[1] = (int)op_stack.top();	op_stack.pop();
+				localVariableTable[1] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[1] << " to localVariableTable[1] and rewrite." << std::endl;
+	std::cout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[1])->value << " to localVariableTable[1] and rewrite." << std::endl;
 #endif
 				break;
 			}
 			case 0x3d:{		// istore_2
-				localVariableTable[2] = (int)op_stack.top();	op_stack.pop();
+				localVariableTable[2] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[2] << " to localVariableTable[2] and rewrite." << std::endl;
+	std::cout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[2])->value << " to localVariableTable[2] and rewrite." << std::endl;
 #endif
 				break;
 			}
 			case 0x3e:{		// istore_3
-				localVariableTable[3] = (int)op_stack.top();	op_stack.pop();
+				localVariableTable[3] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	std::cout << "(DEBUG) pop stack top int: "<< (int)localVariableTable[3] << " to localVariableTable[3] and rewrite." << std::endl;
+	std::cout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
 #endif
 				break;
 			}
 
 
 			case 0x4b:{		// astore_0
-				uint64_t ref = op_stack.top();
+				Oop *ref = op_stack.top();
 				localVariableTable[0] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	if (ref != 0)	// ref == null
-		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[0]." << std::endl;
+	if (ref != nullptr)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ref->get_klass()->get_name() << "'s Oop: address: " << std::hex << ref << " to localVariableTable[0]." << std::endl;
 	else
 		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[0]." << std::endl;
 #endif
 				break;
 			}
 			case 0x4c:{		// astore_1
-				uint64_t ref = op_stack.top();
+				Oop *ref = op_stack.top();
 				localVariableTable[1] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	if (ref != 0)	// ref == null
-		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[1]." << std::endl;
+	if (ref != nullptr)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ref->get_klass()->get_name() << "'s Oop: address: " << std::hex << ref << " to localVariableTable[1]." << std::endl;
 	else
 		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[1]." << std::endl;
 #endif
 				break;
 			}
 			case 0x4d:{		// astore_2
-				uint64_t ref = op_stack.top();
+				Oop *ref = op_stack.top();
 				localVariableTable[2] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	if (ref != 0)	// ref == null
-		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[2]." << std::endl;
+	if (ref != nullptr)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ref->get_klass()->get_name() << "'s Oop: address: " << std::hex << ref << " to localVariableTable[2]." << std::endl;
 	else
 		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[2]." << std::endl;
 #endif
 				break;
 			}
 			case 0x4e:{		// astore_3
-				uint64_t ref = op_stack.top();
+				Oop *ref = op_stack.top();
 				localVariableTable[3] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	if (ref != 0)	// ref == null
-		std::wcout << "(DEBUG) pop ref from stack, "<< ((Oop *)ref)->get_klass()->get_name() << "'s Oop: address: 0x" << std::hex << ref << " to localVariableTable[3]." << std::endl;
+	if (ref != nullptr)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ref->get_klass()->get_name() << "'s Oop: address: " << std::hex << ref << " to localVariableTable[3]." << std::endl;
 	else
 		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[3]." << std::endl;
 #endif
@@ -507,9 +525,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x60:{		// iadd
-				int val2 = op_stack.top(); op_stack.pop();
-				int val1 = op_stack.top(); op_stack.pop();
-				op_stack.push(val2 + val1);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val2 + val1));
 #ifdef DEBUG
 	std::cout << "(DEBUG) add int value from stack: "<< val2 << " + " << val1 << " and put " << (val2+val1) << " on stack." << std::endl;
 #endif
@@ -518,9 +536,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x64:{		// isub
-				int val2 = op_stack.top(); op_stack.pop();
-				int val1 = op_stack.top(); op_stack.pop();
-				op_stack.push(val1 - val2);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val1 - val2));
 #ifdef DEBUG
 	std::cout << "(DEBUG) sub int value from stack: "<< val1 << " - " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
 #endif
@@ -538,7 +556,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x9d:		// ifgt
 			case 0x9e:{		// ifle
 				int branch_pc = ((pc[1] << 8) | pc[2]);
-				int int_value = (int)op_stack.top();	op_stack.pop();
+				int int_value = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
 				if (*pc == 0x99) {
 					judge = (int_value == 0);
@@ -575,8 +593,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0xa3:		// if_icmpgt
 			case 0xa4:{		// if_icmple
 				int branch_pc = ((pc[1] << 8) | pc[2]);
-				int value2 = (int)op_stack.top();	op_stack.pop();
-				int value1 = (int)op_stack.top();	op_stack.pop();
+				int value2 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
+				int value1 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
 				if (*pc == 0x99) {
 					judge = (value1 == value2);
@@ -621,19 +639,19 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// TODO: monitor...
 				jvm.pc = backup_pc;
 #ifdef DEBUG
-	std::cout << "(DEBUG) return an int value from stack: "<< (int)op_stack.top() << std::endl;
+	std::cout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
 #endif
-				return new IntOop(op_stack.top());	// boolean, short, char, int
+				return op_stack.top();	// boolean, short, char, int
 			}
 
 
 			case 0xb0:{		// areturn
 				// TODO: monitor...
 				jvm.pc = backup_pc;
-				Oop *oop = (Oop *)op_stack.top();	op_stack.pop();
+				Oop *oop = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
 	if (oop != 0)
-		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << (uint64_t)oop << std::endl;
+		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << oop << std::endl;
 	else
 		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
 #endif
@@ -663,12 +681,12 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), jvm);
 				}
 				// get the [static Field] value and save to the stack top
-				uint64_t new_top;
+				Oop *new_top;
 				bool temp = new_klass->get_static_field_value(new_field, &new_top);
 				assert(temp == true);
 				op_stack.push(new_top);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get a static value : " << new_top << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
+	std::wcout << "(DEBUG) get a static value : " << get_real_value(new_top) << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
 #endif
 				break;
 			}
@@ -687,10 +705,10 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), jvm);
 				}
 				// get the stack top and save to the [static Field]
-				uint64_t top = op_stack.top();	op_stack.pop();
+				Oop *top = op_stack.top();	op_stack.pop();
 				new_klass->set_static_field_value(new_field, top);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) put a static value (unknown value type): " << top << " from stack, to <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
+	std::wcout << "(DEBUG) put a static value (unknown value type): " << get_real_value(top) << " from stack, to <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
 #endif
 				break;
 			}
@@ -700,15 +718,15 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
 				// TODO: $2.8.3 的 FP_strict 浮点数转换！
 				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
+				Oop *ref = op_stack.top();	op_stack.pop();
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
 //				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
 //				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
-				uint64_t new_value;
+				Oop *new_value;
 				assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
 				op_stack.push(new_value);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get a non-static value : " << new_value << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
+	std::wcout << "(DEBUG) get a non-static value : " << get_real_value(new_value) << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
 #endif
 				break;
 			}
@@ -718,14 +736,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
 				// TODO: $2.8.3 的 FP_strict 浮点数转换！
 				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				uint64_t new_value = op_stack.top();	op_stack.pop();
-				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
+				Oop *new_value = op_stack.top();	op_stack.pop();
+				Oop *ref = op_stack.top();	op_stack.pop();
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
 //				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
 //				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
 				((InstanceOop *)ref)->set_field_value(new_field, new_value);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) put a non-static value (unknown value type): " << new_value << " from stack, to <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
+	std::wcout << "(DEBUG) put a non-static value (unknown value type): " << get_real_value(new_value) << " from stack, to <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
 #endif
 				break;
 			}
@@ -741,11 +759,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
 				// TODO: 参数应该是倒着入栈的吧...?
 				Oop *ref;		// get ref. (this)	// same as invokespecial. but invokespecial didn't use `this` ref to get Klass.
-				list<uint64_t> arg_list;
+				list<Oop *> arg_list;
 				assert(op_stack.size() >= size);
 				while (size > 0) {
 					if (size == 1) {
-						ref = (Oop *)op_stack.top();
+						ref = op_stack.top();
 					}
 					arg_list.push_front(op_stack.top());
 					op_stack.pop();
@@ -774,15 +792,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 					Oop *result = jvm.add_frame_and_execute(target_method, arg_list);
 					if (!target_method->is_void()) {
-						if (result == 0) {		// 防止 areturn 这种返回一个 null (0)，这样在下边 result->get_ooptype() 相当于对 nullptr 解引用...会崩溃。
-							op_stack.push(0);
-						} else {
-							if (result->get_ooptype() == OopType::_BasicTypeOop) {
-								op_stack.push(((BasicTypeOop *)result)->get_value());
-							} else {
-								op_stack.push((uint64_t)result);
-							}
-						}
+						op_stack.push(result);
 #ifdef DEBUG
 	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
@@ -821,7 +831,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					}
 					std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
 					// TODO: 参数应该是倒着入栈的吧...?
-					list<uint64_t> arg_list;
+					list<Oop *> arg_list;
 					assert(op_stack.size() >= size);
 					while (size > 0) {
 						arg_list.push_front(op_stack.top());
@@ -836,15 +846,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 					Oop *result = jvm.add_frame_and_execute(new_method, arg_list);
 					if (!new_method->is_void()) {
-						if (result == 0) {		// 防止 areturn 这种返回一个 null (0)，这样在下边 result->get_ooptype() 相当于对 nullptr 解引用...会崩溃。
-							op_stack.push(0);
-						} else {
-							if (result->get_ooptype() == OopType::_BasicTypeOop) {
-								op_stack.push(((BasicTypeOop *)result)->get_value());
-							} else {
-								op_stack.push((uint64_t)result);
-							}
-						}
+						op_stack.push(result);
 #ifdef DEBUG
 	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
@@ -863,13 +865,70 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// if didnt init then init
 				initial_clinit(real_klass, jvm);
 				auto oop = real_klass->new_instance();
-				op_stack.push((uint64_t)oop);
+				op_stack.push(oop);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) new an object (only alloc memory): <class>: " << klass->get_name() << std::endl;
 #endif
 				break;
 			}
-
+			case 0xbc:{		// newarray		// 创建普通的 basic type 数组。
+				int arr_type = pc[1];
+				int length = ((IntOop *)op_stack.top())->get_value();	op_stack.pop();
+				if (length < 0) {	// TODO: 最后要全部换成异常！
+					std::cerr << "array length can't be negative!!" << std::endl;
+					assert(false);
+				}
+				wstring for_debug;
+				switch (arr_type) {
+					case T_BOOLEAN:
+						assert(system_classmap.find(L"[Z.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[Z.class"])->new_instance(length));	// 注意！这里的 basic type array oop 内部存放的全是引用，指向 basic type oop！！千万不要搞错！需要对数组元素再一次解引用才能得到真正的值！
+						for_debug = L"[Z";
+						break;
+					case T_CHAR:
+						assert(system_classmap.find(L"[C.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[C.class"])->new_instance(length));
+						for_debug = L"[C";
+						break;
+					case T_FLOAT:
+						assert(system_classmap.find(L"[F.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[F.class"])->new_instance(length));
+						for_debug = L"[F";
+						break;
+					case T_DOUBLE:
+						assert(system_classmap.find(L"[D.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[D.class"])->new_instance(length));
+						for_debug = L"[D";
+						break;
+					case T_BYTE:
+						assert(system_classmap.find(L"[B.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[B.class"])->new_instance(length));
+						for_debug = L"[B";
+						break;
+					case T_SHORT:
+						assert(system_classmap.find(L"[S.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[S.class"])->new_instance(length));
+						for_debug = L"[S";
+						break;
+					case T_INT:
+						assert(system_classmap.find(L"[I.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[I.class"])->new_instance(length));
+						for_debug = L"[I";
+						break;
+					case T_LONG:
+						assert(system_classmap.find(L"[J.class") != system_classmap.end());
+						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[J.class"])->new_instance(length));
+						for_debug = L"[J";
+						break;
+					default:{
+						assert(false);
+					}
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) new a basic type array ---> " << for_debug << std::endl;
+#endif
+				break;
+			}
 			case 0xbd:{		// anewarray		// 创建引用(对象)的[一维]数组。
 				/**
 				 * java 的数组十分神奇。在这里需要有所解释。
@@ -882,7 +941,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				 * ** 产生这种表示法的根本原因在于：jvm 根本就不关心句柄是怎么表示的。它只关心的是真正的对象。句柄的表示是由编译器来关注并 parse 的！！**
 				 */
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
-				int length = op_stack.top();	op_stack.pop();
+				int length = ((IntOop *)op_stack.top())->get_value();	op_stack.pop();
 				if (length < 0) {	// TODO: 最后要全部换成异常！
 					std::cerr << "array length can't be negative!!" << std::endl;
 					assert(false);
@@ -895,11 +954,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					if (real_klass->get_classloader() == nullptr) {
 						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
-						op_stack.push((uint64_t)arr_klass->new_instance(length));
+						op_stack.push(arr_klass->new_instance(length));
 					} else {
 						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
-						op_stack.push((uint64_t)arr_klass->new_instance(length));
+						op_stack.push(arr_klass->new_instance(length));
 					}
 				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// [Ljava/lang/Class
 					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
@@ -908,11 +967,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					if (real_klass->get_element_type()->get_classloader() == nullptr) {
 						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
-						op_stack.push((uint64_t)arr_klass->new_instance(length));
+						op_stack.push(arr_klass->new_instance(length));
 					} else {
 						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_type()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
-						op_stack.push((uint64_t)arr_klass->new_instance(length));
+						op_stack.push(arr_klass->new_instance(length));
 					}
 				} else {
 					assert(false);
@@ -925,7 +984,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0xbe:{		// arraylength
 				ArrayOop *array = (ArrayOop *)op_stack.top();	op_stack.pop();
 				assert(array->get_ooptype() == OopType::_ObjArrayOop || array->get_ooptype() == OopType::_TypeArrayOop);
-				op_stack.push(array->get_length());
+				op_stack.push(new IntOop(array->get_length()));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) put array: (element type) " << array->get_klass()->get_name() << " (dimension) " << array->get_dimension() << " 's length: [" << array->get_length() << "] onto the stack." << std::endl;
 #endif
@@ -950,9 +1009,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
 				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);		// constant_pool index
 				// 1. first get the ref and find if it is null
-				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
+				Oop *ref = op_stack.top();	op_stack.pop();
 				if (ref == 0) {
-					op_stack.push(0);
+					op_stack.push(new IntOop(0));
 					break;
 				}
 				// 2. if ref is not null, judge its type
@@ -960,17 +1019,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				bool result = check_instanceof(ref_klass, klass);
 				// 3. push result
 				if (result == true) {
-					op_stack.push(1);
+					op_stack.push(new IntOop(1));
 				} else {
-					op_stack.push(0);
+					op_stack.push(new IntOop(0));
 				}
 				break;
 			}
 
 			case 0xc7:{		// ifnonnull
 				int branch_pc = ((pc[1] << 8) | pc[2]);
-				uint64_t ref_value = op_stack.top();	op_stack.pop();
-				if (ref_value != 0) {	// if not null, jump to the branch_pc.
+				Oop *ref_value = op_stack.top();	op_stack.pop();
+				if (ref_value != nullptr) {	// if not null, jump to the branch_pc.
 					pc += branch_pc;		// 注意！！这里应该是 += ！ 因为 branch_pc 是根据此 ifnonnull 指令而产生的分支，基于此指令 pc 的位置！
 					pc -= occupied;		// 因为最后设置了 pc += occupied 这个强制增加，因而这里强制减少。
 #ifdef DEBUG

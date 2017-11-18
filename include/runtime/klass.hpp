@@ -129,9 +129,9 @@ private:
 													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
-	int total_non_static_fields_bytes = 0;
-	int total_static_fields_bytes = 0;
-	uint8_t *static_fields = nullptr;												// static field values. [non-static field values are in oop].
+	int total_non_static_fields_num = 0;
+	int total_static_fields_num = 0;
+	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
 	// static methods + vtable + itable
 	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
 	vector<shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
@@ -163,16 +163,18 @@ public:
 	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
 public:
 	shared_ptr<Method> get_static_void_main();
+private:
+	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields );		// initializer for parse_fields() and InstanceOop's Initialization
 public:
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);	// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool!!!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
-	int non_static_field_bytes() { return total_non_static_fields_bytes; }
-	bool get_static_field_value(shared_ptr<Field_info> field, uint64_t *result);		// self-maintain a ptr to pass in...
-	void set_static_field_value(shared_ptr<Field_info> field, uint64_t value);
-	bool get_static_field_value(const wstring & signature, uint64_t *result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
-	void set_static_field_value(const wstring & signature, uint64_t value);		// as above.
+	int non_static_field_num() { return total_non_static_fields_num; }
+	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result);		// self-maintain a ptr to pass in...
+	void set_static_field_value(shared_ptr<Field_info> field, Oop *value);
+	bool get_static_field_value(const wstring & signature, Oop **result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+	void set_static_field_value(const wstring & signature, Oop *value);		// as above.
 	shared_ptr<Method> search_vtable(const wstring & signature);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
@@ -185,12 +187,7 @@ private:
 	InstanceKlass(const InstanceKlass &);
 public:
 	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
-	~InstanceKlass() {
-		for (int i = 0; i < attributes_count; i ++) {
-			delete attributes[i];
-		}
-		delete[] attributes;
-	};
+	~InstanceKlass();
 };
 
 class MirrorOop;

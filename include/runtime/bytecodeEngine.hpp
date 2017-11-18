@@ -21,18 +21,27 @@ using std::vector;
 using std::stack;
 using std::shared_ptr;
 
+#define T_BOOLEAN	4
+#define T_CHAR		5
+#define T_FLOAT		6
+#define T_DOUBLE		7
+#define T_BYTE		8
+#define T_SHORT		9
+#define T_INT		10
+#define T_LONG		11
+
 class Method;
 
 struct StackFrame {		// Only a Bean class!
 public:
 	bool valid_frame = true;				// is this frame valid/used ?
-	stack<uint64_t> op_stack;			// the inner opcode stack.		// ignore Method::max_stack_size...
-	vector<uint64_t> localVariableTable;	// this StackFrame's lvt.		// ignore Method::max_local_size...
+	stack<Oop *> op_stack;			// the inner opcode stack.		// ignore Method::max_stack_size...
+	vector<Oop *> localVariableTable;	// this StackFrame's lvt.		// ignore Method::max_local_size...
 	shared_ptr<Method> method;			// the method will be executed in this StackFrame.
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 public:
-	StackFrame(Oop *_this, shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<uint64_t> & list);
+	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list);
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
 	void clear_all();
@@ -49,6 +58,7 @@ public:	// aux
 	static vector<Type> parse_arg_list(const wstring & descriptor);
 	static void initial_clinit(shared_ptr<InstanceKlass>, wind_jvm & jvm);
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
+	static intptr_t get_real_value(Oop *oop);
 };
 
 

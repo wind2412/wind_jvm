@@ -54,7 +54,6 @@ private:
 	u2 access_flags;
 	wstring name;			// variable name
 	wstring descriptor;		// type descripror: I, [I, java.lang.String etc.
-	int value_size;			// **this field's size**: parse descriptor to get it. See: Java SE 8 Specification $4.3.2
 
 	// attributes
 	// 0, 6, 7, 13, 14, 15, 18, 19	// synthetic, deprecated 两者都不需要。并没有保存任何信息。
@@ -76,7 +75,6 @@ public:
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	Type get_type() { return type; }
 	shared_ptr<Klass> get_type_klass() { assert(get_state() == Parsed); return true_type; }	// small lock to keep safe.
-	int get_value_size() { return value_size; }
 	void if_didnt_parse_then_parse();			// **VERY IMPORTANT**!!!
 public:
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }

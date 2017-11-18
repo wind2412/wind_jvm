@@ -38,7 +38,7 @@ wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv
 	for (int i = 0; i < argv.size(); i ++) {
 		(*string_arr_oop)[i] = java_lang_string::intern(argv[i]);
 	}
-	this->vm_stack.push_back(StackFrame(nullptr, main_method, nullptr, nullptr, {(uint64_t)string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 }
 

@@ -85,21 +85,28 @@ public:
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
 private:
 	int field_length;
-	uint8_t *fields = nullptr;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
+	Oop **fields = nullptr;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
 public:		// 以下 8 个方法全部用来赋值。
-	bool get_field_value(shared_ptr<Field_info> field, uint64_t *result);
-	void set_field_value(shared_ptr<Field_info> field, uint64_t value);
-	bool get_field_value(const wstring & signature, uint64_t *result);				// use for forging String Oop at parsing constant_pool.
-	void set_field_value(const wstring & signature, uint64_t value);	// same as above...
-	bool get_static_field_value(shared_ptr<Field_info> field, uint64_t *result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field, result); }
-	void set_static_field_value(shared_ptr<Field_info> field, uint64_t value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
-	bool get_static_field_value(const wstring & signature, uint64_t *result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
-	void set_static_field_value(const wstring & signature, uint64_t value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
+	bool get_field_value(shared_ptr<Field_info> field, Oop **result);
+	void set_field_value(shared_ptr<Field_info> field, Oop *value);
+	bool get_field_value(const wstring & signature, Oop **result);				// use for forging String Oop at parsing constant_pool.
+	void set_field_value(const wstring & signature, Oop *value);	// same as above...
+	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field, result); }
+	void set_static_field_value(shared_ptr<Field_info> field, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
+	bool get_static_field_value(const wstring & signature, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
+	void set_static_field_value(const wstring & signature, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);
+public:
+	~InstanceOop() {
+		for (int i = 0; i < field_length; i ++) {
+			delete fields[i];
+		}
+		delete[] fields;
+	}
 };
 
 class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.
@@ -159,6 +166,7 @@ public:
 	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
 	Type get_type() { return type; }
 	uint64_t get_value();
+	void set_value(uint64_t value);
 };
 
 struct ByteOop : public BasicTypeOop {

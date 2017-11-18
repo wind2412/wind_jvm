@@ -76,14 +76,14 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 		for (auto iter : super_map) {
 			this->fields_layout[iter.first] = iter.second;
 		}
-		this->total_non_static_fields_bytes = std::static_pointer_cast<InstanceKlass>(this->parent)->total_non_static_fields_bytes;
+		this->total_non_static_fields_num = std::static_pointer_cast<InstanceKlass>(this->parent)->total_non_static_fields_num;
 	}
 	// 2. interfaces
 	for (auto iter : this->interfaces) {
 		auto layout = iter.second->fields_layout;
 		for (auto field_iter : layout) {
-			this->fields_layout[iter.first] = make_pair(total_non_static_fields_bytes, field_iter.second.second);
-			total_non_static_fields_bytes += field_iter.second.second->get_value_size();
+			this->fields_layout[iter.first] = make_pair(total_non_static_fields_num, field_iter.second.second);
+			total_non_static_fields_num ++;
 		}
 	}
 	// 3. this_klass
@@ -93,31 +93,35 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 		shared_ptr<Field_info> metaField = make_shared<Field_info>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->fields[i], cf->constant_pool);
 		ss << metaField->get_name() << L":" << metaField->get_descriptor();
 		if((cf->fields[i].access_flags & 0x08) != 0) {	// static field
-			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_bytes, metaField)));
-			total_static_fields_bytes += metaField->get_value_size();	// offset +++
+			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_num, metaField)));
+			total_static_fields_num ++;	// offset +++
 		} else {		// non-static field
-			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_bytes, metaField)));
-			total_non_static_fields_bytes += metaField->get_value_size();
+			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_non_static_fields_num, metaField)));
+			total_non_static_fields_num ++;
 		}
 		ss.str(L"");
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.
-	if (total_static_fields_bytes != 0)		// be careful!!!!
-		this->static_fields = new uint8_t[total_static_fields_bytes];
-	memset(this->static_fields, 0, total_static_fields_bytes);	// bzero!!
+	if (total_static_fields_num != 0)		// be careful!!!!
+		this->static_fields = new Oop*[total_static_fields_num];
+	memset(this->static_fields, 0, total_static_fields_num * sizeof(Oop *));	// bzero!!
+
+	// initialize static BasicTypeOop...
+	initialize_field(this->static_fields_layout, this->static_fields);
+
 #ifdef DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
 	std::cout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
 	if (this->fields_layout.size() != 0)		std::cout << "non-static as below:" << std::endl;
 	int counter = 0;
 	for (auto iter : this->fields_layout) {
-		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << ", size: " << iter.second.second->get_value_size() << std::endl;
+		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
 	}
 	counter = 0;
 	if (this->static_fields_layout.size() != 0)	std::cout << "static as below:" << std::endl;
 	for (auto iter : this->static_fields_layout) {
-		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << ", size: " << iter.second.second->get_value_size() << std::endl;
+		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
 	}
 	std::cout << "===--------------------------------------------------------===" << std::endl;
 #endif
@@ -344,70 +348,51 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signa
 
 }
 
-bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, uint64_t *result)
+bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, Oop **result)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
+
+	// TODO: 修改：惰性生成 BasicTypeOop 对象。如果检测到 result 是 0，且 type 是 basic type，那么就要生成一个 Int/CharOop... 对象。
+	// TODO: 而且 static field / field / BytecodeEngine 里边所有的 iload_0 / istore_0 也要改！！
+
 	return get_static_field_value(signature, result);
 }
 
-void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, uint64_t value)
+void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, Oop *value)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	set_static_field_value(signature, value);
 }
 
-bool InstanceKlass::get_static_field_value(const wstring & signature, uint64_t *result)				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
+bool InstanceKlass::get_static_field_value(const wstring & signature, Oop **result)				// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
 {
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
 		// ** search in parent for static !! **
-		return std::static_pointer_cast<InstanceKlass>(this->parent)->get_static_field_value(signature, result);
+		if (this->parent != nullptr)
+			return std::static_pointer_cast<InstanceKlass>(this->parent)->get_static_field_value(signature, result);
+		else
+			return false;
 	}
 	int offset = iter->second.first;
-	int size = iter->second.second->get_value_size();
-	switch (size) {
-		case 1:
-			return *(uint8_t *)(this->static_fields + offset);
-		case 2:
-			return *(uint16_t *)(this->static_fields + offset);
-		case 4:
-			return *(uint32_t *)(this->static_fields + offset);
-		case 8:
-			return *(uint64_t *)(this->static_fields + offset);
-		default:{
-			std::cerr << "can't get here! size == " << size << std::endl;
-			assert(false);
-		}
-	}
+	*result = this->static_fields[offset];
+	return true;
 }
 
-void InstanceKlass::set_static_field_value(const wstring & signature, uint64_t value)
+void InstanceKlass::set_static_field_value(const wstring & signature, Oop *value)
 {
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
-		std::static_pointer_cast<InstanceKlass>(this->parent)->set_static_field_value(signature, value);
-	}
-	int offset = iter->second.first;
-	int size = iter->second.second->get_value_size();
-	switch (size) {
-		case 1:
-			*(uint8_t *)(this->static_fields + offset) = value;
-			break;
-		case 2:
-			*(uint16_t *)(this->static_fields + offset) = value;
-			break;
-		case 4:
-			*(uint32_t *)(this->static_fields + offset) = value;
-			break;
-		case 8:
-			*(uint64_t *)(this->static_fields + offset) = value;
-			break;
-		default:{
-			std::cerr << "can't get here! size == " << size << std::endl;
+		if (this->parent != nullptr) {
+			std::static_pointer_cast<InstanceKlass>(this->parent)->set_static_field_value(signature, value);
+			return;
+		} else {
+			std::cerr << "don't have this static field !!! fatal fault !!!" << std::endl;
 			assert(false);
 		}
 	}
-
+	int offset = iter->second.first;
+	this->static_fields[offset] = value;
 }
 
 shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
@@ -477,6 +462,49 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	return nullptr;
 }
 
+void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields)
+{
+	for (auto & iter : fields_layout) {
+		// ** 如果是 static 的 get_field，那么需要根据 signature 去 parent 去找。不过这里只是初始化，parent 的 static 域会被自己初始化，不用此子类管。 **
+		int offset = iter.second.first;
+		if (fields[offset] == nullptr) {			// 这里为 0，届时有可能是 ref 的 null，也有可能是 没有经过初始化 的 basic type oop.
+			wstring type = iter.first.substr(iter.first.find_first_of(L":") + 1);		// e.g. value:[C --> [C,   value:J --> J
+			if (type.size() == 1) {
+				// is a basic type !!!
+				switch (type[0]) {
+					case L'B':	// byte
+						fields[offset] = new ByteOop(0);
+						break;
+					case L'C':	// char
+						fields[offset] = new CharOop(0);
+						break;
+					case L'F':	// float
+						fields[offset] = new FloatOop(0);
+						break;
+					case L'I':	// int
+						fields[offset] = new IntOop(0);
+						break;
+					case L'S':	// short
+						fields[offset] = new ShortOop(0);
+						break;
+					case L'Z':	// boolean
+						fields[offset] = new BooleanOop(0);
+						break;
+					case L'D':	// double
+						fields[offset] = new DoubleOop(0);
+						break;
+					case L'J':	// long
+						fields[offset] = new LongOop(0);
+						break;
+					default:{
+						assert(false);
+					}
+				}
+			}
+		}
+	}
+}
+
 bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
 {
 	return check_interfaces(klass->get_name());
@@ -503,6 +531,17 @@ InstanceOop * InstanceKlass::new_instance() {
 	return new InstanceOop(shared_ptr<InstanceKlass>(this, [](auto *){}));
 }
 
+InstanceKlass::~InstanceKlass() {
+	for (int i = 0; i < attributes_count; i ++) {
+		delete attributes[i];
+	}
+	delete[] attributes;
+	for (int i = 0; i < total_static_fields_num; i ++) {
+		delete static_fields[i];
+	}
+	delete[] static_fields;
+};
+
 /*===---------------    MirrorKlass (aux)    --------------------===*/
 MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who) {
 	return new MirrorOop(mirrored_who);
@@ -524,7 +563,48 @@ ArrayOop* ArrayKlass::new_instance(int length)
 	else
 		oop = new ObjArrayOop(shared_ptr<ObjArrayKlass>((ObjArrayKlass*)this, [](auto*){}), length);
 	for (int i = 0; i < length; i ++) {
-		(*oop)[i] = nullptr;		// nullptr is the best !
+		if (this->get_type() == ClassType::ObjArrayClass) {
+			(*oop)[i] = nullptr;		// nullptr is the best !
+		} else {		// allocate basic type...
+			Type basic_type = ((TypeArrayKlass *)this)->get_basic_type();
+			switch (basic_type) {
+				case Type::BOOLEAN:{
+					(*oop)[i] = new BooleanOop(0);		// default value
+					break;
+				}
+				case Type::BYTE:{
+					(*oop)[i] = new ByteOop(0);		// default value
+					break;
+				}
+				case Type::CHAR:{
+					(*oop)[i] = new CharOop(0);		// default value
+					break;
+				}
+				case Type::DOUBLE:{
+					(*oop)[i] = new DoubleOop(0);		// default value
+					break;
+				}
+				case Type::FLOAT:{
+					(*oop)[i] = new FloatOop(0);		// default value
+					break;
+				}
+				case Type::INT:{
+					(*oop)[i] = new IntOop(0);		// default value
+					break;
+				}
+				case Type::LONG:{
+					(*oop)[i] = new LongOop(0);		// default value
+					break;
+				}
+				case Type::SHORT:{
+					(*oop)[i] = new ShortOop(0);		// default value
+					break;
+				}
+				default:{
+					assert(false);
+				}
+			}
+		}
 	}
 	return oop;
 }
