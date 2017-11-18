@@ -102,6 +102,111 @@ vector<Type> BytecodeEngine::parse_arg_list(const wstring & descriptor)
 	return arg_list;
 }
 
+bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
+{
+	bool result;
+	if (ref_klass->get_type() == ClassType::InstanceClass) {
+		if (ref_klass->is_interface()) {		// a. ref_klass is an interface
+			if (klass->is_interface()) {		// a1. klass is an interface, too
+				if (ref_klass == klass || std::static_pointer_cast<InstanceKlass>(ref_klass)->check_interfaces(std::static_pointer_cast<InstanceKlass>(klass))) {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both interfaces. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+			} else {							// a2. klass is a normal class
+				if (klass->get_name() == L"java/lang/Object") {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is interface but klass " << klass->get_name() << " is normal class. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+			}
+			return result;
+		} else {								// b. ref_klass is a normal class
+			if (klass->is_interface()) {		// b1. klass is an interface
+				if (std::static_pointer_cast<InstanceKlass>(ref_klass)->check_interfaces(std::static_pointer_cast<InstanceKlass>(klass))) {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is normal class but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+				return result;
+			} else {							// b2. klass is a normal class, too
+				if (ref_klass == klass || ref_klass->get_parent() == klass) {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+				return result;
+			}
+		}
+	} else if (ref_klass->get_type() == ClassType::TypeArrayClass || ref_klass->get_type() == ClassType::ObjArrayClass) {	// c. ref_klass is an array
+		if (klass->get_type() == ClassType::InstanceClass) {
+			if (!klass->is_interface()) {		// c1. klass is a normal class
+				if (klass->get_name() == L"java/lang/Object") {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is a normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+				return result;
+			} else {								// c2. klass is an interface		// Please see JLS $4.10.3	// array default implements: 1. java/lang/Cloneable  2. java/io/Serializable
+				if (klass->get_name() == L"java/lang/Cloneable" || klass->get_name() == L"java/io/Serializable") {
+					result = true;
+				} else {
+					result = false;
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+				return result;
+			}
+		} else if (klass->get_type() == ClassType::TypeArrayClass) {		// c3. klass is an TypeArrayKlass
+			if (ref_klass->get_type() == ClassType::TypeArrayClass && std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type() == std::static_pointer_cast<TypeArrayKlass>(ref_klass)->get_basic_type()) {
+				result = true;
+			} else {
+				result = false;
+			}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both arrays. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+			return result;
+		} else if (klass->get_type() == ClassType::ObjArrayClass) {		// c4. klass is an ObjArrayKlass
+			if (ref_klass->get_type() == ClassType::ObjArrayClass) {
+				auto ref_klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(ref_klass)->get_element_type();
+				auto klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_type();
+				if (ref_klass_inner_type == klass_inner_type || ref_klass_inner_type->get_parent() == klass_inner_type) {
+					result = true;
+				} else {
+					result = false;
+				}
+			} else {
+				result = false;
+			}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both arrays. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
+#endif
+			return result;
+		} else {
+			assert(false);
+		}
+	} else {
+		assert(false);
+	}
+}
+
 void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jvm & jvm)
 {
 	if (new_klass->get_state() == Klass::KlassState::NotInitialized) {
@@ -836,6 +941,29 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 				assert(false);
 
 
+				break;
+			}
+
+			case 0xc1:{		// instanceof
+				// TODO: paper...
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
+				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);		// constant_pool index
+				// 1. first get the ref and find if it is null
+				Oop *ref = (Oop *)op_stack.top();	op_stack.pop();
+				if (ref == 0) {
+					op_stack.push(0);
+					break;
+				}
+				// 2. if ref is not null, judge its type
+				auto ref_klass = ref->get_klass();													// op_stack top ref's klass
+				bool result = check_instanceof(ref_klass, klass);
+				// 3. push result
+				if (result == true) {
+					op_stack.push(1);
+				} else {
+					op_stack.push(0);
+				}
 				break;
 			}
 

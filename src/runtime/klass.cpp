@@ -477,6 +477,17 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	return nullptr;
 }
 
+bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
+{
+	return check_interfaces(klass->get_name());
+}
+
+bool InstanceKlass::check_interfaces(const wstring & signature)
+{
+	if (this->interfaces.find(signature) != this->interfaces.end())	return true;
+	return false;
+}
+
 shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
 {
 	for (auto method : this->vtable) {

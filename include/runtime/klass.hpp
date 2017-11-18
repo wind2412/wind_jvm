@@ -176,6 +176,8 @@ public:
 	shared_ptr<Method> search_vtable(const wstring & signature);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
+	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
+	bool check_interfaces(shared_ptr<InstanceKlass> klass);
 	InstanceOop* new_instance();
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
