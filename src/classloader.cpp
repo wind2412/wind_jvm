@@ -32,7 +32,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, nullptr);
 			system_classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -62,7 +62,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -74,7 +74,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -91,7 +91,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -102,7 +102,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -150,7 +150,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this);
 			classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -180,7 +180,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -192,7 +192,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -209,7 +209,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif
@@ -220,7 +220,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
 	MyClassLoader::get_loader().print();
 #endif

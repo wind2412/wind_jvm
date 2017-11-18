@@ -58,7 +58,7 @@ public:	// aux
 	static vector<Type> parse_arg_list(const wstring & descriptor);
 	static void initial_clinit(shared_ptr<InstanceKlass>, wind_jvm & jvm);
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
-	static intptr_t get_real_value(Oop *oop);
+	static wstring get_real_value(Oop *oop);
 };
 
 

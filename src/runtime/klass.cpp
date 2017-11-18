@@ -110,7 +110,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	// initialize static BasicTypeOop...
 	initialize_field(this->static_fields_layout, this->static_fields);
 
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
 	std::cout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
 	if (this->fields_layout.size() != 0)		std::cout << "non-static as below:" << std::endl;
@@ -147,7 +147,7 @@ void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *load
 			// above ↑ is a little hack. I don't know whether there is a side effect.
 		}
 	}
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug SuperClass ---------------===" << std::endl;
 	if (cf->super_class == 0) {
 		std::cout << "this class is **java.lang.Object** class and doesn't have a superclass." << std::endl;
@@ -174,7 +174,7 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 		assert(interface != nullptr);
 		this->interfaces.insert(make_pair(interface_name, interface));
 	}
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime InterfacePool ---------------===" << std::endl;
 	std::cout << "interfaces: total " << this->interfaces.size() << std::endl;
 	int counter = 0;
@@ -211,7 +211,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 
 		ss.str(L"");		// make empty
 	}
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
 	std::cout << "methods: total " << this->methods.size() << std::endl;
 	int counter = 0;
@@ -226,7 +226,7 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 {
 	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
 	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
-#ifdef DEBUG
+#ifdef KLASS_DEBUG
 	// this has been deleted because lazy parsing constant_pool...
 //	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
 //	this->rt_pool->print_debug();

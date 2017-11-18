@@ -20,6 +20,8 @@ using std::vector;
 using std::shared_ptr;
 using std::pair;
 
+//#define KLASS_DEBUG
+
 /**
  * 这个 Klass 是一定要被 new 出来的！
  * TODO: 方法区。

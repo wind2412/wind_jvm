@@ -10,12 +10,22 @@
 #include "runtime/method.hpp"
 #include "runtime/constantpool.hpp"
 #include <memory>
+#include <sstream>
 #include <functional>
 #include <boost/any.hpp>
 
+using std::wstringstream;
 using std::list;
 using std::function;
 using std::shared_ptr;
+
+/**
+ * 小技能：
+ * 把 log 中不含 "<bytecode>" 的日志行全部正则删除的方法QAQ
+ * 见 http://www.cnblogs.com/wangqiguo/archive/2012/05/08/2486548.html
+ * 用 ^(?!.*<bytecode>).*\n 这个零度替换(?!)就可以......
+ * 调 bug 要分析几万行的日志。。。。。。想死的心都有了QAQQAQQAQ
+ */
 
 /*===----------- StackFrame --------------===*/
 StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
@@ -102,13 +112,16 @@ vector<Type> BytecodeEngine::parse_arg_list(const wstring & descriptor)
 	return arg_list;
 }
 
-intptr_t BytecodeEngine::get_real_value(Oop *oop)
+wstring BytecodeEngine::get_real_value(Oop *oop)
 {
-	if (oop == nullptr) return 0;
+	if (oop == nullptr) return L"null";
+	wstringstream ss;
 	if (oop->get_klass() == nullptr) {		// basic type oop.
-		return ((BasicTypeOop *)oop)->get_value();
+		ss << ((BasicTypeOop *)oop)->get_value();
+		return ss.str();
 	}
-	return (intptr_t)oop;		// if it is a ref, return itself.
+	ss << oop;
+	return ss.str();		// if it is a ref, return itself.
 }
 
 bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
@@ -336,13 +349,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	Oop *result;
 	bool temp = stringoop->get_field_value(L"value:[C", &result);
 	assert(temp == true);
-	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
-	std::cout << "the string is: --> ";
+	std::cout << "(DEBUG) string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
+	std::cout << "(DEBUG) the string is: --> \"";
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
 		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
 	}
 	std::wcout.clear();
-	std::wcout << std::endl;
+	std::wcout << "\"" << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
 					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
@@ -390,6 +403,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 			case 0x2a:{		// aload_0
+				if (localVariableTable[0] != nullptr) assert(localVariableTable[0]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
 	if (localVariableTable[0] != nullptr)
@@ -400,6 +414,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2b:{		// aload_1
+				if (localVariableTable[1] != nullptr) assert(localVariableTable[1]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
 	if (localVariableTable[1] != nullptr)
@@ -410,6 +425,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2c:{		// aload_2
+				if (localVariableTable[2] != nullptr) assert(localVariableTable[2]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
 	if (localVariableTable[2] != nullptr)
@@ -420,6 +436,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2d:{		// aload_3
+				if (localVariableTable[3] != nullptr) assert(localVariableTable[3]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
 	if (localVariableTable[3] != nullptr)
@@ -461,6 +478,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x4b:{		// astore_0
+				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[0] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -472,6 +490,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4c:{		// astore_1
+				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[1] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -483,6 +502,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4d:{		// astore_2
+				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[2] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -494,6 +514,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4e:{		// astore_3
+				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[3] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -525,7 +546,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x60:{		// iadd
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val2 + val1));
 #ifdef DEBUG
@@ -536,7 +559,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x64:{		// isub
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val1 - val2));
 #ifdef DEBUG

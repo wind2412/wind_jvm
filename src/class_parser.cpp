@@ -2593,7 +2593,7 @@ void ClassFile::parse_header(std::ifstream & f) {
 	minor_version = htons(minor_version);
 	major_version = htons(major_version);
 	constant_pool_count = htons(constant_pool_count);
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	cout << hex  << "(DEBUG) " << magic << " " << dec << minor_version << " " << major_version << " " << constant_pool_count << endl;
 #endif
 }
@@ -2660,7 +2660,7 @@ void ClassFile::parse_constant_pool(std::ifstream & f) {
 				assert(false);
 		}
 	}
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	std::cout << "(DEBUG) constpool_size: " << constant_pool_count << std::endl;
 	print_constant_pool(constant_pool, constant_pool_count-1);
 #endif
@@ -2670,7 +2670,7 @@ void ClassFile::parse_class_msgs(std::ifstream & f) {
 	access_flags = read2(f);
 	this_class = read2(f);
 	super_class = read2(f);
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	wstring this_class_name = ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[this_class-1])->index-1])->convert_to_Unicode();
 	std::wcout << "(DEBUG) ----------------- (" << this_class_name << ") static constant_pool over --------------------" << std::endl;
 	std::cout << "(DEBUG) access_flags: " << access_flags << "  this_class: #" << this_class << "  super_class: #" << super_class << endl;
@@ -2683,7 +2683,7 @@ void ClassFile::parse_interfaces(std::ifstream & f) {
 	for(int i = 0; i < interfaces_count; i ++) {
 		interfaces[i] = read2(f);
 	}
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	if (interfaces_count != 0) {
 		std::cout << "(DEBUG) Interfaces: ";
 		for(int i = 0; i < interfaces_count; i ++) {
@@ -2703,7 +2703,7 @@ void ClassFile::parse_fields(std::ifstream & f) {
 	for(int pos = 0; pos < fields_count; pos ++) {
 		fields[pos].fill(f, constant_pool);
 	}
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	if (fields_count != 0) {
 		std::cout << "(DEBUG) field_info_size: " << fields_count << std::endl;
 		print_fields(fields, fields_count, constant_pool);
@@ -2720,7 +2720,7 @@ void ClassFile::parse_methods(std::ifstream & f) {
 	for(int pos = 0; pos < methods_count; pos ++) {
 		methods[pos].fill(f, constant_pool);
 	}
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	if (methods_count != 0) {
 		std::cout << "(DEBUG) method_number: " << methods_count << std::endl;
 		print_methods(methods, methods_count, constant_pool);
@@ -2737,7 +2737,7 @@ void ClassFile::parse_attributes(std::ifstream & f) {
 	for(int pos = 0; pos < attributes_count; pos ++) {
 		attributes[pos] = new_attribute(f, constant_pool);
 	}
-#ifdef DEBUG
+#ifdef POOL_DEBUG
 	if (attributes_count != 0) {
 		std::cout << "(DEBUG) attribute_number: " << attributes_count << std::endl;
 		for (int pos = 0; pos < attributes_count; pos ++) {
