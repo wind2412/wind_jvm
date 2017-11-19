@@ -248,7 +248,7 @@ class ObjArrayKlass : public ArrayKlass {
 private:
 	shared_ptr<InstanceKlass> element_klass;		// e.g. java.lang.String
 public:
-	shared_ptr<InstanceKlass> get_element_type() { return element_klass; }
+	shared_ptr<InstanceKlass> get_element_klass() { return element_klass; }
 private:
 	ObjArrayKlass(const ObjArrayKlass &);
 public:

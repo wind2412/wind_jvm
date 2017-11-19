@@ -31,6 +31,13 @@ using std::shared_ptr;
  * bug 手记：今天又一次触发 EXC_BAD_ACCESS (code=2, address=0x7fff5f3ff910) 错误。
  * 错误点在于：前一步的函数 xxx(*this, ...) 在参数传递之后，*this 就变了......
  * 找了半天错误，竟然惊人的发现是触发了无限循环？？为什么会这样......
+ * 太可恨了这狗日错误！！说爆栈不就好了吗？！还 EXC_BAD_ACCESS??? code=2?????? 卧槽...... /翻白眼
+ * 你直接说是 Stack Overflow 不就行了吗！！
+ *
+ * 总结下经验......以后看到 Segmentation Fault 还是使用 echo $? 查看返回值吧......
+ * 刚才的 StackOverflow 是 139.
+ * assert(false) 是 134.
+ * 用 perror 134 / perror 139 查看信息......虽然没有卵用
  */
 
 /*===----------- StackFrame --------------===*/
@@ -154,7 +161,6 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is interface but klass " << klass->get_name() << " is normal class. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			}
-			return result;
 		} else {								// b. ref_klass is a normal class
 			if (klass->is_interface()) {		// b1. klass is an interface
 				if (std::static_pointer_cast<InstanceKlass>(ref_klass)->check_interfaces(std::static_pointer_cast<InstanceKlass>(klass))) {
@@ -165,7 +171,6 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 #ifdef DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is normal class but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
-				return result;
 			} else {							// b2. klass is a normal class, too
 				if (ref_klass == klass || ref_klass->get_parent() == klass) {
 					result = true;
@@ -175,7 +180,6 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 #ifdef DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
-				return result;
 			}
 		}
 	} else if (ref_klass->get_type() == ClassType::TypeArrayClass || ref_klass->get_type() == ClassType::ObjArrayClass) {	// c. ref_klass is an array
@@ -189,7 +193,6 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 #ifdef DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is a normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
-				return result;
 			} else {								// c2. klass is an interface		// Please see JLS $4.10.3	// array default implements: 1. java/lang/Cloneable  2. java/io/Serializable
 				if (klass->get_name() == L"java/lang/Cloneable" || klass->get_name() == L"java/io/Serializable") {
 					result = true;
@@ -199,9 +202,13 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 #ifdef DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
-				return result;
 			}
 		} else if (klass->get_type() == ClassType::TypeArrayClass) {		// c3. klass is an TypeArrayKlass
+			// 1. 编译器保证 ref 和 klass 的 dimension 必然相同。
+			int ref_dimension = (std::static_pointer_cast<ArrayKlass>(ref_klass))->get_dimension();
+			int klass_dimension = (std::static_pointer_cast<ArrayKlass>(klass))->get_dimension();
+			assert (ref_dimension == klass_dimension);
+			// 2. judge
 			if (ref_klass->get_type() == ClassType::TypeArrayClass && std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type() == std::static_pointer_cast<TypeArrayKlass>(ref_klass)->get_basic_type()) {
 				result = true;
 			} else {
@@ -212,9 +219,14 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 #endif
 			return result;
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {		// c4. klass is an ObjArrayKlass
+			// 1. 编译器保证 ref 和 klass 的 dimension 必然相同。
+			int ref_dimension = (std::static_pointer_cast<ArrayKlass>(ref_klass))->get_dimension();
+			int klass_dimension = (std::static_pointer_cast<ArrayKlass>(klass))->get_dimension();
+			assert (ref_dimension == klass_dimension);
+			// 2. judge
 			if (ref_klass->get_type() == ClassType::ObjArrayClass) {
-				auto ref_klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(ref_klass)->get_element_type();
-				auto klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_type();
+				auto ref_klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(ref_klass)->get_element_klass();
+				auto klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass();
 				if (ref_klass_inner_type == klass_inner_type || ref_klass_inner_type->get_parent() == klass_inner_type) {
 					result = true;
 				} else {
@@ -233,6 +245,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	} else {
 		assert(false);
 	}
+	return result;
 }
 
 void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jvm & jvm)
@@ -382,28 +395,28 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x1a:{		// iload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable[0] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1b:{		// iload_1
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable[1] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1c:{		// iload_2
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable[2] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x1d:{		// iload_3
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::cout << "(DEBUG) push localVariableTable[3] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -413,7 +426,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
 	if (localVariableTable[0] != nullptr)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[0] << " on stack." << std::endl;
+		std::wcout << "(DEBUG) push localVariableTable[0] ref: "<< (localVariableTable[0])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[0] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[0], to stack." << std::endl;
 #endif
@@ -424,7 +437,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
 	if (localVariableTable[1] != nullptr)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[1] << " on stack." << std::endl;
+		std::wcout << "(DEBUG) push localVariableTable[1] ref: "<< (localVariableTable[1])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[1] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[1], to stack." << std::endl;
 #endif
@@ -435,7 +448,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
 	if (localVariableTable[2] != nullptr)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[2] << " on stack." << std::endl;
+		std::wcout << "(DEBUG) push localVariableTable[2] ref: "<< (localVariableTable[2])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[2] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[2], to stack." << std::endl;
 #endif
@@ -446,12 +459,29 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
 	if (localVariableTable[3] != nullptr)
-		std::wcout << "(DEBUG) push localVariableTable ref: "<< (localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[3] << " on stack." << std::endl;
+		std::wcout << "(DEBUG) push localVariableTable[3] ref: "<< (localVariableTable[3])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[3] << " on stack." << std::endl;
 	else
 		std::wcout << "(DEBUG) push <null> ref from localVariableTable[3], to stack." << std::endl;
 #endif
 				break;
 			}
+
+
+			case 0x34:{		// caload
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				op_stack.push((*charsequence)[index]);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((CharOop *)op_stack.top())->value << "'" << std::endl;
+#endif
+				break;
+			}
+
 
 			case 0x3b:{		// istore_0
 				localVariableTable[0] = op_stack.top();	op_stack.pop();
@@ -508,6 +538,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4d:{		// astore_2
+				// bug report: 这里出现过一次 EXC_BAD_ACCESS (code=EXC_I386_GPFLT)。原因是因为访问了一块不属于自己的内存。但是其实真正原因是：op_stack.size() == 0。特此记录。
 				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[2] = op_stack.top();	op_stack.pop();
@@ -627,15 +658,15 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int value2 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				int value1 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
-				if (*pc == 0x99) {
+				if (*pc == 0x9f) {
 					judge = (value1 == value2);
-				} else if (*pc == 0x9a) {
+				} else if (*pc == 0xa0) {
 					judge = (value1 != value2);
-				} else if (*pc == 0x9b) {
+				} else if (*pc == 0xa1) {
 					judge = (value1 < value2);
-				} else if (*pc == 0x9c) {
+				} else if (*pc == 0xa2) {
 					judge = (value1 <= value2);
-				} else if (*pc == 0x9d) {
+				} else if (*pc == 0xa3) {				// mdzz 这里全都没改然后出了 EXC_BAD_ACCESS Code = 2 错误......
 					judge = (value1 > value2);
 				} else {
 					judge = (value1 >= value2);
@@ -655,7 +686,32 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				}
 				break;
 			}
+			case 0xa5:		// if_acmpeq		// 应该是仅仅比较 ref 所引用的地址。
+			case 0xa6:{		// if_acmpne
+				int branch_pc = ((pc[1] << 8) | pc[2]);
+				Oop *value2 = op_stack.top();	op_stack.pop();
+				Oop *value1 = op_stack.top();	op_stack.pop();
+				bool judge;
+				if (*pc == 0xa5) {
+					judge = (value1 == value2);
+				} else {
+					judge = (value1 != value2);
+				}
 
+				if (judge) {	// if true, jump to the branch_pc.
+					pc += branch_pc;
+					pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref value compare from stack is " << value2 << " and " << value1 << ", so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
+				} else {		// if false, go next.
+					// do nothing
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref value compare from stack is " << value2 << " and " << value1 << ", so will go next." << std::endl;
+#endif
+				}
+				break;
+			}
 			case 0xa7:{		// goto
 				int branch_pc = ((pc[1] << 8) | pc[2]);
 				pc += branch_pc;
@@ -995,12 +1051,12 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
 					// 创建数组的数组。不过也和 if 中的逻辑相同。
 					// 不过由于数组类没有设置 classloader，需要从 element 中去找。
-					if (real_klass->get_element_type()->get_classloader() == nullptr) {
+					if (real_klass->get_element_klass()->get_classloader() == nullptr) {
 						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					} else {
-						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_type()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
+						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_klass()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					}
@@ -1033,16 +1089,27 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 				break;
 			}
-
+			case 0xc0:		// checkcast
 			case 0xc1:{		// instanceof
 				// TODO: paper...
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
 				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);		// constant_pool index
 				// 1. first get the ref and find if it is null
-				Oop *ref = op_stack.top();	op_stack.pop();
+				Oop *ref = op_stack.top();
+				if (*pc == 0xc1) {
+					op_stack.pop();
+				}
 				if (ref == 0) {
-					op_stack.push(new IntOop(0));
+					// if this is 0xc0, re-push and break.
+					if (*pc == 0xc1) {
+						op_stack.push(new IntOop(0));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) So push 1 onto the stack." << std::endl;
+#endif
+					}
+					else
+						op_stack.push(ref);		// re-push.		// "op_stack will not change if op_stack's top is null."
 					break;
 				}
 				// 2. if ref is not null, judge its type
@@ -1050,9 +1117,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				bool result = check_instanceof(ref_klass, klass);
 				// 3. push result
 				if (result == true) {
-					op_stack.push(new IntOop(1));
+					if (*pc == 0xc1) {
+						op_stack.push(new IntOop(1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) So push 1 onto the stack." << std::endl;
+#endif
+					}
+					// else `checkcast` do nothing.
 				} else {
-					op_stack.push(new IntOop(0));
+					if (*pc == 0xc1) {
+						op_stack.push(new IntOop(0));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) So push 0 onto the stack." << std::endl;
+#endif
+					}
+					else {
+						// TODO: throw ClassCastException.
+						assert(false);
+					}
 				}
 				break;
 			}

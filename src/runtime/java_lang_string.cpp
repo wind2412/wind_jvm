@@ -77,12 +77,12 @@ Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	assert(result == charsequence);
 	assert(temp == true);
 	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
-	std::cout << "the string is: --> ";
+	std::cout << "the string is: --> \"";
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
 		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
 	}
 	std::wcout.clear();
-	std::wcout << std::endl;
+	std::wcout << "\"" << std::endl;
 #endif
 	return stringoop;
 }

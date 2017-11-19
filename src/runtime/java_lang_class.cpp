@@ -157,7 +157,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass) {
 			}
 			assert(klass->get_mirror() != nullptr);
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {
-			klass->set_mirror(std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_type()->get_mirror());		// set to element class's mirror!
+			klass->set_mirror(std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass()->get_mirror());		// set to element class's mirror!
 		} else {
 			assert(false);
 		}
