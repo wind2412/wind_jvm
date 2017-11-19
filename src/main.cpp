@@ -14,4 +14,6 @@ int main(int argc, char *argv[])
 	std::wcout.imbue(std::locale(""));
 	std::vector<std::wstring> v{ L"wind_jvm", L"1", L"2" };
 	wind_jvm jvm(L"Test", v);
+
+	pthread_exit(nullptr);
 }

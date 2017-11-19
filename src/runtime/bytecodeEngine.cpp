@@ -9,6 +9,8 @@
 #include "wind_jvm.hpp"
 #include "runtime/method.hpp"
 #include "runtime/constantpool.hpp"
+#include "system_directory.hpp"
+#include "classloader.hpp"
 #include <memory>
 #include <sstream>
 #include <functional>
