@@ -15,10 +15,11 @@
 struct temp {		// pthread aux struct...
 	wind_jvm *jvm;
 	const vector<wstring> *arg;
-};
+} p;
 
 auto scapegoat = [](void *pp) -> void *{
 	temp *real = (temp *)pp;
+	std::cout << real->jvm << std::endl;		// delete
 	real->jvm->start(*real->arg);
 	return nullptr;
 };
@@ -26,10 +27,11 @@ auto scapegoat = [](void *pp) -> void *{
 wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), rsp(-1), pc(0)
 {
 	// start one thread
-	temp p;
+//	temp p;				// p 变成局部变量之后会引发大 bug ？？！！卧槽 ？？？！！		// 重点！！
 	p.jvm = this;
 	p.arg = &argv;
 
+	std::cout << p.jvm << std::endl;		// delete
 //	auto scapegoat = [](void *pp) -> void *{
 //		temp *real = (temp *)pp;
 //	std::cout << real->jvm << "...???" << std::endl;		// delete

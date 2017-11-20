@@ -11,6 +11,7 @@
 #include "native/jni.hpp"
 #include "native/java_lang_System.hpp"
 #include <vector>
+#include <algorithm>
 #include <cassert>
 
 using std::vector;
@@ -28,26 +29,69 @@ static vector<JNINativeMethod> methods = {
     {"setErr0",           "(" PRS ")V",           (void *)&JVM_SetErr0},
 };
 
-void Java_java_lang_system_registerNative(InstanceOop *_this)
+void Java_java_lang_system_registerNative(stack<Oop *> & _stack)
 {
-		// 发现了一个问题：通过函数指针会把类型擦除！！因此估计要全部重改了...... 毕竟这如果要是擦除了，那就太糟糕了......
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);		// 把返回值也压到 stack 中去！！只有这样，才能够避免参数擦除的问题！！
 }
 
-LongOop *JVM_CurrentTimeMillis(InstanceOop *_this){assert(false);}
-LongOop *JVM_NanoTime(InstanceOop *_this){assert(false);}
-void JVM_ArrayCopy(InstanceOop *_this, Oop *obj1, IntOop *i1, Oop *obj2, IntOop *i2, IntOop *i3){assert(false);}
-IntOop *JVM_IdentityHashCode(InstanceOop *_this, Oop *obj){assert(false);}
-InstanceOop *JVM_InitProperties(InstanceOop *_this, InstanceOop *prop){assert(false);}
-InstanceOop *JVM_MapLibraryName(InstanceOop *_this, InstanceOop *str){assert(false);}
-void JVM_SetIn0(InstanceOop *_this, InstanceOop *inputstream){assert(false);}
-void JVM_SetOut0(InstanceOop *_this, InstanceOop *printstream){assert(false);}
-void JVM_SetErr0(InstanceOop *_this, InstanceOop *printstream){assert(false);}
-
-void java_lang_system_search_method(const string & str)
+LongOop *JVM_CurrentTimeMillis(stack<Oop *> & _stack)
 {
-	for (int i = 0; i < methods.size(); i ++) {
-		if ()
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+LongOop *JVM_NanoTime(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+void JVM_ArrayCopy(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	Oop *obj1 = (Oop *)_stack.top();	_stack.pop();
+	IntOop *i1 = (IntOop *)_stack.top();	_stack.pop();
+	Oop *obj2 = (Oop *)_stack.top();	_stack.pop();
+	IntOop *i2 = (IntOop *)_stack.top();	_stack.pop();
+	IntOop *i3 = (IntOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+IntOop *JVM_IdentityHashCode(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	Oop *obj = (Oop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+InstanceOop *JVM_InitProperties(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	InstanceOop *prop = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+InstanceOop *JVM_MapLibraryName(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	InstanceOop *str = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+void JVM_SetIn0(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	InstanceOop *inputstream = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+void JVM_SetOut0(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	InstanceOop *printstream = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+void JVM_SetErr0(stack<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+	InstanceOop *printstream = (InstanceOop *)_stack.top();	_stack.pop();
+	assert(false);
+}
+
+// 返回 fnPtr.
+void *java_lang_system_search_method(const string & str)
+{
+	auto iter = std::find_if(methods.begin(), methods.end(), [&str](JNINativeMethod & m){ return m.name == str; });
+	if (iter != methods.end()) {
+		return (*iter).fnPtr;
 	}
+	return nullptr;
 }
 
 
