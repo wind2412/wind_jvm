@@ -87,6 +87,11 @@ void wind_jvm::start(const vector<wstring> & argv)
 
 		// 3. create a [Main] ThreadGroup obj.
 		InstanceOop *main_threadgroup = threadgroup_klass->new_instance();
+		{
+			// inject it into `init_thread`!! 否则，届时在 java/lang/SecurityManager <clinit> 时，会自动 getCurrentThread --> get 到 main_threadgroup --> get 到 system_threadgroup. 所以必须先行注入。
+			// hack...
+			init_thread->set_field_value(L"group:Ljava/lang/ThreadGroup;", main_threadgroup);
+		}
 		assert(this->vm_stack.size() == 0);
 		{	// 注意：这里创建了针对此 main 的第二个 System ThreadGroup !!用第一个 System ThreadGroup 作为参数！
 			// TODO: pthread_mutex!!
@@ -96,6 +101,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 			list.push_back(init_threadgroup);	// $2 = init_threadgroup
 			list.push_back(java_lang_string::intern(L"main"));	// $3 = L"main"
 			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!		// 直接调用私有方法！为了避过狗日的 java/lang/SecurityManager 的检查......我也是挺拼的......QAQ
+			// TODO: 因为这里是直接调用了私方法，所以有可能是不可移植的。因为它私方法有可能变。
 			shared_ptr<Method> target_method = threadgroup_klass->get_this_class_method(L"<init>:(Ljava/lang/Void;Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);

@@ -299,7 +299,10 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 		int occupied = bccode_map[*pc].second + 1;		// the bytecode takes how many bytes.(include itself)		// TODO: tableswitch, lookupswitch, wide is NEGATIVE!!!
 		switch(*pc) {
-
+			case 0x00:{		// nop
+				// do nothing.
+				break;
+			}
 			case 0x01:{		// aconst_null
 				op_stack.push(0);		// TODO: 我只压入了 0.
 #ifdef DEBUG
@@ -638,6 +641,30 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x53:{		// aastore
+				Oop *value = op_stack.top();	op_stack.pop();
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				Oop *array_ref = op_stack.top();	op_stack.pop();
+				assert(array_ref != nullptr && array_ref->get_ooptype() == OopType::_ObjArrayOop);
+				if (value != nullptr)
+					assert(value->get_ooptype() == OopType::_InstanceOop);
+				InstanceOop *real_value = (InstanceOop *)value;
+				ObjArrayOop *real_array = (ObjArrayOop *)array_ref;
+				assert(real_array->get_length() > index);
+				// overwrite
+				(*real_array)[index] = value;
+#ifdef DEBUG
+	if (real_value == nullptr) {
+		std::wcout << "(DEBUG) put <null> into the index [" << index << "] of the ObjArray of type: ["
+				   << std::static_pointer_cast<ObjArrayKlass>(real_array->get_klass())->get_element_klass() << "]" << std::endl;
+	} else {
+		std::wcout << "(DEBUG) put element of type: [" << real_value->get_klass()->get_name() << "], address :[" << real_value << "] into the index [" << index
+				   << "] of the ObjArray of type: [" << std::static_pointer_cast<ObjArrayKlass>(real_array->get_klass())->get_element_klass() << "]" << std::endl;
+	}
+#endif
+				break;
+			}
+
 
 			case 0x57:{		// pop
 				op_stack.pop();
@@ -691,7 +718,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x9c:		// ifge
 			case 0x9d:		// ifgt
 			case 0x9e:{		// ifle
-				int branch_pc = ((pc[1] << 8) | pc[2]);
+				short branch_pc = ((pc[1] << 8) | pc[2]);
 				int int_value = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
 				if (*pc == 0x99) {
@@ -728,7 +755,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0xa2:		// if_icmpge
 			case 0xa3:		// if_icmpgt
 			case 0xa4:{		// if_icmple
-				int branch_pc = ((pc[1] << 8) | pc[2]);
+				short branch_pc = ((pc[1] << 8) | pc[2]);
 				int value2 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				int value1 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
@@ -762,7 +789,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 			case 0xa5:		// if_acmpeq		// 应该是仅仅比较 ref 所引用的地址。
 			case 0xa6:{		// if_acmpne
-				int branch_pc = ((pc[1] << 8) | pc[2]);
+				short branch_pc = ((pc[1] << 8) | pc[2]);
 				Oop *value2 = op_stack.top();	op_stack.pop();
 				Oop *value1 = op_stack.top();	op_stack.pop();
 				bool judge;
@@ -787,7 +814,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0xa7:{		// goto
-				int branch_pc = ((pc[1] << 8) | pc[2]);
+				short branch_pc = ((pc[1] << 8) | pc[2]);		// [重大bug] 用 short！！！不能用 int！！！ 因为这里如果想要变负，pc[1] 和 pc[2] 全是 uint8_t，想要变负，就必须要
+															// 强制让它越界！！而我一开始用 int，本意是害怕让它越界，结果反而越不了界了...... 要全改！！
 				pc += branch_pc;
 				pc -= occupied;
 #ifdef DEBUG
@@ -1282,6 +1310,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// TODO: 重入？？见 Spec 关于 monitorenter 的解释...也就是递归锁 ???
 				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
 				ref_value->enter_monitor();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) Monitor enter into obj of class:[" << ref_value->get_klass()->get_name() << "], address: [" << ref_value << "]" << std::endl;
+#endif
 				break;
 			}
 			case 0xc3:{		// monitorexit
@@ -1289,22 +1320,36 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
 				// TODO: IllegalMonitorStateException...
 				ref_value->leave_monitor();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) Monitor exit from obj of class:[" << ref_value->get_klass()->get_name() << "], address: [" << ref_value << "]" << std::endl;
+#endif
 				break;
 			}
 
+			case 0xc6:		// ifnull
 			case 0xc7:{		// ifnonnull
-				int branch_pc = ((pc[1] << 8) | pc[2]);
+				short branch_pc = ((pc[1] << 8) | pc[2]);
 				Oop *ref_value = op_stack.top();	op_stack.pop();
-				if (ref_value != nullptr) {	// if not null, jump to the branch_pc.
+				bool result;
+				if (*pc == 0xc6) {
+					result = (ref_value == nullptr) ? true : false;
+				} else {
+					result = (ref_value != nullptr) ? true : false;
+				}
+				if (result == true) {	// if not null, jump to the branch_pc.
 					pc += branch_pc;		// 注意！！这里应该是 += ！ 因为 branch_pc 是根据此 ifnonnull 指令而产生的分支，基于此指令 pc 的位置！
 					pc -= occupied;		// 因为最后设置了 pc += occupied 这个强制增加，因而这里强制减少。
 #ifdef DEBUG
-	std::wcout << "(DEBUG) ref is not null. will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+	std::wcout << "(DEBUG) ref is ";
+	if (*pc == 0xc7)	std::wcout << "not ";
+	std::wcout << "null. will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
 #endif
 				} else {		// if null, go next.
 					// do nothing
 #ifdef DEBUG
-	std::wcout << "(DEBUG) ref is null. will go next." << std::endl;
+	std::wcout << "(DEBUG) ref is ";
+	if (*pc == 0xc6)	std::wcout << "not ";
+	std::wcout << "null. will go next." << std::endl;
 #endif
 				}
 				break;
