@@ -17,7 +17,7 @@ static unordered_map<wstring, void*> methods = {
     {L"notify:()V",					(void *)&JVM_MonitorNotify},
     {L"notifyAll:()V",				(void *)&JVM_MonitorNotifyAll},
     {L"clone:()" OBJ,				(void *)&JVM_Clone},
-    {L"getClass:()" KLS,				(void *)&Java_java_lang_object_getClass},		// I add one line here.
+    {L"getClass:()" CLS,				(void *)&Java_java_lang_object_getClass},		// I add one line here.
 };
 
 void JVM_IHashCode(list<Oop *> & _stack){

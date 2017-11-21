@@ -199,7 +199,7 @@ class MirrorKlass : public InstanceKlass {		// this class, only used to static_c
 private:
 	MirrorKlass();
 public:
-	MirrorOop *new_mirror(shared_ptr<InstanceKlass> mirrored_who);
+	MirrorOop *new_mirror(shared_ptr<InstanceKlass> mirrored_who, ClassLoader *loader);
 };
 
 class ArrayKlass : public Klass {

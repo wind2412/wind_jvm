@@ -6,8 +6,8 @@
  */
 #include "wind_jvm.hpp"
 #include "runtime/klass.hpp"
-#include "runtime/java_lang_class.hpp"
-#include "runtime/java_lang_string.hpp"
+#include "native/java_lang_Class.hpp"
+#include "native/java_lang_String.hpp"
 #include "native/java_lang_Thread.hpp"
 #include "native/native.hpp"
 #include "system_directory.hpp"

@@ -28,7 +28,14 @@ using std::function;
 #define IPS L"Ljava/io/InputStream;"
 #define PRS L"Ljava/io/PrintStream;"
 #define PRO L"Ljava/util/Properties;"
-#define KLS L"Ljava/lang/Class;"
+#define CLS L"Ljava/lang/Class;"
+#define CPL "Lsun/reflect/ConstantPool;"
+#define JCL "Ljava/lang/ClassLoader;"
+#define FLD "Ljava/lang/reflect/Field;"
+#define MHD "Ljava/lang/reflect/Method;"
+#define CTR "Ljava/lang/reflect/Constructor;"
+#define PD  "Ljava/security/ProtectionDomain;"
+#define BA  "[B"
 
 void init_native();
 

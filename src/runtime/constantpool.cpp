@@ -5,7 +5,7 @@
  *      Author: zhengxiaolin
  */
 
-#include <runtime/java_lang_string.hpp>
+#include "native/java_lang_String.hpp"
 #include "runtime/constantpool.hpp"
 #include "classloader.hpp"
 #include "runtime/klass.hpp"

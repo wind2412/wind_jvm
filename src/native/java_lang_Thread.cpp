@@ -6,13 +6,10 @@
  */
 
 #include "native/java_lang_Thread.hpp"
-#include <vector>
 #include <algorithm>
 #include <cassert>
 #include "native/native.hpp"
 #include "runtime/thread.hpp"
-
-using std::vector;
 
 /*===-------------- from hotspot -------------------*/
 static unordered_map<wstring, void*> methods = {

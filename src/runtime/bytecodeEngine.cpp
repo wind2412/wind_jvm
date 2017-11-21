@@ -12,7 +12,7 @@
 #include "system_directory.hpp"
 #include "classloader.hpp"
 #include "native/native.hpp"
-#include "runtime/java_lang_string.hpp"
+#include "native/java_lang_String.hpp"
 #include <memory>
 #include <sstream>
 #include <functional>

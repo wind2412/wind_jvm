@@ -5,12 +5,12 @@
  *      Author: zhengxiaolin
  */
 
+#include "native/java_lang_Class.hpp"
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
 #include "classloader.hpp"
 #include "runtime/constantpool.hpp"
 #include "runtime/oop.hpp"
-#include "runtime/java_lang_class.hpp"
 #include <utility>
 #include <cstring>
 #include <sstream>
@@ -285,7 +285,7 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	cf->attributes_count = 0;
 
 	// set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}));
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}), loader);
 
 	// super_class
 	parse_superclass(cf, loader);
@@ -543,8 +543,22 @@ InstanceKlass::~InstanceKlass() {
 };
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/
-MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who) {
-	return new MirrorOop(mirrored_who);
+MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who, ClassLoader *loader) {
+
+	LockGuard lg(system_classmap_lock);
+	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
+
+	// then inject it!!
+	auto mirror = new MirrorOop(mirrored_who);
+	if (loader != nullptr) {
+		// need to initialize the `ClassLoader.class` by using ClassLoader's constructor!!
+		// TODO !!!!!!!! 这里千万别忘了写了！！！需要由 AppClassLoader 类来加载这个 Klass ！！！
+//		mirror->set_field_value(L"classLoader:Ljava/lang/ClassLoader;", loader);
+		std::cerr << "**Please** load sun/misc/Launcher$AppClassLoader.class first !! " << std::endl;
+		assert(false);
+	}
+
+	return mirror;
 }
 
 /*===---------------    ArrayKlass    --------------------===*/
@@ -614,6 +628,9 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 {	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
+
+	assert(loader == nullptr);		// TODO 这一点我也非常迷惑...... BasicType[][][] Klass 可以由 自己定义的 AppClassLoader 加载吗 ??????
+
 	for (int i = 0; i < dimension; i ++) {
 		ss << L"[";
 	}
@@ -621,49 +638,49 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 		case Type::BOOLEAN:{
 			ss << L"Z";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::BYTE:{
 			ss << L"B";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::CHAR:{
 			ss << L"C";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::SHORT:{
 			ss << L"S";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::INT:{
 			ss << L"I";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::FLOAT:{
 			ss << L"F";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::LONG:{
 			ss << L"J";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		case Type::DOUBLE:{
 			ss << L"D";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 			break;
 		}
 		default:{
@@ -685,7 +702,7 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	ss << element_klass->get_name();
 	this->name = ss.str();
 	// 2. set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}));
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
 
 }
 
