@@ -13,12 +13,12 @@
 
 class Lock : public boost::noncopyable {
 private:
-	pthread_mutexattr_t attr;
+//	pthread_mutexattr_t attr;
 	pthread_mutex_t mutex;
 public:
 	Lock() {
-		pthread_mutexattr_init(&attr);
-		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);	// 设置递归锁
+//		pthread_mutexattr_init(&attr);
+//		pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);	// 设置递归锁	// 然而其实根本没用到...
 
 		pthread_mutex_init(&mutex, nullptr);
 	}
@@ -29,7 +29,7 @@ public:
 		pthread_mutex_unlock(&mutex);
 	}
 	~Lock() {
-		pthread_mutexattr_destroy(&attr);
+//		pthread_mutexattr_destroy(&attr);
 		pthread_mutex_destroy(&mutex);
 	}
 };

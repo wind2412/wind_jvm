@@ -10,6 +10,7 @@
 
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
+#include "utils/monitor.hpp"
 
 #include <cstdlib>
 #include <cstring>
@@ -74,12 +75,19 @@ protected:
 	// TODO: HashCode .etc
 	OopType ooptype;
 	shared_ptr<Klass> klass;
+	Monitor m;
 public:
 	// TODO: HashCode .etc
 	shared_ptr<Klass> get_klass() { return klass; }
+	OopType get_ooptype() { return ooptype; }
+public:
+	void enter_monitor() { m.enter(); }
+	void wait() { m.wait(); }
+	void notify() { m.notify(); }
+	void notify_all() { m.notify_all(); }
+	void leave_monitor() { m.leave(); }
 public:
 	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
-	OopType get_ooptype() { return ooptype; }
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.

@@ -935,15 +935,35 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
 				shared_ptr<Method> target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
 				assert(target_method != nullptr);
+				// synchronize
 				if (target_method->is_synchronized()) {
-					// TODO: synchronized !!!!!!
-					std::cerr << "can't support synchronized now..." << std::endl;
-//					assert(false);
+					ref->enter_monitor();
 				}
 				if (target_method->is_native()) {
-					// TODO: native
-					std::cerr << "can't support native now..." << std::endl;
-					assert(false);	// TODO: 其实我感觉 invokeVirtual 应该不能 invokeNative 方法??? 到时候试一试......
+					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
+						std::cout << "jump off `registerNatives`." << std::endl;
+						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
+					} else {
+						shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+						void *native_method = find_native(new_klass->get_name(), signature);
+						// no need to add a stack frame!
+						assert(native_method != nullptr);
+#ifdef DEBUG
+	if (*pc == 0xb7)
+		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+	else if (*pc == 0xb8)
+		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+#endif
+
+						((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
+						if (!new_method->is_void()) {
+							assert(arg_list.size() >= 1);
+							op_stack.push(arg_list.back());
+#ifdef DEBUG
+	std::cout << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+						}
+					}
 				} else {
 #ifdef DEBUG
 	if (*pc == 0xb7)
@@ -958,6 +978,10 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
 					}
+				}
+				// unsynchronize
+				if (target_method->is_synchronized()) {
+					ref->leave_monitor();
 				}
 				break;
 			}
@@ -976,11 +1000,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
 				initial_clinit(new_klass, jvm);
 				std::wcout << "(DEBUG) " << new_klass->get_name() << "::" << signature << std::endl;	// msg
-				if (new_method->is_synchronized()) {
-					// TODO: synchronized !!!!!!
-					std::cerr << "can't support synchronized now..." << std::endl;
-//					assert(false);
-				}
 				// parse arg list and push args into stack: arg_list !
 				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
 				if (*pc == 0xb7) {
@@ -995,6 +1014,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					op_stack.pop();
 					size --;
 				}
+				// synchronized:
+				Oop *this_obj;
+				if (new_method->is_synchronized()) {
+					if (new_method->is_static()) {	// if static, lock the `mirror` of this klass.	// for 0xb8: invokeStatic
+						new_method->get_klass()->get_mirror()->enter_monitor();
+					} else {							// if not-static, lock this obj.					// for 0xb7: invokeSpecial
+						// get the `obj` from op_stack!
+						this_obj = arg_list.front();
+						this_obj->enter_monitor();
+					}
+				}
 				if (new_method->is_native()) {
 					// TODO: 这里应该有一个 “纸上和现实中” 的问题。因为这里记录的到时候会返回函数指针，而这个指针的类型已经被完全擦除了。我们根本不知道参数的个数是多少。虽然我们能够得到
 					// argument list，但是这个 argument list 又要怎么传给参数呢？这是个非常有难度的问题。
@@ -1004,25 +1034,26 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					// 返回值也一并压到栈中。
 					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
 						std::cout << "jump off `registerNatives`." << std::endl;
-						break;			// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
-					}
-
-					void *native_method = find_native(new_klass->get_name(), signature);
-					// no need to add a stack frame!
-					assert(native_method != nullptr);
+						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
+					} else {
+						void *native_method = find_native(new_klass->get_name(), signature);
+						// no need to add a stack frame!
+						assert(native_method != nullptr);
 #ifdef DEBUG
 	if (*pc == 0xb7)
 		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 	else if (*pc == 0xb8)
 		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
-					((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
-					if (!new_method->is_void()) {
-						assert(arg_list.size() >= 1);
-						op_stack.push(arg_list.back());
+
+						((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
+						if (!new_method->is_void()) {
+							assert(arg_list.size() >= 1);
+							op_stack.push(arg_list.back());
 #ifdef DEBUG
 	std::cout << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
+						}
 					}
 				} else {
 #ifdef DEBUG
@@ -1037,6 +1068,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #ifdef DEBUG
 	std::cout << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
+					}
+				}
+				// unsynchronize
+				if (new_method->is_synchronized()) {
+					if (new_method->is_static()) {
+						new_method->get_klass()->get_mirror()->leave_monitor();
+					} else {
+						this_obj->leave_monitor();
 					}
 				}
 				break;
@@ -1236,6 +1275,20 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 						assert(false);
 					}
 				}
+				break;
+			}
+			case 0xc2:{		// monitorenter
+				Oop *ref_value = op_stack.top();	op_stack.pop();
+				// TODO: 重入？？见 Spec 关于 monitorenter 的解释...也就是递归锁 ???
+				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
+				ref_value->enter_monitor();
+				break;
+			}
+			case 0xc3:{		// monitorexit
+				Oop *ref_value = op_stack.top();	op_stack.pop();
+				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
+				// TODO: IllegalMonitorStateException...
+				ref_value->leave_monitor();
 				break;
 			}
 
