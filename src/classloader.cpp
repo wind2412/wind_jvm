@@ -13,6 +13,8 @@ using std::make_shared;
 
 shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// TODO: ... 如果我恶意删掉 java.lang.Object 会怎样......
 {
+	// TODO: add lock simply... because it will cause code very ugly...
+//	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
 	assert(jl.find_file(L"java/lang/Object.class")==1);	// 这句是上边 static 模块之间初始化顺序不定实验的残留物。留着吧。
 	wstring target = classname + L".class";
 	if (jl.find_file(target)) {	// 在 rt.jar 中，BootStrap 可以 load。
@@ -129,6 +131,7 @@ void BootStrapClassLoader::print()
 /*===-------------------  My ClassLoader -------------------===*/
 shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 {
+//	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
 	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {
 		return result;

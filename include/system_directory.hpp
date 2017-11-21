@@ -11,12 +11,16 @@
 #include <unordered_map>
 #include <string>
 #include <memory>
+#include <pthread.h>
+#include "utils/lock.hpp"
 
 using std::wstring;
 using std::unordered_map;
 using std::shared_ptr;
 
 class Klass;
+
+extern Lock system_classmap_lock;
 
 extern unordered_map<wstring, shared_ptr<Klass>> system_classmap;		// java/lang/Object.class
 

@@ -11,6 +11,8 @@
 #include "runtime/constantpool.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
+#include "native/native.hpp"
+#include "runtime/java_lang_string.hpp"
 #include <memory>
 #include <sstream>
 #include <functional>
@@ -25,7 +27,7 @@ using std::shared_ptr;
  * 小技能：
  * 把 log 中不含 "<bytecode>" 的日志行全部正则删除的方法QAQ
  * 见 http://www.cnblogs.com/wangqiguo/archive/2012/05/08/2486548.html
- * 用 ^(?!.*<bytecode>).*\n 这个零度替换(?!)就可以......
+ * 用 ^(?!.*<bytecode>).*\n 这个零度替换(?!)，替换为 "" 就可以......
  * 调 bug 要分析几万行的日志。。。。。。想死的心都有了QAQQAQQAQ
  */
 
@@ -40,6 +42,14 @@ using std::shared_ptr;
  * 刚才的 StackOverflow 是 139.
  * assert(false) 是 134.
  * 用 perror 134 / perror 139 查看信息......虽然没有卵用
+ */
+
+/**
+ * 新建一个 list, 不小心调用了 list.popfront()，报错：
+ * malloc: *** error for object 0x70000f6da2d0: pointer being freed was not allocated
+ * *** set a breakpoint in malloc_error_break to debug
+ *
+ * 确实在 pop_front() 的时候要调用析构函数。毕竟 STL 的值是 [复制] 进去的。
  */
 
 /*===----------- StackFrame --------------===*/
@@ -269,6 +279,8 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 	}
 }
 
+// TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
+
 Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
 	shared_ptr<Method> method = cur_frame.method;
@@ -338,7 +350,20 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
+			case 0x09:{		// lconst_0
+				op_stack.push(new LongOop(0));
+#ifdef DEBUG
+	std::cout << "(DEBUG) push long 0 on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x0a:{		// lconst_1
+				op_stack.push(new LongOop(1));
+#ifdef DEBUG
+	std::cout << "(DEBUG) push long 1 on stack." << std::endl;
+#endif
+				break;
+			}
 
 			case 0x10: {		// bipush
 				op_stack.push(new ByteOop(pc[1]));
@@ -367,16 +392,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					op_stack.push(stringoop);
 #ifdef DEBUG
 	// for string:
-	Oop *result;
-	bool temp = stringoop->get_field_value(L"value:[C", &result);
-	assert(temp == true);
-	std::cout << "(DEBUG) string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
-	std::cout << "(DEBUG) the string is: --> \"";
-	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
-	}
-	std::wcout.clear();
-	std::wcout << "\"" << std::endl;
+	std::wcout << java_lang_string::print_stringOop(stringoop) << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
 					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
@@ -389,6 +405,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					std::cerr << "can't get here!" << std::endl;
 					assert(false);
 				}
+				break;
+			}
+
+
+			case 0x16:{		// lload
+				int index = pc[1];
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+				op_stack.push(localVariableTable[index]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[" << index << "] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
 				break;
 			}
 
@@ -422,6 +449,36 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x1e:{		// lload_0
+				op_stack.push(localVariableTable[0]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[0] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x1f:{		// lload_1
+				op_stack.push(localVariableTable[1]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[1] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x20:{		// lload_2
+				op_stack.push(localVariableTable[2]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[2] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x21:{		// lload_3
+				op_stack.push(localVariableTable[3]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[3] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+
+
 
 			case 0x2a:{		// aload_0
 				if (localVariableTable[0] != nullptr) assert(localVariableTable[0]->get_ooptype() == OopType::_InstanceOop);
@@ -480,6 +537,21 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push((*charsequence)[index]);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((CharOop *)op_stack.top())->value << "'" << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x3a:{		// astore
+				int index = pc[1];
+				assert(index > 3);
+				Oop *ref = op_stack.top();
+				localVariableTable[index] = ref;	op_stack.pop();
+#ifdef DEBUG
+	if (ref != nullptr)	// ref == null
+		std::wcout << "(DEBUG) pop ref from stack, "<< ref->get_klass()->get_name() << "'s Oop: address: " << std::hex << ref << " to localVariableTable[" << index << "]." << std::endl;
+	else
+		std::wcout << "(DEBUG) pop <null> ref from stack, to localVariableTable[" << index << "]." << std::endl;
 #endif
 				break;
 			}
@@ -846,7 +918,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// 1. 先 parse 参数。因为 ref 在最下边。
 				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size() + 1;		// don't forget `this`!!!
 				std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
-				// TODO: 参数应该是倒着入栈的吧...?
 				Oop *ref;		// get ref. (this)	// same as invokespecial. but invokespecial didn't use `this` ref to get Klass.
 				list<Oop *> arg_list;
 				assert(op_stack.size() >= size);
@@ -859,19 +930,20 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					size --;
 				}
 				// 2. get ref.
+				assert(ref != nullptr);			// `this` must not be nullptr!!!!
 				std::wcout << "(DEBUG) " << ref->get_klass()->get_name() << "::" << signature << std::endl;	// msg
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
 				shared_ptr<Method> target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
 				assert(target_method != nullptr);
 				if (target_method->is_synchronized()) {
 					// TODO: synchronized !!!!!!
-					std::cerr << "can't suppose synchronized now..." << std::endl;
+					std::cerr << "can't support synchronized now..." << std::endl;
 //					assert(false);
 				}
 				if (target_method->is_native()) {
 					// TODO: native
-					std::cerr << "can't suppose native now..." << std::endl;
-//					assert(false);
+					std::cerr << "can't support native now..." << std::endl;
+					assert(false);	// TODO: 其实我感觉 invokeVirtual 应该不能 invokeNative 方法??? 到时候试一试......
 				} else {
 #ifdef DEBUG
 	if (*pc == 0xb7)
@@ -894,6 +966,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
 				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);
+				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
 				if (*pc == 0xb8) {
 					assert(new_method->is_static() && !new_method->is_abstract());
 				} else if (*pc == 0xb7) {
@@ -902,39 +975,56 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// initialize the new_class... <clinit>
 				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
 				initial_clinit(new_klass, jvm);
-				std::wcout << "(DEBUG) " << new_klass->get_name() << "::" << new_method->get_name() << ":" << new_method->get_descriptor() << std::endl;	// msg
+				std::wcout << "(DEBUG) " << new_klass->get_name() << "::" << signature << std::endl;	// msg
 				if (new_method->is_synchronized()) {
 					// TODO: synchronized !!!!!!
-					std::cerr << "can't suppose synchronized now..." << std::endl;
+					std::cerr << "can't support synchronized now..." << std::endl;
 //					assert(false);
 				}
+				// parse arg list and push args into stack: arg_list !
+				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
+				if (*pc == 0xb7) {
+					size ++;		// invokeSpecial 必须加入一个 this 指针！除了 invokeStatic 之外的所有指令都要加上 this 指针！！！ ********* important ！！！！！
+								// this 指针会被自动放到 op_stack 上！所以，从 op_stack 上多读一个就 ok ！！
+				}
+				std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
+				list<Oop *> arg_list;
+				assert(op_stack.size() >= size);
+				while (size > 0) {
+					arg_list.push_front(op_stack.top());
+					op_stack.pop();
+					size --;
+				}
 				if (new_method->is_native()) {
-					// TODO: native
-					std::cerr << "can't suppose native now..." << std::endl;
 					// TODO: 这里应该有一个 “纸上和现实中” 的问题。因为这里记录的到时候会返回函数指针，而这个指针的类型已经被完全擦除了。我们根本不知道参数的个数是多少。虽然我们能够得到
 					// argument list，但是这个 argument list 又要怎么传给参数呢？这是个非常有难度的问题。
 					// 好的解法，就像这里，把所有参数全都去掉，换成局部变量表和栈式虚拟机。这样的话能够避免这个问题——毕竟机器是虚拟出来的。
 					// 而函数调用还是基于别人的语言基础上进行，所以根本无法在纸上进行操作了。
 					// 因此，必须使用栈来解决，把所有 native 方法的参数全都换成栈。而这样，由于每个 native 方法自己知道自己有几个参数，出栈即可。
 					// 返回值也一并压到栈中。
+					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
+						std::cout << "jump off `registerNatives`." << std::endl;
+						break;			// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
+					}
 
-
-//					assert(false);
+					void *native_method = find_native(new_klass->get_name(), signature);
+					// no need to add a stack frame!
+					assert(native_method != nullptr);
+#ifdef DEBUG
+	if (*pc == 0xb7)
+		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+	else if (*pc == 0xb8)
+		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+#endif
+					((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
+					if (!new_method->is_void()) {
+						assert(arg_list.size() >= 1);
+						op_stack.push(arg_list.back());
+#ifdef DEBUG
+	std::cout << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+					}
 				} else {
-					int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
-					if (*pc == 0xb7) {
-						size ++;		// invokeSpecial 必须加入一个 this 指针！除了 invokeStatic 之外的所有指令都要加上 this 指针！！！ ********* important ！！！！！
-									// this 指针会被自动放到 op_stack 上！所以，从 op_stack 上多读一个就 ok ！！
-					}
-					std::cout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
-					// TODO: 参数应该是倒着入栈的吧...?
-					list<Oop *> arg_list;
-					assert(op_stack.size() >= size);
-					while (size > 0) {
-						arg_list.push_front(op_stack.top());
-						op_stack.pop();
-						size --;
-					}
 #ifdef DEBUG
 	if (*pc == 0xb7)
 		std::wcout << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;

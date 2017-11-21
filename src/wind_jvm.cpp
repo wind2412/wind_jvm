@@ -8,18 +8,15 @@
 #include "runtime/klass.hpp"
 #include "runtime/java_lang_class.hpp"
 #include "runtime/java_lang_string.hpp"
+#include "native/java_lang_Thread.hpp"
+#include "native/native.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
+#include "runtime/thread.hpp"
 #include <boost/regex.hpp>
-
-struct temp {		// pthread aux struct...
-	wind_jvm *jvm;
-	const vector<wstring> *arg;
-} p;
 
 auto scapegoat = [](void *pp) -> void *{
 	temp *real = (temp *)pp;
-	std::cout << real->jvm << std::endl;		// delete
 	real->jvm->start(*real->arg);
 	return nullptr;
 };
@@ -27,11 +24,10 @@ auto scapegoat = [](void *pp) -> void *{
 wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), rsp(-1), pc(0)
 {
 	// start one thread
-//	temp p;				// p 变成局部变量之后会引发大 bug ？？！！卧槽 ？？？！！		// 重点！！
+//	temp p;				// p 变成局部变量之后会引发大 bug ？？！！卧槽 ？？？！！		// 重点！！ 看来是要变成全局变量才行... ！！很可能是析构掉了？？
 	p.jvm = this;
 	p.arg = &argv;
 
-	std::cout << p.jvm << std::endl;		// delete
 //	auto scapegoat = [](void *pp) -> void *{
 //		temp *real = (temp *)pp;
 //	std::cout << real->jvm << "...???" << std::endl;		// delete
@@ -39,6 +35,11 @@ wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv
 //		return nullptr;
 //	};
 
+	// 在这里，需要初始化全局变量。线程还没有开启。
+	// TODO: 各种 system_map 这类，以及全局的 BootStrapLoader 这类，线程没有加锁，全可以直接访问，多线程不安全。别忘了加！！
+	init_native();
+
+	pthread_t tid;
 	pthread_create(&tid, nullptr, scapegoat, &p);
 }
 
@@ -47,18 +48,76 @@ void wind_jvm::start(const vector<wstring> & argv)
 	// detach itself.
 	pthread_detach(pthread_self());
 
-	assert(main_class_name != L"");
+	// TODO: 这里在多线程下会发生什么？？？
+
+	// init.
 	{
 		java_lang_class::init();		// must init !!!
 		BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class");
 		java_lang_class::fixup_mirrors();	// only [basic types] + java.lang.Class + java.lang.Object
+
+		// load String.class
+		auto string_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"));
+
+		// 1. create a [half-completed] Thread obj, using the ThreadGroup obj.(for currentThread(), this must be create first!!)
+		auto thread_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Thread"));
+		// TODO: 要不要放到全局？
+		InstanceOop *init_thread = thread_klass->new_instance();
+		BytecodeEngine::initial_clinit(thread_klass, *this);		// first <clinit>!
+		// inject!!
+		init_thread->set_field_value(L"eetop:J", new LongOop((uint64_t)pthread_self()));		// TODO: 这样没有移植性！！要改啊！！！虽然很方便......其实在 linux 下，也是 8 bytes......
+		init_thread->set_field_value(L"priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
+		// add this Thread obj to ThreadTable!!!	// ......在这里放入的 init_thread 并没有初始化完全。因为它还没有执行构造函数。不过，那也必须放到表中了。因为在 <init> 执行的时候，内部有其他的类要调用 currentThread...... 所以不放入表中不行啊......
+		ThreadTable::add_a_thread(pthread_self(), init_thread);
+
+		// 2. create a [System] ThreadGroup obj.
+		auto threadgroup_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/ThreadGroup"));
+		// TODO: 要不要放到全局？
+		InstanceOop *init_threadgroup = threadgroup_klass->new_instance();
+		BytecodeEngine::initial_clinit(threadgroup_klass, *this);		// first <clinit>!
+		{	// 注意：这里创建了全局的第一个 System ThreadGroup !!
+			// TODO: 放到全局！
+			std::list<Oop *> list;
+			list.push_back(init_threadgroup);	// $0 = this
+			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!
+			shared_ptr<Method> target_method = threadgroup_klass->get_this_class_method(L"<init>:()V");
+			assert(target_method != nullptr);
+			this->add_frame_and_execute(target_method, list);
+		}
+
+		// 3. create a [Main] ThreadGroup obj.
+		InstanceOop *main_threadgroup = threadgroup_klass->new_instance();
+		assert(this->vm_stack.size() == 0);
+		{	// 注意：这里创建了针对此 main 的第二个 System ThreadGroup !!用第一个 System ThreadGroup 作为参数！
+			// TODO: pthread_mutex!!
+			std::list<Oop *> list;
+			list.push_back(main_threadgroup);	// $0 = this
+			list.push_back(nullptr);				// $1 = nullptr
+			list.push_back(init_threadgroup);	// $2 = init_threadgroup
+			list.push_back(java_lang_string::intern(L"main"));	// $3 = L"main"
+			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!		// 直接调用私有方法！为了避过狗日的 java/lang/SecurityManager 的检查......我也是挺拼的......QAQ
+			shared_ptr<Method> target_method = threadgroup_klass->get_this_class_method(L"<init>:(Ljava/lang/Void;Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
+			assert(target_method != nullptr);
+			this->add_frame_and_execute(target_method, list);
+		}
+
+		// 4. [complete] the Thread obj using the [uncomplete] main_threadgroup.
+		{
+			std::list<Oop *> list;
+			list.push_back(init_thread);		// $0 = this
+			list.push_back(main_threadgroup);	// $1 = [main_threadGroup]
+			list.push_back(java_lang_string::intern(L"main"));	// $2 = L"main"
+			// execute method: java/lang/Thread.<init>:(ThreadGroup, String)V --> public Method.
+			shared_ptr<Method> target_method = thread_klass->get_this_class_method(L"<init>:(Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
+			assert(target_method != nullptr);
+			this->add_frame_and_execute(target_method, list);
+		}
+
 	}
 	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(main_class_name);		// this time, "java.lang.Object" has been convert to "java/lang/Object".
 	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
 	assert(main_method != nullptr);
 	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
-	// TODO: 别忘了强制执行 main_class 的 clinit 方法！！
-	// TODO：需要把 argv 这个 C++ 对象强行提升成为 Java 的 String[]'s Oop！
 
 	// first execute <clinit> if has
 	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);

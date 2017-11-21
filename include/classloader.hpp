@@ -7,6 +7,7 @@
 #include "class_parser.hpp"
 #include "jarLister.hpp"
 #include "system_directory.hpp"
+#include "utils/lock.hpp"
 
 using std::map;
 
@@ -39,6 +40,7 @@ public:
 
 class MyClassLoader : public ClassLoader {
 private:
+	Lock lock;
 	BootStrapClassLoader & bs = BootStrapClassLoader::get_bootstrap();
 	map<wstring, shared_ptr<Klass>> classmap;
 private:

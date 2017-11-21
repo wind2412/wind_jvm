@@ -4,7 +4,7 @@
 #include <sstream>
 #include <boost/filesystem.hpp>
 #include <jarLister.hpp>
-#include <utils.hpp>
+#include "utils/utils.hpp"
 
 using std::wcout;
 using std::wcerr;

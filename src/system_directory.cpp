@@ -8,4 +8,6 @@
 #include "system_directory.hpp"
 #include "runtime/klass.hpp"
 
+Lock system_classmap_lock;
+
 unordered_map<wstring, shared_ptr<Klass>> system_classmap;

@@ -5,62 +5,53 @@
  *      Author: zhengxiaolin
  */
 
-#include "native/jni.hpp"
 #include "native/java_lang_Object.hpp"
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include "native/native.hpp"
 
-using std::vector;
-
-static vector<JNINativeMethod> methods = {
-	{"registerNatives",	"()V",		  		 (void *)&Java_java_lang_object_registerNative},
-    {"hashCode",    "()I",                    (void *)&JVM_IHashCode},
-    {"wait",        "(J)V",                   (void *)&JVM_MonitorWait},
-    {"notify",      "()V",                    (void *)&JVM_MonitorNotify},
-    {"notifyAll",   "()V",                    (void *)&JVM_MonitorNotifyAll},
-    {"clone",       "()" OBJ,                 (void *)&JVM_Clone},
-    {"getClass",    "()" KLS,                 (void *)&Java_java_lang_object_getClass},		// I add one line here.
+static unordered_map<wstring, void*> methods = {
+    {L"hashCode:()I",				(void *)&JVM_IHashCode},
+    {L"wait:(J)V",					(void *)&JVM_MonitorWait},
+    {L"notify:()V",					(void *)&JVM_MonitorNotify},
+    {L"notifyAll:()V",				(void *)&JVM_MonitorNotifyAll},
+    {L"clone:()" OBJ,				(void *)&JVM_Clone},
+    {L"getClass:()" KLS,				(void *)&Java_java_lang_object_getClass},		// I add one line here.
 };
 
-void Java_java_lang_object_registerNative(stack<Oop *> & _stack)
-{
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_IHashCode(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-
-IntOop *JVM_IHashCode(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_MonitorWait(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	LongOop *l1 = (LongOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_MonitorWait(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	LongOop *l1 = (LongOop *)_stack.top();	_stack.pop();
+void JVM_MonitorNotify(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_MonitorNotify(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_MonitorNotifyAll(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_MonitorNotifyAll(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_Clone(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-Oop *JVM_Clone(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	assert(false);
-}
-MirrorOop *Java_java_lang_object_getClass(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void Java_java_lang_object_getClass(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 
 // 返回 fnPtr.
-void *java_lang_object_search_method(const string & str)
+void *java_lang_object_search_method(const wstring & signature)
 {
-	auto iter = std::find_if(methods.begin(), methods.end(), [&str](JNINativeMethod & m){ return m.name == str; });
+	auto iter = methods.find(signature);
 	if (iter != methods.end()) {
-		return (*iter).fnPtr;
+		return (*iter).second;
 	}
 	return nullptr;
 }

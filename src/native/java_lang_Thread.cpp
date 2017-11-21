@@ -5,130 +5,110 @@
  *      Author: zhengxiaolin
  */
 
-#include "native/jni.hpp"
 #include "native/java_lang_Thread.hpp"
 #include <vector>
 #include <algorithm>
 #include <cassert>
+#include "native/native.hpp"
+#include "runtime/thread.hpp"
 
 using std::vector;
 
 /*===-------------- from hotspot -------------------*/
-enum ThreadPriority {        // JLS 20.20.1-3
-  NoPriority       = -1,     // Initial non-priority value
-  MinPriority      =  1,     // Minimum priority
-  NormPriority     =  5,     // Normal (non-daemon) priority
-  NearMaxPriority  =  9,     // High priority, used for VMThread
-  MaxPriority      = 10,     // Highest priority, used for WatcherThread
-                             // ensures that VMThread doesn't starve profiler
-  CriticalPriority = 11      // Critical thread priority
+static unordered_map<wstring, void*> methods = {
+    {L"start0:()V",						(void *)&JVM_StartThread},
+    {L"stop0:(" OBJ L")V",				(void *)&JVM_StopThread},
+    {L"isAlive:()Z",						(void *)&JVM_IsThreadAlive},
+    {L"suspend0:()V",					(void *)&JVM_SuspendThread},
+    {L"resume0:()V",						(void *)&JVM_ResumeThread},
+    {L"setPriority0:(I)V",				(void *)&JVM_SetThreadPriority},
+    {L"yield:()V",						(void *)&JVM_Yield},
+    {L"sleep:(J)V",						(void *)&JVM_Sleep},
+    {L"currentThread:()" THD,			(void *)&JVM_CurrentThread},
+    {L"countStackFrames:()I",			(void *)&JVM_CountStackFrames},
+    {L"interrupt0:()V",					(void *)&JVM_Interrupt},
+    {L"isInterrupted:(Z)Z",				(void *)&JVM_IsInterrupted},
+    {L"holdsLock:(" OBJ L")Z",			(void *)&JVM_HoldsLock},
+    {L"getThreads:()[" THD,				(void *)&JVM_GetAllThreads},
+    {L"dumpThreads:([" THD L")[[" STE,	(void *)&JVM_DumpThreads},
+    {L"setNativeName:(" STR L")V",		(void *)&JVM_SetNativeThreadName},
 };
 
-static vector<JNINativeMethod> methods = {
-	{"registerNatives",	"()V",		   (void *)&Java_java_lang_thread_registerNative},
-    {"start0",           "()V",        (void *)&JVM_StartThread},
-    {"stop0",            "(" OBJ ")V", (void *)&JVM_StopThread},
-    {"isAlive",          "()Z",        (void *)&JVM_IsThreadAlive},
-    {"suspend0",         "()V",        (void *)&JVM_SuspendThread},
-    {"resume0",          "()V",        (void *)&JVM_ResumeThread},
-    {"setPriority0",     "(I)V",       (void *)&JVM_SetThreadPriority},
-    {"yield",            "()V",        (void *)&JVM_Yield},
-    {"sleep",            "(J)V",       (void *)&JVM_Sleep},
-    {"currentThread",    "()" THD,     (void *)&JVM_CurrentThread},
-    {"countStackFrames", "()I",        (void *)&JVM_CountStackFrames},
-    {"interrupt0",       "()V",        (void *)&JVM_Interrupt},
-    {"isInterrupted",    "(Z)Z",       (void *)&JVM_IsInterrupted},
-    {"holdsLock",        "(" OBJ ")Z", (void *)&JVM_HoldsLock},
-    {"getThreads",        "()[" THD,   (void *)&JVM_GetAllThreads},
-    {"dumpThreads",      "([" THD ")[[" STE, (void *)&JVM_DumpThreads},
-    {"setNativeName",    "(" STR ")V", (void *)&JVM_SetNativeThreadName},
-};
-
-// register native, I don't want to use a dylib. Origin name will be Java_java_lang_thread_registerNative.
-void Java_java_lang_thread_registerNative(stack<Oop *> & _stack)
-{
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_StartThread(list<Oop *> & _stack){		// static
 	assert(false);
 }
-
-void JVM_StartThread(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_StopThread(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	Oop *obj = (Oop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_StopThread(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	Oop *obj = (Oop *)_stack.top();	_stack.pop();
+void JVM_IsThreadAlive(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-bool JVM_IsThreadAlive(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_SuspendThread(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_SuspendThread(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_ResumeThread(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_ResumeThread(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_SetThreadPriority(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	IntOop *i = (IntOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_SetThreadPriority(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	IntOop *i = (IntOop *)_stack.top();	_stack.pop();
+void JVM_Yield(list<Oop *> & _stack){			// static
 	assert(false);
 }
-void JVM_Yield(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_Sleep(list<Oop *> & _stack){			// static
+	LongOop *l1 = (LongOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_Sleep(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	LongOop *l1 = (LongOop *)_stack.top();	_stack.pop();
+void JVM_CurrentThread(list<Oop *> & _stack){		// static
+	InstanceOop *thread_oop;
+	ThreadTable::print_table();
+	assert(ThreadTable::detect_thread_death(pthread_self()) == false);
+	assert((thread_oop = ThreadTable::get_a_thread(pthread_self())) != nullptr);						// TODO: 我自己都不知道这实现是否正确......多线程太诡异了......
+	_stack.push_back(thread_oop);		// 返回值被压入 _stack.
+}
+void JVM_CountStackFrames(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-InstanceOop *JVM_CurrentThread(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_Interrupt(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-IntOop *JVM_CountStackFrames(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_IsInterrupted(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	BooleanOop *b1 = (BooleanOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_Interrupt(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_HoldsLock(list<Oop *> & _stack){		// static, no this...
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-bool JVM_IsInterrupted(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	BooleanOop *b1 = (BooleanOop *)_stack.top();	_stack.pop();
+void JVM_GetAllThreads(list<Oop *> & _stack){	// static
 	assert(false);
 }
-bool JVM_HoldsLock(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	InstanceOop *obj = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_DumpThreads(list<Oop *> & _stack){	// static
+	ObjArrayOop *threads = (ObjArrayOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-ObjArrayOop *JVM_GetAllThreads(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	assert(false);
-}
-ObjArrayOop *JVM_DumpThreads(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	ObjArrayOop *threads = (ObjArrayOop *)_stack.top();	_stack.pop();
-	assert(false);
-}
-void JVM_SetNativeThreadName(stack<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.top();	_stack.pop();
-	InstanceOop *str = (InstanceOop *)_stack.top();	_stack.pop();
+void JVM_SetNativeThreadName(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 
 // 返回 fnPtr.
-void *java_lang_thread_search_method(const string & str)
+void *java_lang_thread_search_method(const wstring & signature)
 {
-	auto iter = std::find_if(methods.begin(), methods.end(), [&str](JNINativeMethod & m){ return m.name == str; });
+	auto iter = methods.find(signature);
 	if (iter != methods.end()) {
-		return (*iter).fnPtr;
+		return (*iter).second;
 	}
 	return nullptr;
 }

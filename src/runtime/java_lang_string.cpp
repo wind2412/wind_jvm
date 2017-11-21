@@ -5,7 +5,7 @@
  *      Author: zhengxiaolin
  */
 
-#include <runtime/java_lang_string.hpp>
+#include "runtime/java_lang_string.hpp"
 #include "runtime/oop.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
@@ -15,7 +15,8 @@ size_t java_string_hash::operator()(Oop* ptr) noexcept
 {
 	// if has a hash_val cache, need no calculate.
 	Oop *int_oop_hash;
-	if (((InstanceOop *)ptr)->get_field_value(L"hash:I", &int_oop_hash) == true) {	// cashed_hash will become a ... IntOop...
+	if (((InstanceOop *)ptr)->get_field_value(L"hash:I", &int_oop_hash) == true && ((IntOop *)int_oop_hash)->value != 0) {	// cashed_hash will become a ... IntOop...
+		// 基本不可能是 0.如果是 0，那么就重算就好。如果重算还是 0，那就是 0 了。
 		return ((IntOop *)int_oop_hash)->value;
 	}
 
@@ -25,7 +26,7 @@ size_t java_string_hash::operator()(Oop* ptr) noexcept
 	int length = ((TypeArrayOop *)value_field)->get_length();
 	unsigned int hash_val = 0;
 	for (int i = 0; i < length; i ++) {
-		hash_val =  31 * hash_val + ((CharOop *)&((TypeArrayOop *)value_field)[i])->value;
+		hash_val =  31 * hash_val + ((CharOop *)(*((TypeArrayOop *)value_field))[i])->value;
 	}
 	// 这里需要注意！！由于 java.lang.String 这个对象是被伪造出来，在 openjdk 的实现是：`value` field 被强行注入，但是 `hashcode` field 被惰性算出。这里算出之后会直接 save 到 oop 中！
 	// make a hashvalue cache
@@ -49,7 +50,7 @@ bool java_string_equal_to::operator() (const Oop *lhs, const Oop *rhs) const
 	int length_rhs = ((TypeArrayOop *)value_field_rhs)->get_length();
 	if (length_lhs != length_rhs)	return false;
 	for (int i = 0; i < length_lhs; i ++) {
-		if (((CharOop *)&((TypeArrayOop *)value_field_lhs)[i])->value != ((CharOop *)&((TypeArrayOop *)value_field_rhs)[i])->value) {
+		if ( ((CharOop *)(*((TypeArrayOop *)value_field_lhs))[i])->value !=  ((CharOop *)(*((TypeArrayOop *)value_field_rhs))[i])->value) {
 			return false;
 		}
 	}
@@ -58,6 +59,26 @@ bool java_string_equal_to::operator() (const Oop *lhs, const Oop *rhs) const
 
 
 /*===---------------- java_lang_string ----------------===*/
+wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
+	wstringstream ss;
+	Oop *result;
+	bool temp = stringoop->get_field_value(L"value:[C", &result);
+	assert(temp == true);
+	// get length
+	ss << "string length: [" << ((TypeArrayOop *)result)->get_length() << "] ";
+	// get string literal
+	ss << "string is: --> [\"";
+	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
+		ss << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
+	}
+	ss << "\"]";
+	// get hash value
+	Oop *int_oop_hash;
+	assert(stringoop->get_field_value(L"hash:I", &int_oop_hash) == true);
+	ss << " hash is: [" << ((IntOop *)int_oop_hash)->value << "]";
+	return ss.str();
+}
+
 Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	assert(system_classmap.find(L"[C.class") != system_classmap.end());
 	// alloc a `char[]` for `value` field
@@ -72,18 +93,7 @@ Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	assert(stringoop != nullptr);
 	stringoop->set_field_value(L"value:[C", charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
 #ifdef DEBUG
-	Oop *result;
-	bool temp = stringoop->get_field_value(L"value:[C", &result);
-	assert(result == charsequence);
-	assert(temp == true);
-	std::cout << "string length: " << ((TypeArrayOop *)result)->get_length() << std::endl;
-	std::cout << "the string is: --> \"";
-	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-		std::wcout << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
-	}
-	std::wcout.clear();
-	std::wcout << "\"" << std::endl;
+	std::wcout << java_lang_string::print_stringOop(stringoop) << std::endl;
 #endif
 	return stringoop;
 }
-

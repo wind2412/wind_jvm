@@ -9,30 +9,39 @@
 #define INCLUDE_NATIVE_JAVA_LANG_THREAD_HPP_
 
 #include "runtime/oop.hpp"
-#include <stack>
+#include <list>
 
-using std::stack;
+using std::list;
 using std::string;
 
-void Java_java_lang_thread_registerNative(stack<Oop *> & _stack);
+/*===-------------- from hotspot -------------------*/
+enum ThreadPriority {        // JLS 20.20.1-3
+  NoPriority       = -1,     // Initial non-priority value
+  MinPriority      =  1,     // Minimum priority
+  NormPriority     =  5,     // Normal (non-daemon) priority
+  NearMaxPriority  =  9,     // High priority, used for VMThread
+  MaxPriority      = 10,     // Highest priority, used for WatcherThread
+                             // ensures that VMThread doesn't starve profiler
+  CriticalPriority = 11      // Critical thread priority
+};
 
-void JVM_StartThread(stack<Oop *> & _stack);
-void JVM_StopThread(stack<Oop *> & _stack);
-bool JVM_IsThreadAlive(stack<Oop *> & _stack);
-void JVM_SuspendThread(stack<Oop *> & _stack);
-void JVM_ResumeThread(stack<Oop *> & _stack);
-void JVM_SetThreadPriority(stack<Oop *> & _stack);
-void JVM_Yield(stack<Oop *> & _stack);
-void JVM_Sleep(stack<Oop *> & _stack);
-InstanceOop *JVM_CurrentThread(stack<Oop *> & _stack);
-IntOop *JVM_CountStackFrames(stack<Oop *> & _stack);
-void JVM_Interrupt(stack<Oop *> & _stack);
-bool JVM_IsInterrupted(stack<Oop *> & _stack);
-bool JVM_HoldsLock(stack<Oop *> & _stack);
-ObjArrayOop *JVM_GetAllThreads(stack<Oop *> & _stack);
-ObjArrayOop *JVM_DumpThreads(stack<Oop *> & _stack);
-void JVM_SetNativeThreadName(stack<Oop *> & _stack);
+void JVM_StartThread(list<Oop *> & _stack);
+void JVM_StopThread(list<Oop *> & _stack);
+void JVM_IsThreadAlive(list<Oop *> & _stack);
+void JVM_SuspendThread(list<Oop *> & _stack);
+void JVM_ResumeThread(list<Oop *> & _stack);
+void JVM_SetThreadPriority(list<Oop *> & _stack);
+void JVM_Yield(list<Oop *> & _stack);
+void JVM_Sleep(list<Oop *> & _stack);
+void JVM_CurrentThread(list<Oop *> & _stack);
+void JVM_CountStackFrames(list<Oop *> & _stack);
+void JVM_Interrupt(list<Oop *> & _stack);
+void JVM_IsInterrupted(list<Oop *> & _stack);
+void JVM_HoldsLock(list<Oop *> & _stack);
+void JVM_GetAllThreads(list<Oop *> & _stack);
+void JVM_DumpThreads(list<Oop *> & _stack);
+void JVM_SetNativeThreadName(list<Oop *> & _stack);
 
-void *java_lang_thread_search_method(const string & str);
+void *java_lang_thread_search_method(const wstring & str);
 
 #endif /* INCLUDE_NATIVE_JAVA_LANG_THREAD_HPP_ */
