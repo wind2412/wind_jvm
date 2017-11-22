@@ -1087,7 +1087,7 @@ type_annotation::type_path::~type_path() { delete[] path; }
 std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
 	i.target_type = read1(f);
 	if (i.target_type == 0x00 || i.target_type == 0x01) {
-		auto *result = new type_annotation::type_argument_target;
+		auto *result = new type_annotation::type_parameter_target;		// 可恨！！这里写错了，又调了一晚上 QAQ ！！ 论 parameter 和 argument 的语义到底有毛区别啊 ?????
 		f >> *result;
 		i.target_info = result;
 	} else if (i.target_type == 0x10) {
