@@ -141,6 +141,9 @@ public:
 	const Oop* operator[] (int index) const {
 		return this->operator[](index);
 	}
+	int get_buf_offset() {		// use for sun/misc/Unsafe...
+		return ((char *)&buf - (char *)this);
+	}
 	~ArrayOop() {
 		if (buf != nullptr) {
 			for (int i = 0; i < length; i ++) {
