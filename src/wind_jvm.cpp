@@ -120,6 +120,12 @@ void wind_jvm::start(const vector<wstring> & argv)
 		}
 
 	}
+
+	// for test
+	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
+	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
+
+	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
 	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(main_class_name);		// this time, "java.lang.Object" has been convert to "java/lang/Object".
 	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
 	assert(main_method != nullptr);

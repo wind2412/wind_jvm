@@ -295,7 +295,9 @@ void JVM_GetClassConstantPool(list<Oop *> & _stack){
 }
 void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	// TODO: 我默认禁止了断言！！ assert 是没有用的。默认是不加 -ea （逃
+	// TODO: 关于 assert 字节码的生成，还没有搞清楚。搞清楚了之后立马加上。也可以参见 hotspot: vm/prims/jvm.cpp:2230 --> JVM_DesiredAssertionStatus.
+	_stack.push_back(new BooleanOop(false));
 }
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();

@@ -936,9 +936,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-			case 0xb6:{		// invokeVirtual
-				int rtpool_index = ((pc[1] << 8) | pc[2]);
-				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
+			case 0xb6:		// invokeVirtual
+			case 0xb9:{		// invokeInterface
+				int rtpool_index = ((pc[1] << 8) | pc[2]);	// if is `invokeInterface`: pc[3] && pc[4] deprecated.
+				if (*pc == 0xb6) {
+					assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
+				} else {
+					assert(rt_pool[rtpool_index-1].first == CONSTANT_InterfaceMethodref);
+				}
 				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);		// 这个方法，在我的常量池中解析的时候是按照子类同名方法优先的原则。也就是，如果最子类有同样签名的方法，父类的不会被 parse。这在 invokeStatic 和 invokeSpecial 是成立的，不过在 invokeVirtual 和 invokeInterface 中是不准的。因为后两者是动态绑定。
 				// 因此，得到此方法的目的只有一个，得到方法签名。
 				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
@@ -961,7 +966,12 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(ref != nullptr);			// `this` must not be nullptr!!!!
 				std::wcout << "(DEBUG) " << ref->get_klass()->get_name() << "::" << signature << std::endl;	// msg
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
-				shared_ptr<Method> target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+				shared_ptr<Method> target_method;
+				if (*pc == 0xb6){
+					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+				} else {
+					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
+				}
 				assert(target_method != nullptr);
 				// synchronize
 				if (target_method->is_synchronized()) {
@@ -994,10 +1004,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					}
 				} else {
 #ifdef DEBUG
-	if (*pc == 0xb7)
-		std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
-	else if (*pc == 0xb8)
-		std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+	std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 #endif
 					Oop *result = jvm.add_frame_and_execute(target_method, arg_list);
 					if (!target_method->is_void()) {
@@ -1108,6 +1115,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				}
 				break;
 			}
+
+
+
+
+
 
 			case 0xbb:{		// new // 仅仅分配了内存！
 				// TODO: 这里不是很明白。规范中写：new 的后边可能会跟上一个常量池索引，这个索引指向类或接口......接口是什么鬼???? 还能被实例化吗 ???

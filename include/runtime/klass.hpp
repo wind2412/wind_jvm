@@ -169,7 +169,7 @@ private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields );		// initializer for parse_fields() and InstanceOop's Initialization
 public:
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);	// [name + ':' + descriptor]
-	shared_ptr<Method> get_class_method(const wstring & signature);			// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool!!!
+	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 	int non_static_field_num() { return total_non_static_fields_num; }

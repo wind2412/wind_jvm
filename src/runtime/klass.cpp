@@ -404,7 +404,7 @@ shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signatur
 		return nullptr;
 }
 
-shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
+shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bool search_interfaces)
 {
 	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
@@ -420,10 +420,11 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature)
 		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
 	if (target != nullptr)	return target;
 	// search in interfaces and interfaces' [parent interface].
-	for (auto iter : this->interfaces) {
-		target = iter.second->get_interface_method(signature);
-		if (target != nullptr)	return target;
-	}
+	if (search_interfaces)		// this `switch` is for `invokeInterface`. Because `invokeInterface` only search in `this` and `parent`, not in `interfaces`.
+		for (auto iter : this->interfaces) {
+			target = iter.second->get_interface_method(signature);
+			if (target != nullptr)	return target;
+		}
 	return nullptr;
 }
 
