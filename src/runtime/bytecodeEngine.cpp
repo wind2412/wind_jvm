@@ -411,7 +411,15 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 
-
+			case 0x15:{		// iload
+				int index = pc[1];
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 iload_0~3.
+				op_stack.push(localVariableTable[index]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[" << index << "] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x16:{		// lload
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
@@ -423,7 +431,18 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
-
+			case 0x19:{		// aload
+				int index = pc[1];
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+				op_stack.push(localVariableTable[index]);
+#ifdef DEBUG
+	if (localVariableTable[index] != nullptr)
+		std::wcout << "(DEBUG) push localVariableTable[" << index << "] ref: "<< (localVariableTable[index])->get_klass()->get_name() << "'s Oop: address: " << std::hex << localVariableTable[index] << " on stack." << std::endl;
+	else
+		std::wcout << "(DEBUG) push <null> ref from localVariableTable[" << index << "], to stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x1a:{		// iload_0
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
@@ -484,7 +503,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x2a:{		// aload_0
-				if (localVariableTable[0] != nullptr) assert(localVariableTable[0]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
 	if (localVariableTable[0] != nullptr)
@@ -495,7 +513,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2b:{		// aload_1
-				if (localVariableTable[1] != nullptr) assert(localVariableTable[1]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
 	if (localVariableTable[1] != nullptr)
@@ -506,7 +523,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2c:{		// aload_2
-				if (localVariableTable[2] != nullptr) assert(localVariableTable[2]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
 	if (localVariableTable[2] != nullptr)
@@ -517,7 +533,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x2d:{		// aload_3
-				if (localVariableTable[3] != nullptr) assert(localVariableTable[3]->get_ooptype() == OopType::_InstanceOop);
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
 	if (localVariableTable[3] != nullptr)
@@ -529,6 +544,23 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x32:{		// aaload
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_ObjArrayOop);		// assert char[] array
+				ObjArrayOop * objarray = (ObjArrayOop *)op_stack.top();	op_stack.pop();
+				assert(objarray->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				op_stack.push((*objarray)[index]);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get ObjArray[" << index << "] which type is <class>" << std::static_pointer_cast<ObjArrayKlass>(objarray->get_klass())->get_element_klass()->get_name()
+			   << ", and the element address is "<< op_stack.top() << "." << std::endl;
+#endif
+				break;
+			}
+
 			case 0x34:{		// caload
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (op_stack.top() == nullptr) {
@@ -537,9 +569,21 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				}
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push((*charsequence)[index]);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((CharOop *)op_stack.top())->value << "'" << std::endl;
+#endif
+				break;
+			}
+
+			case 0x36:{		// istore
+				int index = pc[1];
+				assert(index > 3);
+				IntOop *ref = (IntOop *)op_stack.top();
+				localVariableTable[index] = ref;	op_stack.pop();
+#ifdef DEBUG
+		std::wcout << "(DEBUG) pop int [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
 #endif
 				break;
 			}
@@ -591,7 +635,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x4b:{		// astore_0
-				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[0] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -603,7 +646,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4c:{		// astore_1
-				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[1] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -616,7 +658,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 			case 0x4d:{		// astore_2
 				// bug report: 这里出现过一次 EXC_BAD_ACCESS (code=EXC_I386_GPFLT)。原因是因为访问了一块不属于自己的内存。但是其实真正原因是：op_stack.size() == 0。特此记录。
-				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[2] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -628,7 +669,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x4e:{		// astore_3
-				if (op_stack.top() != nullptr) assert(op_stack.top()->get_ooptype() == OopType::_InstanceOop);
 				Oop *ref = op_stack.top();
 				localVariableTable[3] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -681,6 +721,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x5a:{		// dup_x1
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				Oop *val2 = op_stack.top();	op_stack.pop();
+				op_stack.push(val1);
+				op_stack.push(val2);
+				op_stack.push(val1);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) only dup_x1 from stack." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x60:{		// iadd
@@ -710,6 +761,53 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 
+
+			case 0x7c:{		// iushr
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+
+				int s = (val2 & 0x1F);
+				if (val1 > 0) {
+					op_stack.push(new IntOop(val1 >> s));
+				} else {
+					op_stack.push(new IntOop((val1 >> s)+(2 << ~s)));
+				}
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val1 << " >> " << s << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x7e:{		// iand
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val2 & val1));
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val2 << " & " << val1 << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x82:{		// ixor
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val2 ^ val1));
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val2 << " ^ " << val1 << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+			case 0x83:{		// lxor
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val2 ^ val1));
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val2 << " ^ " << val1 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x99:		// ifeq

@@ -22,7 +22,8 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_IHashCode(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	// hash code: I only use address for it.	// in HotSpot `synchronizer.cpp::get_next_hash()`, condition `hashCode = 4`.
+	_stack.push_back(new IntOop((intptr_t)_this));
 }
 void JVM_MonitorWait(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
