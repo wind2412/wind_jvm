@@ -182,3 +182,36 @@ Oop * wind_jvm::add_frame_and_execute(shared_ptr<Method> new_method, const std::
 	this->vm_stack.pop_back();
 	return result;
 }
+
+MirrorOop *wind_jvm::get_caller_class_CallerSensitive()
+{
+	// back-trace. this method is called from: sun_reflect_Reflection.cpp:JVM_GetCallerClass()
+	int level = 0;
+	int total_levelnum = this->vm_stack.size();
+	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it, ++level) {
+		shared_ptr<Method> m = it->method;
+		if (level == 0 || level == 1) {
+			// if level == 0, this method must be `getCallerClass`.
+			if (level == 0) {
+				if (m->get_name() != L"getCallerClass" || m->get_descriptor() != L"()Ljava/lang/Class;")
+					assert(false);
+			}
+			// must be @CallerSensitive
+			if (!m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
+				assert(false);
+			}
+		} else {
+			// TODO: openjdk: is_ignored_by_security_stack_walk(), but didn't implement the third switch because I didn't understand it...
+			if (m->get_name() == L"invoke:(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") {
+				continue;	// java/lang/Reflection/Method.invoke(), ignore.
+			}
+			if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
+				continue;
+			}
+			// TODO: 第三点名没有明白......有待研究...
+		}
+		m->print_all_attribute_name();		// delete
+		return m->get_klass()->get_mirror();
+	}
+	assert(false);
+}

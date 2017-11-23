@@ -53,7 +53,9 @@ using std::shared_ptr;
  */
 
 /*===----------- StackFrame --------------===*/
-StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list) : localVariableTable(method->get_code()->max_locals), method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
+StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
+	if (is_native)	return;
+	localVariableTable.resize(method->get_code()->max_locals);
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
 	for (Oop * value : list) {		// 这里的 int 就是 int，不是 IntOop ！！因为在字节码范围内的 invoke 那里已经修改。
 		localVariableTable.at(i++) = value;	// 检查越界。
@@ -1094,8 +1096,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	else if (*pc == 0xb8)
 		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
-
-						((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
+						arg_list.push_back((Oop *)&jvm);
+						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
+						uint8_t *backup_pc = pc;
+						pc = 0;
+						jvm.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
+						// execute !!
+						((void (*)(list<Oop *> &))native_method)(arg_list);
+						// 然后弹出并恢复 pc......
+						jvm.vm_stack.pop_back();
+						pc = backup_pc;
+						// return value.
 						if (!new_method->is_void()) {
 							assert(arg_list.size() >= 1);
 							op_stack.push(arg_list.back());
@@ -1182,8 +1193,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	else if (*pc == 0xb8)
 		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
-
-						((void (*)(list<Oop *> &))native_method)(arg_list);		// execute !!
+						arg_list.push_back((Oop *)&jvm);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。
+						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
+						uint8_t *backup_pc = pc;
+						pc = 0;
+						jvm.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
+						// execute !!
+						((void (*)(list<Oop *> &))native_method)(arg_list);
+						// 然后弹出并恢复 pc......
+						jvm.vm_stack.pop_back();
+						pc = backup_pc;
+						// return value.
 						if (!new_method->is_void()) {
 							assert(arg_list.size() >= 1);
 							op_stack.push(arg_list.back());

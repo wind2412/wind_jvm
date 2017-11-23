@@ -41,7 +41,7 @@ public:
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 public:
-	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list);
+	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, bool is_native = false);
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
 	void clear_all();

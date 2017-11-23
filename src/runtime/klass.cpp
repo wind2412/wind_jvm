@@ -236,7 +236,6 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 
 void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 {
-	// TODO:
 	for(int i = 0; i < this->attributes_count; i ++) {
 		int attribute_tag = peek_attribute(this->attributes[i]->attribute_name_index, cf->constant_pool);
 		switch (attribute_tag) {	// must be 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21

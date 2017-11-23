@@ -185,6 +185,8 @@ public:
 	ClassLoader *get_classloader() { return this->loader; }
 	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
 	bool check_interfaces(shared_ptr<InstanceKlass> klass);
+	bool check_parent(const wstring & signature) { return this->parent->get_name() == signature || std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(signature); }
+	bool check_parent(shared_ptr<InstanceKlass> klass) { return this->parent == klass || std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(klass); }
 	InstanceOop* new_instance();
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }

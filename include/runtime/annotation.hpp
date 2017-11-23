@@ -56,6 +56,8 @@ struct Annotation : public Value_t {
 
     Annotation(cp_info **constant_pool, const annotation & v);
 	~Annotation();
+public:
+	bool match_annotation_name(const wstring & name) { return name == type; }
 };
 
 struct Array_value_t : public Value_t {
@@ -74,6 +76,15 @@ struct Parameter_annotations_t {	// extract from Runtime_XXX_Annotations_attribu
 
 	Parameter_annotations_t(cp_info **constant_pool, const parameter_annotations_t & v);
 	~Parameter_annotations_t();
+public:
+	bool has_annotation_name(const wstring & name) {
+		for (int i = 0; i < num_annotations; i ++) {
+			if (annotations[i].match_annotation_name(name)) {
+				return true;
+			}
+		}
+		return false;
+	}
 };
 
 
@@ -85,8 +96,12 @@ struct TypeAnnotation {
 	type_annotation::type_path target_path;
 	Annotation *anno = nullptr;			// [1]	// only this CHANGED.
 
-	explicit TypeAnnotation(cp_info **constant_pool, type_annotation & v);
+	TypeAnnotation(cp_info **constant_pool, type_annotation & v);
 	~TypeAnnotation();
+public:
+	bool has_annotation_name(const wstring & name) {
+		return anno->match_annotation_name(name);
+	}
 };
 
 #endif /* INCLUDE_RUNTIME_ANNOTATION_HPP_ */

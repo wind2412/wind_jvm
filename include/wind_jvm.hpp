@@ -35,6 +35,7 @@ public:
 	void start(const vector<wstring> & argv);
 	void execute();
 	Oop *add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list);
+	MirrorOop *get_caller_class_CallerSensitive();
 };
 
 

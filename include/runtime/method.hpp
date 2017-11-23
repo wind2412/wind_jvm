@@ -68,6 +68,37 @@ public:
 	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
 public:
+	bool has_annotation_name_in_method(const wstring & name) {
+		if (rvpa != nullptr && rvpa->has_annotation_name(name)) return true;
+		if (rva != nullptr && rva->has_annotation_name(name))	return true;
+		if (rvta != nullptr && rvta->has_annotation_name(name))	return true;
+		return false;
+	}
+	void print_all_attribute_name() {		// for debug
+		std::cout << "===-------------- print attributes name -------------------===" << std::endl;
+		std::cout << "--- Runtime Visible Annotations: \n";
+		if (rva != nullptr)
+			for (int i = 0; i < rva->num_annotations; i ++) {
+				std::wcout << rva->annotations[i].type << std::endl;
+			}
+		else std::wcout << "none." << std::endl;
+		std::cout << "--- Runtime Visible Parameter Annotations: \n";
+		if (rvpa != nullptr)
+			for (int i = 0; i < num_RuntimeVisibleParameterAnnotation; i ++) {
+				for (int j = 0; j < rvpa[i].num_annotations; j ++) {
+					std::wcout << rvpa[i].annotations[j].type << std::endl;
+				}
+			}
+		else std::wcout << "none." << std::endl;
+		std::cout << "--- Runtime Visible Type Annotations: \n";
+		if (rvta != nullptr)
+			for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
+				std::wcout << rvta[i].anno->type << std::endl;
+			}
+		else std::wcout << "none." << std::endl;
+		std::cout << "===--------------------------------------------------------===" << std::endl;
+	}
+public:
 	bool operator== (const Method & rhs) const {
 		return this->name == rhs.name && this->descriptor == rhs.descriptor;
 	}
