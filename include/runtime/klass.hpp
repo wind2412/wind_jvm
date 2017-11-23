@@ -141,19 +141,20 @@ private:
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
-	// TODO: Inner Class!!!
-
 	// Attributes
-	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21
+	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21		// source_file ignored.
 	u2 attributes_count;
 	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
 
 	InnerClasses_attribute *inner_classes = nullptr;
 	EnclosingMethod_attribute *enclosing_method = nullptr;
-	u2 signature_index;
-	u2 source_file_index;
+	u2 signature_index = 0;
+	BootstrapMethods_attribute *bm = nullptr;
 
-	// TODO: Annotations
+	Parameter_annotations_t *rva = nullptr;
+
+	u2 num_RuntimeVisibleTypeAnnotations;
+	TypeAnnotation *rvta = nullptr;
 
 private:
 	void parse_methods(shared_ptr<ClassFile> cf);
@@ -165,6 +166,8 @@ public:
 	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
 public:
 	shared_ptr<Method> get_static_void_main();
+	void initialize_final_static_field();
+	wstring parse_signature();
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields );		// initializer for parse_fields() and InstanceOop's Initialization
 public:

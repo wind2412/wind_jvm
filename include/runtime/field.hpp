@@ -14,7 +14,9 @@
 #include <string>
 #include <cassert>
 #include <memory>
+#include <boost/any.hpp>
 #include "runtime/klass.hpp"
+#include "annotation.hpp"
 
 using std::wstring;
 using std::vector;
@@ -56,13 +58,19 @@ private:
 	wstring descriptor;		// type descripror: I, [I, java.lang.String etc.
 
 	// attributes
-	// 0, 6, 7, 13, 14, 15, 18, 19	// synthetic, deprecated 两者都不需要。并没有保存任何信息。
+	// 0, 6, 7, 13, 14, 15, 18, 19	// synthetic, deprecated, RuntimeInvisible(Type)Annotation 这几者都不需要。并没有保存任何信息。
 
 	u2 attributes_count;
 	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
 
+	// 其实我设置 RuntimeVisibleAnnotation 内部是一个 ParameterAnnotation.
+	Parameter_annotations_t *rva = nullptr;
+
+	u2 num_RuntimeVisibleTypeAnnotations;
+	TypeAnnotation *rvta = nullptr;
+
 	ConstantValue_attribute *constant_value = nullptr;	// only one
-	u2 signature_index;
+	u2 signature_index = 0;
 	// TODO: support Annotations
 
 
@@ -78,16 +86,15 @@ public:
 	void if_didnt_parse_then_parse();			// **VERY IMPORTANT**!!!
 public:
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
+	bool is_final() { return (access_flags & ACC_FINAL) == ACC_FINAL; }
+public:
+	ConstantValue_attribute *get_constant_value() { return constant_value; }
+	wstring parse_signature();
 public:
 	void print() { std::wcout << name << ":" << descriptor; }
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。
-	~Field_info () {
-		for (int i = 0; i < attributes_count; i ++) {
-			delete attributes[i];
-		}
-		delete[] attributes;
-	}
+	~Field_info ();
 };
 
 #endif /* INCLUDE_RUNTIME_FIELD_HPP_ */

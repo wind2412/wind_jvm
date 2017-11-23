@@ -244,7 +244,7 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 				inner_classes = (InnerClasses_attribute *)this->attributes[i];
 				break;
 			}
-			case 3: {	// Exception
+			case 5: {	// EnclosingMethod
 				enclosing_method = (EnclosingMethod_attribute *)this->attributes[i];
 				break;
 			}
@@ -252,17 +252,36 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 				signature_index = ((Signature_attribute *)this->attributes[i])->signature_index;
 				break;
 			}
-			case 8: {	// SourceFile
-				source_file_index = ((SourceFile_attribute *)this->attributes[i])->sourcefile_index;
+			case 14:{		// RuntimeVisibleAnnotation
+				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
+				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
+				constructor(this->rva, cf->constant_pool, enter);
 				break;
 			}
-
-
-			// TODO: 支持更多 attributes
-
+			case 18:{		// RuntimeVisibleTypeAnnotation
+				auto enter_ptr = ((RuntimeVisibleTypeAnnotations_attribute *)this->attributes[i]);
+				this->num_RuntimeVisibleTypeAnnotations = enter_ptr->num_annotations;
+				this->rvta = (TypeAnnotation *)malloc(sizeof(TypeAnnotation) * this->num_RuntimeVisibleTypeAnnotations);
+				for (int pos = 0; pos < this->num_RuntimeVisibleTypeAnnotations; pos ++) {
+					constructor(&this->rvta[pos], cf->constant_pool, enter_ptr->annotations[pos]);
+				}
+				break;
+			}
+			case 21:{		// BootStrapMethods (for lambda)
+				this->bm = (BootstrapMethods_attribute *)this->attributes[i];
+				break;
+			}
+			case 6:
+			case 8:
+			case 9:
+			case 13:
+			case 15:
+			case 19:{
+				break;
+			}
 			default:{
-				std::cerr << "Annotations are TODO! attribute_tag == " << attribute_tag << std::endl;
-//				assert(false);		// TODO:
+				std::cerr << "attribute_tag == " << attribute_tag << std::endl;
+				assert(false);
 			}
 		}
 
@@ -504,6 +523,56 @@ void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr
 			}
 		}
 	}
+}
+
+// to set the ConstantValue_attribute at initialization.
+void InstanceKlass::initialize_final_static_field()
+{
+	for (auto iter : this->static_fields_layout) {
+		if (iter.second.second->is_static()) {		// TODO: ??? 很疑惑，我测试只有 static final 才需要强行设置 ConstantValue_attribute 啊...... 为何不是测试 final ?? 见 Spec... $4.7.2
+			auto const_val_attr = iter.second.second->get_constant_value();
+			if (const_val_attr != nullptr) {
+				int index = const_val_attr->constantvalue_index;
+				std::cout << "ConstantValue_attribute point to index: " << index << std::endl;		// delete
+				auto _pair = (*this->rt_pool)[index - 1];
+				std::cout << "initialize ConstantValue_attribute !" << std::endl;		// delete
+				switch (_pair.first) {
+					case CONSTANT_Long:{
+						this->set_static_field_value(iter.first, new LongOop(boost::any_cast<long>(_pair.second)));
+						break;
+					}
+					case CONSTANT_Float:{
+						this->set_static_field_value(iter.first, new FloatOop(boost::any_cast<float>(_pair.second)));
+						break;
+					}
+					case CONSTANT_Double:{
+						this->set_static_field_value(iter.first, new DoubleOop(boost::any_cast<double>(_pair.second)));
+						break;
+					}
+					case CONSTANT_Integer:{
+						this->set_static_field_value(iter.first, new IntOop(boost::any_cast<int>(_pair.second)));
+						break;
+					}
+					case CONSTANT_String:{
+						this->set_static_field_value(iter.first, boost::any_cast<Oop *>(_pair.second));
+						break;
+					}
+					default:{
+						std::cerr << "it's ..." << _pair.first << std::endl;
+						assert(false);
+					}
+				}
+			}
+		}
+	}
+}
+
+wstring InstanceKlass::parse_signature()
+{
+	assert(signature_index != 0);
+	auto _pair = (*this->rt_pool)[signature_index];
+	assert(_pair.first == CONSTANT_Utf8);
+	return boost::any_cast<wstring>(_pair.second);
 }
 
 bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)

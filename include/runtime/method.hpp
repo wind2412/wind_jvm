@@ -4,7 +4,9 @@
 #include <string>
 #include <cassert>
 #include <memory>
+#include "runtime/constantpool.hpp"
 #include "class_parser.hpp"
+#include "annotation.hpp"
 
 using std::wstring;
 using std::shared_ptr;
@@ -30,13 +32,30 @@ private:
 	u2 attributes_count;
 	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
 
-	// TODO: code attribute
-	Code_attribute *code;
-	// TODO: exception attribute
+	// RuntimeAnnotation
+	Parameter_annotations_t *rva = nullptr;		// [1]
+
+	u1 num_RuntimeVisibleParameterAnnotation = 0;
+	Parameter_annotations_t *rvpa = nullptr;		// [n]
+
+	// RuntimeTypeAnnotation [of Method]
+	u2 num_RuntimeVisibleTypeAnnotations = 0;
+	TypeAnnotation *rvta = nullptr;				// [n]
+
+	// Code attribute
+	Code_attribute *code = nullptr;			// TODO: !!! 小心！！ Code 属性中还有一份异常表！！
+//	LineNumberTable_attribute *lnt = nullptr;					// 用于调试器。
+//	LocalVariableTable_attribute *lvt = nullptr;				// 用于调试器。
+//	LocalVariableTypeTable_attribute *lvtt = nullptr;			// 用于调试器。
+//	StackMapTable_attribute *smt = nullptr;					// 此属性用于虚拟机的类型检查阶段。
+	// RuntimeTypeAnnotation [of Code attribute]
+	u2 Code_num_RuntimeVisibleTypeAnnotations = 0;
+	TypeAnnotation *Code_rvta = nullptr;				// [n]
+
 	Exceptions_attribute *exceptions = nullptr;
 	u2 signature_index;
-
-	// TODO: 支持更多 attributes, Annotations.
+	Element_value *ad = nullptr;
+//	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
 
 public:
 	bool is_static() { return (this->access_flags & ACC_STATIC) == ACC_STATIC; }
@@ -57,8 +76,10 @@ public:
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	const Code_attribute *get_code() { return code; }
-	void print() { std::wcout << name << ":" << descriptor; }
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
+	wstring parse_signature();
+	void print() { std::wcout << name << ":" << descriptor; }
+
 	~Method() {
 		for (int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];

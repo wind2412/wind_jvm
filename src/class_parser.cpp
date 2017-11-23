@@ -1087,7 +1087,7 @@ type_annotation::type_path::~type_path() { delete[] path; }
 std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
 	i.target_type = read1(f);
 	if (i.target_type == 0x00 || i.target_type == 0x01) {
-		auto *result = new type_annotation::type_parameter_target;		// 可恨！！这里写错了，又调了一晚上 QAQ ！！ 论 parameter 和 argument 的语义到底有毛区别啊 ?????
+		auto *result = new type_annotation::type_parameter_target;
 		f >> *result;
 		i.target_info = result;
 	} else if (i.target_type == 0x10) {
@@ -2390,7 +2390,11 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 			auto *annotations_ptr = (RuntimeVisibleTypeAnnotations_attribute *)ptr;
 			for (int i = 0; i < annotations_ptr->num_annotations; i ++) {
 				type_annotation *ta = &annotations_ptr->annotations[i];
-				// 1. print [target_info]
+				// 1. print [annotation]
+				annotation *target = ta->anno;
+				std::cout << "(DEBUG)     ";
+				std::cout << recursive_parse_annotation(target) << std::endl;
+				// 2. print [target_info]
 				std::cout << "(DEBUG)     ";
 				std::cout << "tag == " << hex << (int)ta->target_type << " ";	// TODO: NEW / CLASS_EXTENSIONS 信息显示
 				switch (ta->target_type) {
@@ -2464,17 +2468,13 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						assert(false);
 					}
 				}
-				// 2. print [target_path]
+				// 3. print [target_path]
 				type_annotation::type_path *path_ptr = &ta->target_path;
 				if (path_ptr->path_length != 0)
 					std::cout << "(DEBUG)     ";
 				for (int pos = 0; pos < path_ptr->path_length; pos ++) {
 					std::cout << "type_path_kind: " << (int)path_ptr->path[pos].type_path_kind << "; type_argument_index: " << (int)path_ptr->path[pos].type_argument_index << std::endl;
 				}
-				// 3. print [annotation]
-				annotation *target = ta->anno;
-				std::cout << "(DEBUG)     ";
-				std::cout << recursive_parse_annotation(target) << std::endl;
 			}
 			break;
 		}

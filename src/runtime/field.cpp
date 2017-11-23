@@ -7,6 +7,8 @@
 
 #include "runtime/field.hpp"
 #include "classloader.hpp"
+#include "utils/utils.hpp"
+#include "runtime/constantpool.hpp"
 
 Field_info::Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool) : klass(klass) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
 	this->access_flags = fi.access_flags;
@@ -34,12 +36,30 @@ Field_info::Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info
 				this->signature_index = ((Signature_attribute *)this->attributes[i])->signature_index;
 				break;
 			}
-
-				// TODO: Annotations...
-
+			case 14:{		// RuntimeVisibleAnnotation
+				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
+				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
+				constructor(this->rva, constant_pool, enter);
+				break;
+			}
+			case 18:{		// RuntimeVisibleTypeAnnotation
+				auto enter_ptr = ((RuntimeVisibleTypeAnnotations_attribute *)this->attributes[i]);
+				this->num_RuntimeVisibleTypeAnnotations = enter_ptr->num_annotations;
+				this->rvta = (TypeAnnotation *)malloc(sizeof(TypeAnnotation) * this->num_RuntimeVisibleTypeAnnotations);
+				for (int pos = 0; pos < this->num_RuntimeVisibleTypeAnnotations; pos ++) {
+					constructor(&this->rvta[pos], constant_pool, enter_ptr->annotations[pos]);
+				}
+				break;
+			}
+			case 6:
+			case 13:
+			case 15:
+			case 19:{		// do nothing
+				break;
+			}
 			default:{
-				std::cerr << "Annotations are TODO! attribute_tag == " << attribute_tag << std::endl;
-//				assert(false);
+				std::cerr << "attribute_tag == " << attribute_tag << std::endl;
+				assert(false);
 			}
 		}
 	}
@@ -112,4 +132,26 @@ void Field_info::if_didnt_parse_then_parse()
 		}
 	}
 	this->state = Parsed;
+}
+
+wstring Field_info::parse_signature() {
+	assert(signature_index != 0);
+	auto _pair = (*klass->get_rtpool())[signature_index];
+	assert(_pair.first == CONSTANT_Utf8);
+	return boost::any_cast<wstring>(_pair.second);
+}
+
+Field_info::~Field_info () {
+	for (int i = 0; i < attributes_count; i ++) {
+		delete attributes[i];
+	}
+	delete[] attributes;
+
+	destructor(this->rva);
+	free(this->rva);
+
+	for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
+		destructor(&rvta[i]);
+	}
+	free(rvta);
 }

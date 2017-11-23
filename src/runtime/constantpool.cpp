@@ -130,8 +130,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		case CONSTANT_Long:{
 			CONSTANT_Long_info* target = (CONSTANT_Long_info*)bufs[i];
 			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target->get_value())));		// long
-			i ++;
-			this->pool[i] = (make_pair(-1, boost::any()));									// 由于有一位占位符，因此 empty。
+			this->pool[i+1] = (make_pair(-1, boost::any()));									// 由于有一位占位符，因此 empty。
 			break;
 		}
 		case CONSTANT_Double:{
@@ -140,8 +139,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			CONSTANT_Double_info* target = (CONSTANT_Double_info*)bufs[i];
 			double result = target->get_value();
 			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target->get_value())));		// double
-			i ++;
-			this->pool[i] = (make_pair(-1, boost::any()));									// 由于有一位占位符，因此 empty。
+			this->pool[i+1] = (make_pair(-1, boost::any()));									// 由于有一位占位符，因此 empty。
 			break;
 		}
 		case CONSTANT_NameAndType:{

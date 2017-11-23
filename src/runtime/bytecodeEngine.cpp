@@ -263,10 +263,14 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jvm & jvm)
 {
 	if (new_klass->get_state() == Klass::KlassState::NotInitialized) {
+		std::wcout << "initializing <class>: [" << new_klass->get_name() << "]" << std::endl;
+		new_klass->set_state(Klass::KlassState::Initializing);
 		// recursively initialize its parent first !!!!! So java.lang.Object must be the first !!!
 		if (new_klass->get_parent() != nullptr)	// prevent this_klass is the java.lang.Object.
 			BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(new_klass->get_parent()), jvm);
-		// then initialize this_klass.
+		// if static field has ConstantValue_attribute (final field), then initialize it.
+		new_klass->initialize_final_static_field();
+		// then initialize this_klass, call <clinit>.
 		std::wcout << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;
 		shared_ptr<Method> clinit = new_klass->get_this_class_method(L"<clinit>:()V");		// **IMPORTANT** only search in this_class for `<clinit>` !!!
 		if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。

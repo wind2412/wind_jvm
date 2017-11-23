@@ -16,36 +16,6 @@
 #include <cstring>
 #include <memory>
 
-template <typename Tp, typename Arg1>
-void __constructor(Tp *ptr, const Arg1 & arg1)		// 适配一个参数
-{
-	::new ((void *)ptr) Tp(arg1);
-}
-
-template <typename Tp, typename Arg1, typename Arg2>
-void __constructor(Tp *ptr, const Arg1 & arg1, const Arg2 & arg2)		// 适配两个参数
-{
-	::new ((void *)ptr) Tp(arg1, arg2);
-}
-
-template <typename Tp, typename Arg1, typename Arg2, typename Arg3>
-void __constructor(Tp *ptr, const Arg1 & arg1, const Arg2 & arg2, const Arg3 & arg3)		// 适配三个参数
-{
-	::new ((void *)ptr) Tp(arg1, arg2, arg3);
-}
-
-template <typename Tp, typename ...Args>
-void constructor(Tp *ptr, Args &&...args)		// placement new.
-{
-	__constructor(ptr, std::forward<Args>(args)...);		// 完美转发变长参数
-}
-
-template <typename Tp>
-void destructor(Tp *ptr)
-{
-	ptr->~Tp();
-}
-
 class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
 
 };
