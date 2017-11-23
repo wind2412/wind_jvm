@@ -382,8 +382,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 
-			case 0x12:{		// ldc
-				int rtpool_index = pc[1];
+			case 0x12:		// ldc
+			case 0x13:{		// ldc_w
+				int rtpool_index;
+				if (*pc == 0x12) {
+					rtpool_index = pc[1];
+				} else {
+					rtpool_index = ((pc[1] << 8) | pc[2]);
+				}
 				if (rt_pool[rtpool_index-1].first == CONSTANT_Integer) {
 					int value = boost::any_cast<int>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new IntOop(value));
@@ -411,12 +417,31 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	std::wcout << "(DEBUG) push class: "<< klass->get_name() << "'s mirror "<< "on stack." << std::endl;
 #endif
 				} else {
-					std::cerr << "can't get here!" << std::endl;
+					// TODO: Constant_MethodHandle and Constant_MethodType
+					std::cerr << "doesn't support Constant_MethodHandle and Constant_MethodType now..." << std::endl;
 					assert(false);
 				}
 				break;
 			}
-
+			case 0x14:{		// ldc2_w
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				if (rt_pool[rtpool_index-1].first == CONSTANT_Double) {
+					double value = boost::any_cast<double>(rt_pool[rtpool_index-1].second);
+					op_stack.push(new DoubleOop(value));
+#ifdef DEBUG
+	std::cout << "(DEBUG) push double: "<< value << "on stack." << std::endl;
+#endif
+				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Long) {
+					long value = boost::any_cast<long>(rt_pool[rtpool_index-1].second);
+					op_stack.push(new LongOop(value));
+#ifdef DEBUG
+	std::cout << "(DEBUG) push long: "<< value << "on stack." << std::endl;
+#endif
+				} else {
+					assert(false);
+				}
+				break;
+			}
 			case 0x15:{		// iload
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 iload_0~3.
@@ -707,6 +732,25 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 		std::wcout << "(DEBUG) put element of type: [" << real_value->get_klass()->get_name() << "], address :[" << real_value << "] into the index [" << index
 				   << "] of the ObjArray of type: [" << std::static_pointer_cast<ObjArrayKlass>(real_array->get_klass())->get_element_klass() << "]" << std::endl;
 	}
+#endif
+				break;
+			}
+
+
+
+			case 0x55:{		// castore
+				CharOop *ch = (CharOop *)op_stack.top();	op_stack.pop();
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				(*charsequence)[index] = ch;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get wchar_t ['" << (wchar_t)ch->value << "'] from the stack to char[]'s position of [" << index << "]" << std::endl;
 #endif
 				break;
 			}
