@@ -2568,8 +2568,9 @@ ClassFile::ClassFile(ClassFile && cf) {
 ClassFile::~ClassFile() {
 	if (constant_pool != nullptr) {
 		for(int i = 0; i < constant_pool_count-1; i ++) {
+			int tag = constant_pool[i]->tag;
 			delete constant_pool[i];
-			if(constant_pool[i]->tag == CONSTANT_Long || constant_pool[i]->tag == CONSTANT_Double)	i ++;
+			if(tag == CONSTANT_Long || tag == CONSTANT_Double)	i ++;
 		}
 	}
 	delete[] constant_pool;

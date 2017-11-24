@@ -876,7 +876,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				} else if (*pc == 0x9b) {
 					judge = (int_value < 0);
 				} else if (*pc == 0x9c) {
-//					judge = (int_value <= 0);	// delete
+//					judge = (int_value <= 0);	// delete		// 这里是最诡异的 bug 的发现地点......太厉害了。用 clang++ 和 g++ 编译，clang++ 跑到一半崩溃；g++ 一直跑都没事。简直神了。然后调试 bug 一直调试不出来，看哪好像都是对的。mdzz。
 					judge = (int_value >= 0);	// real
 				} else if (*pc == 0x9d) {
 					judge = (int_value > 0);
