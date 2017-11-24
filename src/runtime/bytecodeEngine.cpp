@@ -876,11 +876,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 				} else if (*pc == 0x9b) {
 					judge = (int_value < 0);
 				} else if (*pc == 0x9c) {
-					judge = (int_value <= 0);
+					judge = (int_value >= 0);
 				} else if (*pc == 0x9d) {
 					judge = (int_value > 0);
 				} else {
-					judge = (int_value >= 0);
+					judge = (int_value <= 0);
 				}
 
 				if (judge) {	// if true, jump to the branch_pc.
