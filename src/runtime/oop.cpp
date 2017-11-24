@@ -64,8 +64,9 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 }
 
 /*===----------------  MirrorOop  -------------------===*/
-MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who) : mirrored_who(mirrored_who),
-					InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))) {}
+MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who)			// 注意：在使用 lldb 调试的时候：输入 mirrored_who 其实是在输出 this->mirrored_who...... 而不是这个形参的...... 形参的 mirrored_who 的输出要使用 fr v mirrored_who 来进行打印！......
+					: InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))),
+					  mirrored_who(mirrored_who){}
 
 /*===----------------  TypeArrayOop  -------------------===*/
 

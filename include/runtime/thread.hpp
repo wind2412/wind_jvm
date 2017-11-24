@@ -13,6 +13,7 @@
 #include <iostream>
 #include <cassert>
 #include <pthread.h>
+#include <signal.h>
 #include <errno.h>
 #include "utils/lock.hpp"
 

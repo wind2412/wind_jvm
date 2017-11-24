@@ -613,11 +613,16 @@ InstanceKlass::~InstanceKlass() {
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/
 MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who, ClassLoader *loader) {
-
+	// 注意 mirrored_who 可以为 nullptr。因为在数组类使用了 new_mirror(nullptr, nullptr).
 	LockGuard lg(system_classmap_lock);
 	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
 
 	// then inject it!!
+	if (mirrored_who != nullptr && mirrored_who->get_name() == L"java/lang/Exception") {
+		auto & loaderr = BootStrapClassLoader::get_bootstrap();
+		wstring ll(L"java/lang/Class");
+		loaderr.loadClass(ll);
+	}
 	auto mirror = new MirrorOop(mirrored_who);
 	if (loader != nullptr) {
 		// need to initialize the `ClassLoader.class` by using ClassLoader's constructor!!

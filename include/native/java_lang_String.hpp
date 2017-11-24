@@ -13,6 +13,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include "runtime/oop.hpp"
 #include "utils/lock.hpp"
 
 using std::wstring;
@@ -30,17 +31,14 @@ using std::wstringstream;
 //    return h;
 //  }
 
-class Oop;
-class InstanceOop;
-
 struct java_string_hash	// Hash 用于决定此 T 变量放到哪个桶中，equator 才是判断两个 T 相不相同的重要因素！！
 {
-	size_t operator()(Oop* ptr) noexcept;
+	size_t operator()(Oop* const & ptr) const noexcept;
 };
 
 struct java_string_equal_to
 {
-	bool operator() (const Oop *lhs, const Oop *rhs) const;
+	bool operator() (Oop* const & lhs, Oop* const & rhs) const;
 };
 
 
@@ -62,7 +60,7 @@ public:
 		LockGuard lg(getLock());
 		auto iter = java_lang_string::get_string_table().find(stringoop);
 #ifndef DEBUG		// TODO: 1. DEBUG 宏到这里会消失？？
-#define DEBUG		// TODO: 2. 同一个 string intern 之后出现多份？？？bug...
+#define DEBUG
 #endif
 #ifdef DEBUG
 	std::cout << "===-------------- string_table ---------------===" << std::endl;
