@@ -168,8 +168,16 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	return false;
 }
 
-JarLister::JarLister(const wstring & rtjar_pos) : rjd(L"root"), rtjar_pos(rtjar_pos)
+JarLister::JarLister() : rjd(L"root")
 {
+#if (defined (__APPLE__))
+	rtjar_pos = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/rt.jar";
+#elif (defined (__linux__))
+	rtjar_pos = L"/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar";
+#else
+	std::cerr << "do not support for windows!" << std::endl;
+	assert(false);
+#endif
 	bool success = this->getjarlist(rtjar_pos);
 	if (!success)	exit(-1);
 

@@ -78,3 +78,22 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	ss << " hash is: [" << ((IntOop *)int_oop_hash)->value << "]";
 	return ss.str();
 }
+
+Oop *java_lang_string::intern_to_oop(const wstring & str) {
+	assert(system_classmap.find(L"[C.class") != system_classmap.end());
+	// alloc a `char[]` for `value` field
+	TypeArrayOop * charsequence = (TypeArrayOop *)std::static_pointer_cast<TypeArrayKlass>((*system_classmap.find(L"[C.class")).second)->new_instance(str.size());
+	assert(charsequence->get_klass() != nullptr);
+	// fill in `char[]`
+	for (int pos = 0; pos < str.size(); pos ++) {
+		(*charsequence)[pos] = new CharOop((uint32_t)str[pos]);
+	}
+	// alloc a StringOop.
+	InstanceOop *stringoop = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"))->new_instance();
+	assert(stringoop != nullptr);
+	stringoop->set_field_value(L"value:[C", charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
+#ifdef DEBUG
+	std::wcout << java_lang_string::print_stringOop(stringoop) << std::endl;
+#endif
+	return stringoop;
+}

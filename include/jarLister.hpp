@@ -81,7 +81,7 @@ public:
 
 class JarLister {
 private:
-	wstring rtjar_pos;	// for cache.
+	wstring rtjar_pos;
 	RtJarDirectory rjd;
 	const wstring rtlist = L"rt.list";
 	const wstring uncompressed_dir = L"sun_src";
@@ -89,7 +89,7 @@ private:
 	// get rt.jar files list and put them into a file `rt.list`
 	bool getjarlist(const std::wstring & rtjar_pos) const;
 public:
-	JarLister(const std::wstring & rtjar_pos = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/rt.jar");	// for Mac
+	JarLister();
 	bool find_file(const std::wstring & classname) {	// java/util/Map.class
 		return rjd.find_file(StringSplitter(classname));
 	}
