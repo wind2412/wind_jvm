@@ -59,9 +59,9 @@ public:
 		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
 		LockGuard lg(getLock());
 		auto iter = java_lang_string::get_string_table().find(stringoop);
-#ifndef DEBUG		// 我操你妈？？？？？到这里加上这大佬三连，竟然会报 bus error ？？？？？ 为啥啊？？？？？？？？？ 去掉这三连就好了 ？？？？？？
-#define DEBUG		// 卧槽？？？只要加上这 绝命三连，mac 就会报 bus error ？？？？
-#endif				// 我发现了...... 只要定义这个 DEBUG 宏，就肯定出问题！！为啥啊 ？？？？？
+//#ifndef DEBUG		// 查了半天得到结论，应该是 mac 系统内部以及 clang++ 内部的共同的 bug 造成的吧。
+//#define DEBUG
+//#endif
 #ifdef DEBUG
 	std::cout << "===-------------- string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
