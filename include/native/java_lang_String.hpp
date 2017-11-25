@@ -59,9 +59,6 @@ public:
 		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
 		LockGuard lg(getLock());
 		auto iter = java_lang_string::get_string_table().find(stringoop);
-#ifndef DEBUG		// TODO: 1. DEBUG 宏到这里会消失？？
-#define DEBUG
-#endif
 #ifdef DEBUG
 	std::cout << "===-------------- string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {

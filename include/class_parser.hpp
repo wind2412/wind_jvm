@@ -4,7 +4,7 @@
 #include <iostream>
 #include <unordered_map>
 
-#define DEBUG
+//#define DEBUG
 
 // used in parser
 

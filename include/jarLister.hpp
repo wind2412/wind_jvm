@@ -18,7 +18,7 @@ using std::unordered_set;
 
 extern wstring splitter;
 
-#define DEBUG
+//#define DEBUG
 
 class StringSplitter {
 private:

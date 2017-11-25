@@ -301,6 +301,8 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	uint8_t * & pc = jvm.pc;
 	pc = code_begin;
 
+	std::cout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
+
 	while (pc < code_begin + code_length) {
 		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 		int occupied = bccode_map[*pc].second + 1;		// the bytecode takes how many bytes.(include itself)		// TODO: tableswitch, lookupswitch, wide is NEGATIVE!!!
@@ -460,6 +462,15 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x17:{		// fload
+				int index = pc[1];
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+				op_stack.push(localVariableTable[index]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[" << index << "] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x19:{		// aload
@@ -527,6 +538,35 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
 	std::cout << "(DEBUG) push localVariableTable[3] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x22:{		// fload_0
+				op_stack.push(localVariableTable[0]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[0] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x23:{		// fload_1
+				op_stack.push(localVariableTable[1]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[1] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x24:{		// fload_2
+				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop);
+				op_stack.push(localVariableTable[2]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[2] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x25:{		// fload_3
+				op_stack.push(localVariableTable[3]);
+#ifdef DEBUG
+	std::cout << "(DEBUG) push localVariableTable[3] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -633,8 +673,6 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
-
 			case 0x3b:{		// istore_0
 				localVariableTable[0] = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -811,6 +849,29 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 
+			case 0x78:{		// ishl
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int s = (val2 & 0x1F);
+				op_stack.push(new IntOop(val1 << s));
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val1 << " << " << s << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x7a:{		// ishr
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int s = (val2 & 0x1F);
+				op_stack.push(new IntOop(val1 >> s));
+#ifdef DEBUG
+	std::cout << "(DEBUG) do [" << val1 << " >> " << s << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
 
 			case 0x7c:{		// iushr
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -876,13 +937,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				} else if (*pc == 0x9b) {
 					judge = (int_value < 0);
 				} else if (*pc == 0x9c) {
-					judge = (int_value <= 0);	// delete		// 这里是最诡异的 bug 的发现地点......太厉害了。用 clang++ 和 g++ 编译，clang++ 跑到一半崩溃；g++ 一直跑都没事。简直神了。然后调试 bug 一直调试不出来，看哪好像都是对的。mdzz。
-//					judge = (int_value >= 0);	// real
+//					judge = (int_value <= 0);	// delete		// 这里是最诡异的 bug 的发现地点......太厉害了。用 clang++ 和 g++ 编译，clang++ 跑到一半崩溃；g++ 一直跑都没事。简直神了。然后调试 bug 一直调试不出来，看哪好像都是对的。mdzz。
+					judge = (int_value >= 0);	// real
 				} else if (*pc == 0x9d) {
 					judge = (int_value > 0);
 				} else {
-					judge = (int_value >= 0);	// delete
-//					judge = (int_value <= 0);	// real
+//					judge = (int_value >= 0);	// delete
+					judge = (int_value <= 0);	// real
 				}
 
 				if (judge) {	// if true, jump to the branch_pc.
