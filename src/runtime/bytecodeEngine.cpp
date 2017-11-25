@@ -301,7 +301,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 	uint8_t * & pc = jvm.pc;
 	pc = code_begin;
 
-	std::cout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
+//	std::cout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
 
 	while (pc < code_begin + code_length) {
 		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;

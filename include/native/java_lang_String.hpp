@@ -59,6 +59,9 @@ public:
 		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
 		LockGuard lg(getLock());
 		auto iter = java_lang_string::get_string_table().find(stringoop);
+//#ifndef DEBUG		// 我操你妈？？？？？到这里加上这大佬三连，竟然会报 bus error ？？？？？ 为啥啊？？？？？？？？？ 去掉这三连就好了 ？？？？？？
+//#define DEBUG
+//#endif
 #ifdef DEBUG
 	std::cout << "===-------------- string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
