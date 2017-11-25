@@ -162,7 +162,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both interfaces. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			} else {							// a2. klass is a normal class
@@ -171,7 +171,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is interface but klass " << klass->get_name() << " is normal class. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			}
@@ -182,7 +182,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is normal class but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			} else {							// b2. klass is a normal class, too
@@ -191,7 +191,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			}
@@ -204,7 +204,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is a normal classes. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			} else {								// c2. klass is an interface		// Please see JLS $4.10.3	// array default implements: 1. java/lang/Cloneable  2. java/io/Serializable
@@ -213,7 +213,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 				} else {
 					result = false;
 				}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is an array but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			}
@@ -228,7 +228,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			} else {
 				result = false;
 			}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both arrays. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			return result;
@@ -249,7 +249,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			} else {
 				result = false;
 			}
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " and klass " << klass->get_name() << " are both arrays. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			return result;
@@ -301,7 +301,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	uint8_t * & pc = jvm.pc;
 	pc = code_begin;
 
-//	std::cout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
+	std::cout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
 
 	while (pc < code_begin + code_length) {
 		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
@@ -313,7 +313,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 			case 0x01:{		// aconst_null
 				op_stack.push(0);		// TODO: 我只压入了 0.
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push null on stack." << std::endl;
 #endif
 				break;
@@ -321,56 +321,56 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 			case 0x03:{		// iconst_0
 				op_stack.push(new IntOop(0));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 0 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x04:{		// iconst_1
 				op_stack.push(new IntOop(1));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 1 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x05:{		// iconst_2
 				op_stack.push(new IntOop(2));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 2 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x06:{		// iconst_3
 				op_stack.push(new IntOop(3));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 3 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x07:{		// iconst_4
 				op_stack.push(new IntOop(4));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 4 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x08:{		// iconst_5
 				op_stack.push(new IntOop(5));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int 5 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x09:{		// lconst_0
 				op_stack.push(new LongOop(0));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push long 0 on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x0a:{		// lconst_1
 				op_stack.push(new LongOop(1));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push long 1 on stack." << std::endl;
 #endif
 				break;
@@ -378,7 +378,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 			case 0x10: {		// bipush
 				op_stack.push(new ByteOop(pc[1]));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push byte " << (int)(((ByteOop *)op_stack.top())->value) << " on stack." << std::endl;
 #endif
 				break;
@@ -395,19 +395,19 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				if (rt_pool[rtpool_index-1].first == CONSTANT_Integer) {
 					int value = boost::any_cast<int>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new IntOop(value));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push int: "<< value << "on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Float) {
 					float value = boost::any_cast<float>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new FloatOop(value));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push float: "<< value << "on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_String) {
 					InstanceOop *stringoop = (InstanceOop *)boost::any_cast<Oop *>(rt_pool[rtpool_index-1].second);
 					op_stack.push(stringoop);
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	// for string:
 	std::wcout << java_lang_string::print_stringOop(stringoop) << std::endl;
 #endif
@@ -415,7 +415,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
 					assert(klass->get_mirror() != nullptr);
 					op_stack.push(klass->get_mirror());		// push into [Oop*] type.
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::wcout << "(DEBUG) push class: "<< klass->get_name() << "'s mirror "<< "on stack." << std::endl;
 #endif
 				} else {
@@ -430,13 +430,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				if (rt_pool[rtpool_index-1].first == CONSTANT_Double) {
 					double value = boost::any_cast<double>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new DoubleOop(value));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push double: "<< value << "on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Long) {
 					long value = boost::any_cast<long>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new LongOop(value));
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push long: "<< value << "on stack." << std::endl;
 #endif
 				} else {
@@ -448,7 +448,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 iload_0~3.
 				op_stack.push(localVariableTable[index]);
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push localVariableTable[" << index << "] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
@@ -457,20 +457,20 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
 				op_stack.push(localVariableTable[index]);
-#ifdef DEBUG
+#ifdef ENGINE_DEBUG
 	std::cout << "(DEBUG) push localVariableTable[" << index << "] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
-			case 0x17:{		// fload
-				int index = pc[1];
-				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
-				op_stack.push(localVariableTable[index]);
-#ifdef DEBUG
-	std::cout << "(DEBUG) push localVariableTable[" << index << "] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
-#endif
-				break;
-			}
+//			case 0x17:{		// fload
+//				int index = pc[1];
+//				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+//				op_stack.push(localVariableTable[index]);
+//#ifdef DEBUG		// 去掉这一段，bus error bug 匪夷所思地消失了... 然而程序根本没走到这啊？？？？！！到底是什么情况？？？？
+//	std::cout << "(DEBUG) push localVariableTable[" << index << "] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+//#endif
+//				break;
+//			}
 
 
 			case 0x19:{		// aload
