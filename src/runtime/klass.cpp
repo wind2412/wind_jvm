@@ -582,6 +582,13 @@ bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
 bool InstanceKlass::check_interfaces(const wstring & signature)
 {
 	if (this->interfaces.find(signature) != this->interfaces.end())	return true;
+	else {
+		for (auto iter : this->interfaces) {		// recursive
+			if (iter.second->check_interfaces(signature)) {
+				return true;
+			}
+		}
+	}
 	return false;
 }
 

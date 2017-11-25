@@ -37,11 +37,64 @@ void JVM_NanoTime(list<Oop *> & _stack){				// static
 }
 void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 	Oop *obj1 = (Oop *)_stack.front();	_stack.pop_front();
-	IntOop *i1 = (IntOop *)_stack.front();	_stack.pop_front();
+	int src_pos = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	Oop *obj2 = (Oop *)_stack.front();	_stack.pop_front();
-	IntOop *i2 = (IntOop *)_stack.front();	_stack.pop_front();
-	IntOop *i3 = (IntOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	int dst_pos = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	int length = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+	if (obj1 == obj2) {
+		ArrayOop *objarr = (ArrayOop *)obj1;
+		// memcpy has bugs so, we can't copy directly. => first alloc
+		ArrayOop temp(*objarr);	// copy for one layer. deep copy its member variable for only one layer.
+		for (int i = 0; i < length; i ++) {
+			assert(src_pos + i < objarr->get_length() && dst_pos + i < objarr->get_length());	// TODO: ArrayIndexOutofBound
+			(*objarr)[dst_pos + i] = temp[src_pos + i];
+		}
+	} else if (obj1->get_ooptype() == OopType::_TypeArrayOop) {
+		assert(obj2->get_ooptype() == OopType::_TypeArrayOop);
+		TypeArrayOop *objarr1 = (TypeArrayOop *)obj1;
+		TypeArrayOop *objarr2 = (TypeArrayOop *)obj2;
+		assert(objarr1->get_dimension() == objarr2->get_dimension());
+		for (int i = 0; i < length; i ++) {
+			assert(src_pos + i < objarr1->get_length() && dst_pos + i < objarr2->get_length());	// TODO: ArrayIndexOutofBound
+			(*objarr2)[dst_pos + i] = (*objarr1)[src_pos + i];
+		}
+	} else if (obj1->get_ooptype() == OopType::_ObjArrayOop) {
+		assert(obj2->get_ooptype() == OopType::_ObjArrayOop);
+		ObjArrayOop *objarr1 = (ObjArrayOop *)obj1;
+		ObjArrayOop *objarr2 = (ObjArrayOop *)obj2;
+		assert(objarr1->get_dimension() == objarr2->get_dimension());
+		assert(src_pos + length < objarr1->get_length() && dst_pos + length < objarr2->get_length());	// TODO: ArrayIndexOutofBound
+		// 1. src has same element of dst, 2. or is sub_type of dst, 3. all the copy part are null.
+		auto src_klass = std::static_pointer_cast<ObjArrayKlass>(objarr1->get_klass())->get_element_klass();
+		auto dst_klass = std::static_pointer_cast<ObjArrayKlass>(objarr2->get_klass())->get_element_klass();
+		if (src_klass == dst_klass || src_klass->check_parent(dst_klass) || src_klass->check_interfaces(dst_klass)) {		// 1 or 2
+			// directly copy
+			for (int i = 0; i < length; i ++) {
+				(*objarr2)[dst_pos + i] = (*objarr1)[src_pos + i];
+			}
+		} else {
+			bool splice_all_null = true;
+			for (int i = 0; i < length; i ++) {
+				if (!((*objarr1)[src_pos + i] == nullptr)) {
+					splice_all_null = false;
+					break;
+				}
+			}
+			if (splice_all_null) {		// 3.
+				for (int i = 0; i < length; i ++) {
+					(*objarr2)[dst_pos + i] = nullptr;
+				}
+			} else {
+				assert(false);
+			}
+		}
+	} else {
+		assert(false);
+	}
+#ifdef DEBUG
+	std::wcout << "copy from objarray1[" << src_pos << "] to objarray2[" << dst_pos << "] for length: [" << length << "]." << std::endl;
+#endif
 }
 void JVM_IdentityHashCode(list<Oop *> & _stack){		// static
 	Oop *obj = (Oop *)_stack.front();	_stack.pop_front();

@@ -22,6 +22,11 @@ InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::
 	klass->initialize_field(klass->fields_layout, this->fields);
 }
 
+InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.field_length), fields(new Oop*[this->field_length])	// TODO: not gc control......
+{
+	memcpy(this->fields, rhs.fields, sizeof(Oop *) * this->field_length);		// shallow copy
+}
+
 bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
@@ -69,6 +74,10 @@ MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who)			// 注意：在使用 lld
 					  mirrored_who(mirrored_who){}
 
 /*===----------------  TypeArrayOop  -------------------===*/
+ArrayOop::ArrayOop(const ArrayOop & rhs) : Oop(rhs), length(rhs.length), buf(new Oop*[this->length])	// TODO: not gc control......
+{
+	memcpy(this->buf, rhs.buf, sizeof(Oop *) * this->length);		// shallow copy
+}
 
 /*===----------------  BasicTypeOop  -------------------===*/
 uint64_t BasicTypeOop::get_value()

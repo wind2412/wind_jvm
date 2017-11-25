@@ -58,6 +58,7 @@ public:
 	void leave_monitor() { m.leave(); }
 public:
 	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
+	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
@@ -66,6 +67,7 @@ private:
 	Oop **fields = nullptr;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
+	InstanceOop(const InstanceOop & rhs);		// shallow copy
 public:		// 以下 8 个方法全部用来赋值。
 	bool get_field_value(shared_ptr<Field_info> field, Oop **result);
 	void set_field_value(shared_ptr<Field_info> field, Oop *value);
@@ -102,6 +104,7 @@ protected:
 	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
 public:
 	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
+	ArrayOop(const ArrayOop & rhs);
 	int get_length() { return length; }
 	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
 	Oop* & operator[] (int index) {
