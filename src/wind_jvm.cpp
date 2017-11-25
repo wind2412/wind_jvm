@@ -15,7 +15,7 @@
 #include "runtime/thread.hpp"
 #include <boost/regex.hpp>
 
-auto scapegoat = [](void *pp) -> void *{
+void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
 	real->jvm->start(*real->arg);
 	return nullptr;
@@ -177,9 +177,12 @@ void wind_jvm::execute()
 }
 
 Oop * wind_jvm::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
+	// for defense:
+	int frame_num = this->vm_stack.size();
 	this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
 	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
 	this->vm_stack.pop_back();
+	assert(frame_num == this->vm_stack.size());
 	return result;
 }
 

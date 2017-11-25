@@ -266,7 +266,7 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 {
 	if (new_klass->get_state() == Klass::KlassState::NotInitialized) {
 		std::wcout << "initializing <class>: [" << new_klass->get_name() << "]" << std::endl;
-		new_klass->set_state(Klass::KlassState::Initializing);
+		new_klass->set_state(Klass::KlassState::Initializing);		// important.
 		// recursively initialize its parent first !!!!! So java.lang.Object must be the first !!!
 		if (new_klass->get_parent() != nullptr)	// prevent this_klass is the java.lang.Object.
 			BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(new_klass->get_parent()), jvm);
@@ -276,7 +276,6 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 		std::wcout << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;
 		shared_ptr<Method> clinit = new_klass->get_this_class_method(L"<clinit>:()V");		// **IMPORTANT** only search in this_class for `<clinit>` !!!
 		if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。
-			new_klass->set_state(Klass::KlassState::Initializing);		// important.
 			jvm.add_frame_and_execute(clinit, {});		// no return value
 		} else {
 			std::cout << "(DEBUG) no <clinit>." << std::endl;
@@ -289,6 +288,7 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 
 Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
+	assert(&cur_frame == &jvm.vm_stack.back());
 	shared_ptr<Method> method = cur_frame.method;
 	uint32_t code_length = method->get_code()->code_length;
 	stack<Oop *> & op_stack = cur_frame.op_stack;
@@ -916,11 +916,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				} else if (*pc == 0xa1) {
 					judge = (value1 < value2);
 				} else if (*pc == 0xa2) {
-					judge = (value1 <= value2);
-				} else if (*pc == 0xa3) {				// mdzz 这里全都没改然后出了 EXC_BAD_ACCESS Code = 2 错误......
+//					judge = (value1 <= value2);			// delete
+					judge = (value1 >= value2);			// real
+				} else if (*pc == 0xa3) {					// mdzz 这里全都没改然后出了 EXC_BAD_ACCESS Code = 2 错误......
 					judge = (value1 > value2);
 				} else {
-					judge = (value1 >= value2);
+//					judge = (value1 >= value2);			// delete
+					judge = (value1 <= value2);			// real
 				}
 
 				if (judge) {	// if true, jump to the branch_pc.
