@@ -217,7 +217,8 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 	assert(false);	// 不知道能不能用的上
 	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
 	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
-	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
+//	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
+	bool initialize = ((IntOop *)_stack.front())->value;	_stack.pop_front();		// 虚拟机内部全都使用 Int！！
 	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
 	// the fourth argument is not needed ?
 	if (loader != nullptr) {
@@ -323,7 +324,7 @@ void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	// TODO: 我默认禁止了断言！！ assert 是没有用的。默认是不加 -ea （逃
 	// TODO: 关于 assert 字节码的生成，还没有搞清楚。搞清楚了之后立马加上。也可以参见 hotspot: vm/prims/jvm.cpp:2230 --> JVM_DesiredAssertionStatus.
-	_stack.push_back(new BooleanOop(false));
+	_stack.push_back(new IntOop(false));		// 虚拟机内部全使用 Int！！
 }
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

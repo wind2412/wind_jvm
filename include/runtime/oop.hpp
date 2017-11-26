@@ -145,30 +145,30 @@ public:
 
 class BasicTypeOop : public Oop {
 private:
-	Type type;	// only allow for BYTE, BOOLEAN, CHAR, SHORT, INT, FLOAT, LONG, DOUBLE.
+	Type type;	// only allow for CHAR, INT, FLOAT, LONG, DOUBLE.		[BYTE, BOOLEAN and SHORT are all INT!!!]
 public:
 	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
 	Type get_type() { return type; }
 };
 
-struct ByteOop : public BasicTypeOop {
-	int8_t value;		// data		// 全都有符号......！！
-	ByteOop(int8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
-};
-
-struct BooleanOop : public BasicTypeOop {
-	bool value;		// data
-	BooleanOop(bool value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
-};
+//struct ByteOop : public BasicTypeOop {
+//	int8_t value;		// data		// 全都有符号......！！
+//	ByteOop(int8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
+//};
+//
+//struct BooleanOop : public BasicTypeOop {
+//	bool value;		// data
+//	BooleanOop(bool value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
+//};
+//
+//struct ShortOop : public BasicTypeOop {
+//	short value;		// data
+//	ShortOop(short value) : BasicTypeOop(Type::SHORT), value(value) {}
+//};
 
 struct CharOop : public BasicTypeOop {
 	wchar_t value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......
 	CharOop(wchar_t value) : BasicTypeOop(Type::CHAR), value(value) {}
-};
-
-struct ShortOop : public BasicTypeOop {
-	short value;		// data
-	ShortOop(short value) : BasicTypeOop(Type::SHORT), value(value) {}
 };
 
 struct IntOop : public BasicTypeOop {

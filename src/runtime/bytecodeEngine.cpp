@@ -146,19 +146,13 @@ wstring BytecodeEngine::get_real_value(Oop *oop)
 	if (oop->get_klass() == nullptr) {		// basic type oop.
 		switch (((BasicTypeOop *)oop)->get_type()) {
 			case Type::BYTE:
-				ss << ((ByteOop *)oop)->value;
-				break;
 			case Type::BOOLEAN:
-				ss << ((BooleanOop *)oop)->value;
+			case Type::SHORT:
+			case Type::INT:
+				ss << ((IntOop *)oop)->value;
 				break;
 			case Type::CHAR:
 				ss << ((CharOop *)oop)->value;
-				break;
-			case Type::SHORT:
-				ss << ((ShortOop *)oop)->value;
-				break;
-			case Type::INT:
-				ss << ((IntOop *)oop)->value;
 				break;
 			case Type::FLOAT:
 				ss << ((FloatOop *)oop)->value;
@@ -313,7 +307,7 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 }
 
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
-
+// TODO: 注意！！以下，所有代码，不应该出现 ByteOop、BooleanOop、ShortOop ！！ 取而代之的应当是 IntOop ！！
 Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
 	assert(&cur_frame == &jvm.vm_stack.back());
@@ -433,7 +427,14 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
+			case 0x11:{		// sipush
+				short val = ((pc[1] << 8) | pc[2]);
+				op_stack.push(new IntOop(val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push short " << ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x12:		// ldc
 			case 0x13:{		// ldc_w
 				int rtpool_index;
@@ -576,7 +577,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::LONG);
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[0] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[0] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
 				break;
 			}
@@ -584,7 +585,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::LONG);
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[1] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[1] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
 				break;
 			}
@@ -592,7 +593,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::LONG);
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG						// 是的，还有这里也是！去掉之后就没事。但是会触发另一个非常诡异的 segmentation fault. linux 平台没有此现象......
-	std::wcout << "(DEBUG) push localVariableTable[2] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[2] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
 				break;
 			}
@@ -600,7 +601,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::LONG);
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[3] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[3] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
 				break;
 			}
@@ -608,7 +609,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::FLOAT);
 				op_stack.push(localVariableTable[0]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[0] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[0] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
 				break;
 			}
@@ -616,7 +617,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::FLOAT);
 				op_stack.push(localVariableTable[1]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[1] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[1] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
 				break;
 			}
@@ -624,7 +625,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::FLOAT);
 				op_stack.push(localVariableTable[2]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[2] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[2] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
 				break;
 			}
@@ -632,7 +633,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::FLOAT);
 				op_stack.push(localVariableTable[3]);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push localVariableTable[3] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push localVariableTable[3] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
 				break;
 			}
@@ -915,9 +916,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x60:{		// iadd
-				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
-				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val2 + val1));
 #ifdef DEBUG
@@ -925,12 +926,23 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x61:{		// ladd
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val2 + val1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) add long value from stack: "<< val2 << " + " << val1 << " and put " << (val2+val1) << " on stack." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x64:{		// isub
-				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
-				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val1 - val2));
 #ifdef DEBUG
@@ -982,7 +994,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x78:{		// ishl
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				int s = (val2 & 0x1F);
 				op_stack.push(new IntOop(val1 << s));
@@ -991,10 +1005,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x79:{		// lshl
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				int s = (val2 & 0x3F);
+				op_stack.push(new LongOop(val1 << s));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val1 << " << " << s << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x7a:{		// ishr
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				int s = (val2 & 0x1F);
 				op_stack.push(new IntOop(val1 >> s));
@@ -1006,7 +1034,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x7c:{		// iushr
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 
 				int s = (val2 & 0x1F);
@@ -1023,7 +1053,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 
 			case 0x7e:{		// iand
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val2 & val1));
 #ifdef DEBUG
@@ -1031,10 +1063,23 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
+			case 0x7f:{		// land
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val2 & val1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val2 << " & " << val1 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x82:{		// ixor
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val2 ^ val1));
 #ifdef DEBUG
@@ -1043,7 +1088,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				break;
 			}
 			case 0x83:{		// lxor
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new LongOop(val2 ^ val1));
 #ifdef DEBUG
@@ -1053,7 +1100,17 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x85:{		// i2l
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop((long)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert int: [" << val << "] to long: [" << ((LongOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x86:{		// i2f
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new FloatOop((float)val));
 #ifdef DEBUG
@@ -1063,9 +1120,41 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x8b:{		// f2i		// TODO: 和 fmul, getField, setField 一样，没有做 Spec $2.8.3 FP Strict!!
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+
+				if (val == FLOAT_NAN) {
+					op_stack.push(new IntOop(0));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert float: [FLOAT_NAN] to int: [0]." << std::endl;
+#endif
+				} else if (val == FLOAT_INFINITY) {
+					op_stack.push(new IntOop(INT_MAX));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert float: [FLOAT_INFINITY] to int: [INT_MAX]." << std::endl;
+#endif
+				} else if (val == FLOAT_NEGATIVE_INFINITY) {
+					op_stack.push(new IntOop(INT_MIN));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert float: [FLOAT_NEGATIVE_INFINITY] to int: [INT_MIN]." << std::endl;
+#endif
+				} else {
+					op_stack.push(new IntOop((int)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert float: [" << val << "f] to int: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				}
+
+				break;
+			}
+
+
 			case 0x95:		// fcmp_l
 			case 0x96:{		// fcmp_g
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val1 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
 
 #ifdef DEBUG
@@ -1101,6 +1190,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x9d:		// ifgt
 			case 0x9e:{		// ifle
 				short branch_pc = ((pc[1] << 8) | pc[2]);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int int_value = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
 				if (*pc == 0x99) {
@@ -1140,7 +1230,9 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0xa3:		// if_icmpgt
 			case 0xa4:{		// if_icmple
 				short branch_pc = ((pc[1] << 8) | pc[2]);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int value2 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int value1 = ((IntOop*)op_stack.top())->value;	op_stack.pop();
 				bool judge;
 				if (*pc == 0x9f) {
@@ -1213,6 +1305,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0xac:{		// ireturn
 				// TODO: monitor...
 				jvm.pc = backup_pc;
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
@@ -1221,8 +1314,29 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0xae:{		// freturn
+				jvm.pc = backup_pc;
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) return an float value from stack: "<< ((FloatOop*)op_stack.top())->value << "f" << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+#endif
+				return op_stack.top();	// float
+			}
+			case 0xaf:{		// dreturn
+				jvm.pc = backup_pc;
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) return an double value from stack: "<< ((DoubleOop*)op_stack.top())->value << "ld"<< std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+#endif
+				return op_stack.top();	// double
+				break;
+			}
+
+
 			case 0xb0:{		// areturn
-				// TODO: monitor...
+				// TODO: monitor... 我在 invokeStatic 那些方法里边 monitorexit 了。相比于在这里，会有延迟。最后在解决。
 				jvm.pc = backup_pc;
 				Oop *oop = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
@@ -1353,7 +1467,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				}
 				// 2. get ref.
 				assert(ref != nullptr);			// `this` must not be nullptr!!!!
-				std::wcout << "(DEBUG) " << ref->get_klass()->get_name() << "::" << signature << std::endl;	// msg
+#ifdef DEBUG
+				std::wcout << "(DEBUG)";
+				if (new_method->is_private()) {
+					std::wcout << " [private]";
+				}
+				if (new_method->is_static()) {
+					std::wcout << " [static]";
+				}
+				std::wcout << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
+#endif
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
 				shared_ptr<Method> target_method;
 				if (*pc == 0xb6){
@@ -1429,7 +1552,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				// initialize the new_class... <clinit>
 				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
 				initial_clinit(new_klass, jvm);
-				std::wcout << "(DEBUG) " << new_klass->get_name() << "::" << signature << std::endl;	// msg
+#ifdef DEBUG
+				std::wcout << "(DEBUG)";
+				if (new_method->is_private()) {
+					std::wcout << " [private]";
+				}
+				if (new_method->is_static()) {
+					std::wcout << " [static]";
+				}
+				std::wcout << " " << new_klass->get_name() << "::" << signature << std::endl;
+#endif
 				// parse arg list and push args into stack: arg_list !
 				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
 				if (*pc == 0xb7) {

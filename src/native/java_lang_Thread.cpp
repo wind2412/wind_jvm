@@ -80,7 +80,7 @@ void JVM_Interrupt(list<Oop *> & _stack){
 }
 void JVM_IsInterrupted(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	BooleanOop *b1 = (BooleanOop *)_stack.front();	_stack.pop_front();
+//	BooleanOop *b1 = (BooleanOop *)_stack.front();	_stack.pop_front();			// 错！！jvm 中不能出现 BooleanOop !!!用 IntOop 代替！
 	assert(false);
 }
 void JVM_HoldsLock(list<Oop *> & _stack){		// static, no this...

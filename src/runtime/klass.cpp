@@ -492,22 +492,16 @@ void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr
 				// is a basic type !!!
 				switch (type[0]) {
 					case L'B':	// byte
-						fields[offset] = new ByteOop(0);
+					case L'Z':	// boolean
+					case L'S':	// short
+					case L'I':	// int
+						fields[offset] = new IntOop(0);
 						break;
 					case L'C':	// char
 						fields[offset] = new CharOop(0);
 						break;
 					case L'F':	// float
 						fields[offset] = new FloatOop(0);
-						break;
-					case L'I':	// int
-						fields[offset] = new IntOop(0);
-						break;
-					case L'S':	// short
-						fields[offset] = new ShortOop(0);
-						break;
-					case L'Z':	// boolean
-						fields[offset] = new BooleanOop(0);
 						break;
 					case L'D':	// double
 						fields[offset] = new DoubleOop(0);
@@ -663,12 +657,11 @@ ArrayOop* ArrayKlass::new_instance(int length)
 		} else {		// allocate basic type...
 			Type basic_type = ((TypeArrayKlass *)this)->get_basic_type();
 			switch (basic_type) {
-				case Type::BOOLEAN:{
-					(*oop)[i] = new BooleanOop(0);		// default value
-					break;
-				}
-				case Type::BYTE:{
-					(*oop)[i] = new ByteOop(0);		// default value
+				case Type::BOOLEAN:					// 我全用 int[] 处理了。
+				case Type::BYTE:
+				case Type::SHORT:
+				case Type::INT:{
+					(*oop)[i] = new IntOop(0);		// default value
 					break;
 				}
 				case Type::CHAR:{
@@ -683,16 +676,8 @@ ArrayOop* ArrayKlass::new_instance(int length)
 					(*oop)[i] = new FloatOop(0);		// default value
 					break;
 				}
-				case Type::INT:{
-					(*oop)[i] = new IntOop(0);		// default value
-					break;
-				}
 				case Type::LONG:{
 					(*oop)[i] = new LongOop(0);		// default value
-					break;
-				}
-				case Type::SHORT:{
-					(*oop)[i] = new ShortOop(0);		// default value
 					break;
 				}
 				default:{
