@@ -6,6 +6,7 @@
  */
 
 #include "native/java_lang_Class.hpp"
+#include "native/java_lang_String.hpp"
 #include "runtime/klass.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
@@ -202,113 +203,118 @@ static unordered_map<wstring, void*> methods = {
 
 // TODO: 调查他们哪个是 static！！
 void JVM_GetClassName(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
+	assert(_this != nullptr);
+	Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
+#ifdef DEBUG
+	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::print_stringOop((InstanceOop *)str) << "]." << std::endl;
+#endif
+	_stack.push_back(str);
 }
 void JVM_ForClassName(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetSuperClass(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassInterfaces(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassLoader(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_IsInterface(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_IsInstance(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_IsAssignableFrom(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassSigners(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_SetClassSigners(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_IsArrayClass(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_IsPrimitiveClass(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetComponentType(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassModifiers(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetProtectionDomain(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetDeclaredClasses(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetDeclaringClass(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassSignature(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassAnnotations(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassConstantPool(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	// TODO: 我默认禁止了断言！！ assert 是没有用的。默认是不加 -ea （逃
 	// TODO: 关于 assert 字节码的生成，还没有搞清楚。搞清楚了之后立马加上。也可以参见 hotspot: vm/prims/jvm.cpp:2230 --> JVM_DesiredAssertionStatus.
 	_stack.push_back(new BooleanOop(false));
 }
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetClassTypeAnnotations(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 void JVM_GetPrimitiveClass(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
 
