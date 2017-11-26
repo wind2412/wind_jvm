@@ -214,7 +214,6 @@ void JVM_GetClassName(list<Oop *> & _stack){
 	_stack.push_back(str);
 }
 void JVM_ForClassName(list<Oop *> & _stack){		// static
-	assert(false);	// 不知道能不能用的上
 	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
 	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 //	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
@@ -226,7 +225,7 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 		assert(false);
 	} else {
 		std::wcout << klass_name << std::endl;
-		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name + L".class");
+		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);
 		assert(klass != nullptr);		// wrong. Because user want to load a non-exist class.
 		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
 		if (initialize) {

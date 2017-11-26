@@ -14,6 +14,7 @@
 
 static unordered_map<wstring, void*> methods = {
     {L"doPrivileged:(" PA ")" OBJ,				(void *)&JVM_DoPrivileged},
+    {L"doPrivileged:(" PEA ")" OBJ,				(void *)&JVM_DoPrivileged},
     {L"getStackAccessControlContext:()" ACC,		(void *)&JVM_GetStackAccessControlContext},
 };
 
@@ -27,6 +28,9 @@ void JVM_DoPrivileged(list<Oop *> & _stack){		// static
 	shared_ptr<Method> method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" VOD);		// TODO: 我这里看来不支持泛型啊......
 	if (method == nullptr) {
 		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
+		if (method == nullptr) {
+			method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" FLD);
+		}
 	}
 	assert(method != nullptr);
 	Oop *result = vm.add_frame_and_execute(method, {pa});		// load the `this` obj

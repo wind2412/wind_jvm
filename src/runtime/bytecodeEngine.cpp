@@ -1533,6 +1533,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #ifdef DEBUG
 	std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 #endif
+						arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeVirtual 和 invokeInterface，所以应该 ref 指向的是真的。
 						arg_list.push_back((Oop *)&jvm);
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
@@ -1603,7 +1604,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				std::wcout << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
 				list<Oop *> arg_list;
 				assert(op_stack.size() >= size);
+				Oop *ref = nullptr;
 				while (size > 0) {
+					if (size == 1 && *pc == 0xb7) {
+						ref = op_stack.top();
+					}
 					arg_list.push_front(op_stack.top());
 					op_stack.pop();
 					size --;
@@ -1639,6 +1644,10 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	else if (*pc == 0xb8)
 		std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
+						if (*pc == 0xb7)
+							arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
+						else
+							arg_list.push_back(new_method->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
 						arg_list.push_back((Oop *)&jvm);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;

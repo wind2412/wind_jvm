@@ -63,7 +63,7 @@ public:
 //#ifndef DEBUG		// 查了半天得到结论，应该是 mac 系统内部以及 clang++ 内部的共同的 bug 造成的吧。
 //#define DEBUG
 //#endif
-#ifdef DEBUG
+#ifdef STRING_DEBUG
 	std::wcout << "===-------------- origin string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
 		std::wcout << java_lang_string::print_stringOop((InstanceOop *)iter) << std::endl;	// TODO: map 的 iter 是 pair... set 的 iter 就是元素自身..... 都忘光了......
@@ -72,12 +72,12 @@ public:
 #endif
 		if (iter == java_lang_string::get_string_table().end()) {
 			java_lang_string::get_string_table().insert(stringoop);
-#ifdef DEBUG
+#ifdef STRING_DEBUG
 	std::wcout << java_lang_string::print_stringOop((InstanceOop *)stringoop) << std::endl;
 #endif
 			return stringoop;
 		} else {
-#ifdef DEBUG
+#ifdef STRING_DEBUG
 	std::wcout << java_lang_string::print_stringOop((InstanceOop *)*iter) << std::endl;
 #endif
 			return *iter;

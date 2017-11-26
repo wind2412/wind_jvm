@@ -36,6 +36,7 @@ using std::function;
 #define CTR L"Ljava/lang/reflect/Constructor;"
 #define PD  L"Ljava/security/ProtectionDomain;"
 #define PA  L"Ljava/security/PrivilegedAction;"
+#define PEA L"Ljava/security/PrivilegedExceptionAction;"
 #define ACC L"Ljava/security/AccessControlContext;"
 #define VOD L"Ljava/lang/Void;"
 #define BA  "[B"
