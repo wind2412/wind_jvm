@@ -573,17 +573,20 @@ bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
 	return check_interfaces(klass->get_name());
 }
 
-bool InstanceKlass::check_interfaces(const wstring & signature)
+bool InstanceKlass::check_interfaces(const wstring & signature)		// 查看此 InstanceKlass **是否实现了** signature 代表的 Interface.
 {
+	// 1. find in this class of the interface
 	if (this->interfaces.find(signature) != this->interfaces.end())	return true;
 	else {
+		// 2. find in this class's interfaces (recursively) for the interface
 		for (auto iter : this->interfaces) {		// recursive
 			if (iter.second->check_interfaces(signature)) {
 				return true;
 			}
 		}
 	}
-	return false;
+	// 3. then if `this`'s parent has the interface, also okay.
+	return std::static_pointer_cast<InstanceKlass>(this->get_parent())->check_interfaces(signature);
 }
 
 shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
