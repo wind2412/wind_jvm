@@ -58,6 +58,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 		// load String.class
 		auto string_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"));
 
+
 		// 1. create a [half-completed] Thread obj, using the ThreadGroup obj.(for currentThread(), this must be create first!!)
 		auto thread_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Thread"));
 		// TODO: 要不要放到全局？
@@ -68,6 +69,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 		init_thread->set_field_value(L"priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
 		// add this Thread obj to ThreadTable!!!	// ......在这里放入的 init_thread 并没有初始化完全。因为它还没有执行构造函数。不过，那也必须放到表中了。因为在 <init> 执行的时候，内部有其他的类要调用 currentThread...... 所以不放入表中不行啊......
 		ThreadTable::add_a_thread(pthread_self(), init_thread);
+
 
 		// 2. create a [System] ThreadGroup obj.
 		auto threadgroup_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/ThreadGroup"));
@@ -84,7 +86,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 			this->add_frame_and_execute(target_method, list);
 		}
 
-		// 3. create a [Main] ThreadGroup obj.
+		// 3. INCOMPLETELY create a [Main] ThreadGroup obj.
 		InstanceOop *main_threadgroup = threadgroup_klass->new_instance();
 		{
 			// inject it into `init_thread`!! 否则，届时在 java/lang/SecurityManager <clinit> 时，会自动 getCurrentThread --> get 到 main_threadgroup --> get 到 system_threadgroup. 所以必须先行注入。
@@ -92,6 +94,34 @@ void wind_jvm::start(const vector<wstring> & argv)
 			init_thread->set_field_value(L"group:Ljava/lang/ThreadGroup;", main_threadgroup);
 		}
 		assert(this->vm_stack.size() == 0);
+
+		// load System.class		// 需要在 Main ThreadGroup 之前执行。因为它的初始化会调用 System。因而会自动触发 <clinit> 的。需要提前把 System.class 设为 initialized.
+		// 这里要 hack 一下。不执行 System.<clinit> 了，而是手动执行。因为 Java 类库当中的 java/lang/System 这个类，在 <clinit> 中由于 putStatic，
+		// 会自动执行 java/lang/Console 的 <clinit>。而这个 <clinit> 会执行 <sun/misc/JavaLangAccess>registerShutdownHook:(IZLjava/lang/Runnable;)V invokeInterface 方法。
+		// 但是，真正的引用指向的是 null！！因为这个 sun/misc/JavaLangAccess 引用是经过 java/lang/System::initializeSystemClass() 来设置的......
+		// 然而，System 没有执行 <clinit>，是不可能执行方法的......至少在我这里是这样。
+		// 虽然看不太明白 openjdk 是怎么搞定这个环节的......主要是因为 openjdk 的 initialize_impl() 方法太长（逃......。不过这个循环依赖的问题也可以依靠 hack 来解决。
+		// System <clinit> 中仅仅执行了：java/io/InputStream::<clinit>, java/io/PrintStream::<clinit>, Ljava/lang/SecurityManager::<clinit>。
+		// 然后把 System 中的 static 变量：out, in, err 设成 null。也就是初始化打印设备。
+		// 然而我这里引用默认是 null。所以不用初始化。因此只要执行 <clinit> 原谅三连就行。
+		// 那么就让我们开始吧。仅仅 loadClass 而不 initial_clinit，即仅仅 load class，而不执行 system 的 <clinit>。
+		auto system_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System"));
+		system_klass->set_state(Klass::KlassState::Initializing);
+//		BytecodeEngine::initial_clinit(system_klass, *this);
+		auto InputStream_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/InputStream"));
+		BytecodeEngine::initial_clinit(InputStream_klass, *this);
+		auto PrintStream_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/PrintStream"));
+		BytecodeEngine::initial_clinit(PrintStream_klass, *this);
+		auto SecurityManager_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/SecurityManager"));
+		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
+		system_klass->set_state(Klass::KlassState::Initialized);		// set state.
+		// invoke the method...
+		shared_ptr<Method> _initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
+		this->add_frame_and_execute(_initialize_system_class, {});
+
+		assert(false);
+
+		// 3.5 COMPLETELY create the [Main] ThreadGroup obj.
 		{	// 注意：这里创建了针对此 main 的第二个 System ThreadGroup !!用第一个 System ThreadGroup 作为参数！
 			// TODO: pthread_mutex!!
 			std::list<Oop *> list;
@@ -106,6 +136,8 @@ void wind_jvm::start(const vector<wstring> & argv)
 			this->add_frame_and_execute(target_method, list);
 		}
 
+		std::wcout << "this is overrrrrr!!" << std::endl;		// delete
+
 		// 4. [complete] the Thread obj using the [uncomplete] main_threadgroup.
 		{
 			std::list<Oop *> list;
@@ -117,6 +149,9 @@ void wind_jvm::start(const vector<wstring> & argv)
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);
 		}
+
+
+
 
 	}
 

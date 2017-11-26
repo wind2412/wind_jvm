@@ -57,8 +57,13 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 	if (is_native)	return;
 	localVariableTable.resize(method->get_code()->max_locals);
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
-	for (Oop * value : list) {		// 这里的 int 就是 int，不是 IntOop ！！因为在字节码范围内的 invoke 那里已经修改。
+	for (Oop * value : list) {
+		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
+		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
+				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
+			localVariableTable.at(i++) = nullptr;
+		}
 	}
 }
 
@@ -835,7 +840,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(op_stack.top()->get_ooptype() == OopType::_ObjArrayOop || op_stack.top()->get_ooptype() == OopType::_TypeArrayOop);
 				ArrayOop *arr = (ArrayOop *)op_stack.top();	op_stack.pop();
 				assert(index < arr->get_length());
-				(*arr)[index] = value;				// 我设置了就指向同一个对象了。我并不会直接操纵改变对象的值，如果值改变了，那么我一定会生成一个新的对象。所以理论上没有问题。
+				(*arr)[index] = new IntOop(value->value);	// 不能指向同一个对象了...。理论上有问题...。
 #ifdef DEBUG
 	std::wcout << "(DEBUG) put an int value: [" << value->value << "] into the IntArray[" << index << "]." << std::endl;
 #endif
@@ -993,6 +998,25 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 
+			case 0x70:{		// irem
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+
+				assert(val2 != 0);
+				assert((val1 / val2) * val2 + (val1 % val2) == val1);
+				assert(val1 % val2 == (val1 - (val1 / val2) * val2));
+
+				op_stack.push(new IntOop(val1 % val2));
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val1 << " % " << val2 << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
 			case 0x78:{		// ishl
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -1098,8 +1122,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #endif
 				break;
 			}
-
-
+			case 0x84:{		// iinc
+				int index = pc[1];
+				int _const = (int8_t)pc[2];			// TODO: 这里！！千万小心！！严格按照规范来！！pc[2] 是有符号的！！如果值是 -1，然而我设置的 pc 是 uint_8 ！！直接转成 int 会变成 255！！！必须先变成 int8_t 才是 -1！！！
+				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::INT);
+				((IntOop *)localVariableTable[index])->value += _const;		// TODO: 注意！！这里直接修改，而不是自增了！！上次说要指向同一个的那个...
+#ifdef DEBUG
+	std::wcout << "(DEBUG) localVariableTable[" << index << "] += " << _const << ", now value is [" << ((IntOop *)localVariableTable[index])->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x85:{		// i2l
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
