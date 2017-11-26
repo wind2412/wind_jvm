@@ -149,48 +149,46 @@ private:
 public:
 	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
 	Type get_type() { return type; }
-	uint64_t get_value();
-	void set_value(uint64_t value);
 };
 
 struct ByteOop : public BasicTypeOop {
-	uint8_t value;		// data
-	ByteOop(uint8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
+	int8_t value;		// data		// 全都有符号......！！
+	ByteOop(int8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
 };
 
 struct BooleanOop : public BasicTypeOop {
-	uint8_t value;		// data
-	BooleanOop(uint8_t value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
+	bool value;		// data
+	BooleanOop(bool value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
 };
 
 struct CharOop : public BasicTypeOop {
-	uint32_t value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......
-	CharOop(uint32_t value) : BasicTypeOop(Type::CHAR), value(value) {}
+	wchar_t value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......
+	CharOop(wchar_t value) : BasicTypeOop(Type::CHAR), value(value) {}
 };
 
 struct ShortOop : public BasicTypeOop {
-	uint16_t value;		// data
-	ShortOop(uint16_t value) : BasicTypeOop(Type::SHORT), value(value) {}
+	short value;		// data
+	ShortOop(short value) : BasicTypeOop(Type::SHORT), value(value) {}
 };
 
 struct IntOop : public BasicTypeOop {
-	uint32_t value;		// data
-	IntOop(uint32_t value) : BasicTypeOop(Type::INT), value(value) {}
+	int value;		// data
+	IntOop(int value) : BasicTypeOop(Type::INT), value(value) {}
 };
 
 struct FloatOop : public BasicTypeOop {
 	float value;		// data
-	FloatOop(uint32_t value) : BasicTypeOop(Type::FLOAT), value(value) {}
+	FloatOop(float value) : BasicTypeOop(Type::FLOAT), value(value) {}
 };
 
 struct LongOop : public BasicTypeOop {
-	uint64_t value;		// data
-	LongOop(uint64_t value) : BasicTypeOop(Type::LONG), value(value) {}
+	long value;		// data
+	LongOop(long value) : BasicTypeOop(Type::LONG), value(value) {}
 };
 
 struct DoubleOop : public BasicTypeOop {
 	double value;		// data
-	DoubleOop(uint64_t value) : BasicTypeOop(Type::DOUBLE), value(value) {}
+	DoubleOop(float value) : BasicTypeOop(Type::DOUBLE), value(value) {}
 };
 
 #endif /* INCLUDE_RUNTIME_OOP_HPP_ */

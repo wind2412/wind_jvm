@@ -144,11 +144,39 @@ wstring BytecodeEngine::get_real_value(Oop *oop)
 	if (oop == nullptr) return L"null";
 	wstringstream ss;
 	if (oop->get_klass() == nullptr) {		// basic type oop.
-		ss << ((BasicTypeOop *)oop)->get_value();
-		return ss.str();
-	}
-	ss << oop;
-	return ss.str();		// if it is a ref, return itself.
+		switch (((BasicTypeOop *)oop)->get_type()) {
+			case Type::BYTE:
+				ss << ((ByteOop *)oop)->value;
+				break;
+			case Type::BOOLEAN:
+				ss << ((BooleanOop *)oop)->value;
+				break;
+			case Type::CHAR:
+				ss << ((CharOop *)oop)->value;
+				break;
+			case Type::SHORT:
+				ss << ((ShortOop *)oop)->value;
+				break;
+			case Type::INT:
+				ss << ((IntOop *)oop)->value;
+				break;
+			case Type::FLOAT:
+				ss << ((FloatOop *)oop)->value;
+				break;
+			case Type::LONG:
+				ss << ((LongOop *)oop)->value;
+				break;
+			case Type::DOUBLE:
+				ss << ((DoubleOop *)oop)->value;
+				break;
+			default:{
+				std::cerr << "can't get here!" << std::endl;
+				assert(false);
+			}
+		}
+	} else ss << oop;						// if it is a reference, return itself.
+
+	return ss.str();
 }
 
 bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
@@ -401,7 +429,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x10: {		// bipush
 				op_stack.push(new IntOop(pc[1]));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push byte " << (int)(((IntOop *)op_stack.top())->value) << " on stack." << std::endl;
+	std::wcout << "(DEBUG) push byte " << ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -424,7 +452,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 					float value = boost::any_cast<float>(rt_pool[rtpool_index-1].second);
 					op_stack.push(new FloatOop(value));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) push float: "<< value << "f on stack." << std::endl;
+	std::wcout << "(DEBUG) push float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_String) {
 					InstanceOop *stringoop = (InstanceOop *)boost::any_cast<Oop *>(rt_pool[rtpool_index-1].second);
@@ -683,7 +711,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				op_stack.push(new IntOop(((CharOop *)(*charsequence)[index])->value));
+				op_stack.push(new IntOop((int)((CharOop *)(*charsequence)[index])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((IntOop *)op_stack.top())->value << "'" << std::endl;
 #endif
@@ -852,7 +880,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				(*charsequence)[index] = ch;
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get wchar_t ['" << (wchar_t)ch->value << "'] from the stack to char[]'s position of [" << index << "]" << std::endl;
+	std::wcout << "(DEBUG) get wchar_t ['" << ch->value << "'] from the stack to char[]'s position of [" << index << "]" << std::endl;
 #endif
 				break;
 			}
@@ -1137,6 +1165,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				jvm.pc = backup_pc;
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// boolean, short, char, int
 			}
@@ -1151,6 +1180,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << oop << std::endl;
 	else
 		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 //				assert(method->return_type() == oop->get_klass()->get_name());
 				return oop;	// boolean, short, char, int
@@ -1160,6 +1190,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				jvm.pc = backup_pc;
 #ifdef DEBUG
 	std::wcout << "(DEBUG) only return." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return nullptr;
 			}
@@ -1462,7 +1493,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 			case 0xbc:{		// newarray		// 创建普通的 basic type 数组。
 				int arr_type = pc[1];
-				int length = ((IntOop *)op_stack.top())->get_value();	op_stack.pop();
+				int length = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (length < 0) {	// TODO: 最后要全部换成异常！
 					std::cerr << "array length can't be negative!!" << std::endl;
 					assert(false);
@@ -1530,7 +1561,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				 * ** 产生这种表示法的根本原因在于：jvm 根本就不关心句柄是怎么表示的。它只关心的是真正的对象。句柄的表示是由编译器来关注并 parse 的！！**
 				 */
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
-				int length = ((IntOop *)op_stack.top())->get_value();	op_stack.pop();
+				int length = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (length < 0) {	// TODO: 最后要全部换成异常！
 					std::cerr << "array length can't be negative!!" << std::endl;
 					assert(false);

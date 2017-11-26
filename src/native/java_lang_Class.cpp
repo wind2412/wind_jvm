@@ -11,6 +11,7 @@
 #include "system_directory.hpp"
 #include "classloader.hpp"
 #include "native/native.hpp"
+#include "wind_jvm.hpp"
 
 /*===--------------------- java_lang_class ----------------------===*/
 java_lang_class::mirror_state & java_lang_class::state() {
@@ -172,7 +173,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Cl
 /*===----------------------- Natives ----------------------------===*/
 static unordered_map<wstring, void*> methods = {
     {L"getName0:()" STR,						(void *)&JVM_GetClassName},
-    {L"forName0:()" CLS,						(void *)&JVM_ForClassName},
+    {L"forName0:(" STR L"Z" JCL CLS ")" CLS,	(void *)&JVM_ForClassName},
 //  {L"getSuperclass:()" CLS,				NULL},			// 为啥是 NULL ？？？
     {L"getSuperclass:()" CLS,				(void *)&JVM_GetSuperClass},			// 那我可自己实现了...
     {L"getInterfaces0:()[" CLS,				(void *)&JVM_GetClassInterfaces},
@@ -202,6 +203,7 @@ static unordered_map<wstring, void*> methods = {
 };
 
 // TODO: 调查他们哪个是 static！！
+
 void JVM_GetClassName(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
@@ -211,9 +213,27 @@ void JVM_GetClassName(list<Oop *> & _stack){
 #endif
 	_stack.push_back(str);
 }
-void JVM_ForClassName(list<Oop *> & _stack){
-	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+void JVM_ForClassName(list<Oop *> & _stack){		// static
+	assert(false);	// 不知道能不能用的上
+	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
+	wstring klass_name = java_lang_string::print_stringOop((InstanceOop *)_stack.front());	_stack.pop_front();
+	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
+	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
+	// the fourth argument is not needed ?
+	if (loader != nullptr) {
+		std::wcerr << "Now don't support java/lang/Class::forName()'s argument `loader` is Application loader!! only support BootStrapLoader!!" << std::endl;
+		assert(false);
+	} else {
+		std::wcout << klass_name << std::endl;
+		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name + L".class");
+		assert(klass != nullptr);		// wrong. Because user want to load a non-exist class.
+		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
+		if (initialize) {
+			if (klass->get_type() == ClassType::InstanceClass)	// not an ArrayKlass
+				BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(klass), vm);
+		}
+		_stack.push_back(klass->get_mirror());
+	}
 }
 void JVM_GetSuperClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

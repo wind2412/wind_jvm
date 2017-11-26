@@ -69,7 +69,7 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	// get string literal
 	ss << "string is: --> [\"";
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-		ss << wchar_t(((CharOop *)(*(TypeArrayOop *)result)[pos])->value);
+		ss << ((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
 	}
 	ss << "\"]";
 	// get hash value
