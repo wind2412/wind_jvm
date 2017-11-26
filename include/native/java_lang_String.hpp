@@ -55,6 +55,7 @@ private:
 	static Oop *intern_to_oop(const wstring & str);
 public:
 	static wstring print_stringOop(InstanceOop *stringoop);
+	static wstring stringOop_to_wstring(InstanceOop *stringoop);
 	static inline __attribute__((always_inline)) Oop *intern(const wstring & str) {		// intern 用到的次数非常多。建议内联。
 		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
 		LockGuard lg(getLock());
@@ -63,11 +64,11 @@ public:
 //#define DEBUG
 //#endif
 #ifdef DEBUG
-	std::cout << "===-------------- string_table ---------------===" << std::endl;
+	std::wcout << "===-------------- string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
 		std::wcout << java_lang_string::print_stringOop((InstanceOop *)iter) << std::endl;	// TODO: map 的 iter 是 pair... set 的 iter 就是元素自身..... 都忘光了......
 	}
-	std::cout << "===-------------------------------------------===" << std::endl;
+	std::wcout << "===-------------------------------------------===" << std::endl;
 #endif
 		if (iter == java_lang_string::get_string_table().end()) {
 			java_lang_string::get_string_table().insert(stringoop);

@@ -941,6 +941,46 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 
 
 
+			case 0x6a:{		// fmul
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val1 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+
+#ifdef DEBUG
+	auto print_float = [](float val) {
+		if (val == FLOAT_NAN)	std::wcout << "FLOAT_NAN";
+		else if (val == FLOAT_INFINITY)	std::wcout << "FLOAT_INFINITY";
+		else if (val == FLOAT_NEGATIVE_INFINITY)	std::wcout << "FLOAT_NEGATIVE_INFINITY";
+		else std::wcout << val << "f";
+	};
+	std::wcout << "(DEBUG) fmul of val2: [";
+	print_float(val2);
+	std::wcout << "] and val1: [";
+	print_float(val1);
+	std::wcout << "], result is: [";
+#endif
+				if (val2 == FLOAT_NAN || val1 == FLOAT_NAN) {		// NAN * (any other)
+					op_stack.push(new FloatOop(FLOAT_NAN));
+				} else if (((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && val1 == 0.0f) || ((val1 == FLOAT_INFINITY || val1 == FLOAT_NEGATIVE_INFINITY) && val2 == 0.0f)) {
+					op_stack.push(new FloatOop(FLOAT_NAN));			// INFINITY * 0
+				} else if ((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && (val1 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY)) {
+					if ((val1 == FLOAT_INFINITY && val2 == FLOAT_INFINITY) || (val1 == FLOAT_NEGATIVE_INFINITY && val2 == FLOAT_NEGATIVE_INFINITY)) {
+						op_stack.push(new FloatOop(FLOAT_INFINITY));
+					} else {											// INFINITY * INFINITY
+						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+					}
+				} else {
+					op_stack.push(new FloatOop(val2 * val1));
+				}
+#ifdef DEBUG
+	print_float(((FloatOop *)op_stack.top())	->value);
+	std::wcout << "]." << std::endl;
+#endif
+				break;
+			}
+
+
 			case 0x78:{		// ishl
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -1008,6 +1048,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// ÂçßÊ
 				op_stack.push(new LongOop(val2 ^ val1));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) do [" << val2 << " ^ " << val1 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
+			case 0x86:{		// i2f
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new FloatOop((float)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert int: [" << val << "] to float: [" << ((FloatOop *)op_stack.top())->value << "]." << std::endl;
 #endif
 				break;
 			}

@@ -57,16 +57,16 @@ public:
 		} else if (ret == ESRCH) {
 			return true;
 		} else {
-			std::cerr << "wrong!" << std::endl;		// maybe the EINVAL...
+			std::wcerr << "wrong!" << std::endl;		// maybe the EINVAL...
 			assert(false);
 		}
 	}
 	static void print_table() {
-		std::cout << "===------------- ThreadTable ----------------===" << std::endl;
+		std::wcout << "===------------- ThreadTable ----------------===" << std::endl;
 		for (auto iter : get_thread_table()) {
-			std::cout << "pthread_t :[" << iter.first << "], Thread Oop address: [" << iter.second << "]" << std::endl;
+			std::wcout << "pthread_t :[" << iter.first << "], Thread Oop address: [" << iter.second << "]" << std::endl;
 		}
-		std::cout << "===------------------------------------------===" << std::endl;
+		std::wcout << "===------------------------------------------===" << std::endl;
 	}
 };
 

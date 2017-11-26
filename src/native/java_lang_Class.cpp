@@ -199,7 +199,7 @@ static unordered_map<wstring, void*> methods = {
     {L"desiredAssertionStatus0:(" CLS ")Z",	(void *)&JVM_DesiredAssertionStatus},
     {L"getEnclosingMethod0:()[" OBJ,			(void *)&JVM_GetEnclosingMethodInfo},
     {L"getRawTypeAnnotations:()" BA,			(void *)&JVM_GetClassTypeAnnotations},
-    {L"getPrimitiveClass:()" CLS,			(void *)&JVM_GetPrimitiveClass},
+    {L"getPrimitiveClass:(" STR ")" CLS,		(void *)&JVM_GetPrimitiveClass},
 };
 
 // TODO: 调查他们哪个是 static！！
@@ -209,14 +209,14 @@ void JVM_GetClassName(list<Oop *> & _stack){
 	assert(_this != nullptr);
 	Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
 #ifdef DEBUG
-	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::print_stringOop((InstanceOop *)str) << "]." << std::endl;
+	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)str) << "]." << std::endl;
 #endif
 	_stack.push_back(str);
 }
 void JVM_ForClassName(list<Oop *> & _stack){		// static
 	assert(false);	// 不知道能不能用的上
 	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
-	wstring klass_name = java_lang_string::print_stringOop((InstanceOop *)_stack.front());	_stack.pop_front();
+	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
 	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
 	// the fourth argument is not needed ?
@@ -333,9 +333,36 @@ void JVM_GetClassTypeAnnotations(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_GetPrimitiveClass(list<Oop *> & _stack){
-	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
+	wstring basic_type_klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get BasicTypeMirror of `" << basic_type_klass_name << "`" << std::endl;
+#endif
+	auto get_basic_type_mirror = [](const wstring & name) -> MirrorOop * {
+		auto basic_type_mirror_iter = java_lang_class::get_single_basic_type_mirrors().find(name);
+		assert(basic_type_mirror_iter != java_lang_class::get_single_basic_type_mirrors().end());
+		return basic_type_mirror_iter->second;
+	};
+	if (basic_type_klass_name == L"byte") {
+		_stack.push_back(get_basic_type_mirror(L"B"));
+	} else if (basic_type_klass_name == L"boolean") {
+		_stack.push_back(get_basic_type_mirror(L"Z"));
+	} else if (basic_type_klass_name == L"char") {
+		_stack.push_back(get_basic_type_mirror(L"C"));
+	} else if (basic_type_klass_name == L"short") {
+		_stack.push_back(get_basic_type_mirror(L"S"));
+	} else if (basic_type_klass_name == L"int") {
+		_stack.push_back(get_basic_type_mirror(L"I"));
+	} else if (basic_type_klass_name == L"float") {
+		_stack.push_back(get_basic_type_mirror(L"F"));
+	} else if (basic_type_klass_name == L"long") {
+		_stack.push_back(get_basic_type_mirror(L"J"));
+	} else if (basic_type_klass_name == L"double") {
+		_stack.push_back(get_basic_type_mirror(L"D"));
+	} else {
+		std::wcerr << "can't get here!" << std::endl;
+		assert(false);
+	}
 }
 
 // 返回 fnPtr.

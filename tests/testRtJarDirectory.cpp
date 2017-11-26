@@ -15,9 +15,9 @@ int main()
 	rjd.add_file(StringSplitter(L"蛤蛤/我的天/你够了.class"));
 	rjd.print();
 
-	std::cout << rjd.find_file(StringSplitter(L"apple/applescript/AppleScriptEngineFactory.class")) << std::endl;
-	std::cout << rjd.find_file(StringSplitter(L"haha.class")) << std::endl;
-	std::cout << rjd.find_file(StringSplitter(L"apple/laf/AquaLookAndFeel.class")) << std::endl;
-	std::cout << rjd.find_file(StringSplitter(L"apple/applescript/AppleScriptEngineFactory$.class")) << std::endl;
-	std::cout << rjd.find_file(StringSplitter(L"蛤蛤/我的天/你够了.class")) << std::endl;
+	std::wcout << rjd.find_file(StringSplitter(L"apple/applescript/AppleScriptEngineFactory.class")) << std::endl;
+	std::wcout << rjd.find_file(StringSplitter(L"haha.class")) << std::endl;
+	std::wcout << rjd.find_file(StringSplitter(L"apple/laf/AquaLookAndFeel.class")) << std::endl;
+	std::wcout << rjd.find_file(StringSplitter(L"apple/applescript/AppleScriptEngineFactory$.class")) << std::endl;
+	std::wcout << rjd.find_file(StringSplitter(L"蛤蛤/我的天/你够了.class")) << std::endl;
 }

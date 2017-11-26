@@ -34,7 +34,7 @@ void *find_native(const wstring & klass_name, const wstring & signature)	// such
 	if (iter != native_map.end()) {
 		return (*iter).second(signature);		// call the klass's find native method.	// maybe will get nullptr.
 	} else {
-		std::cerr << "didn't find this klass in native !! it didn't do registerNatives() function!!" << std::endl;
+		std::wcerr << "didn't find this klass in native !! it didn't do registerNatives() function!!" << std::endl;
 		assert(false);
 	}
 }

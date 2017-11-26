@@ -57,7 +57,7 @@ Element_value::Element_value(cp_info **constant_pool, const element_value & v) :
 			break;
 		}
 		default:{
-			std::cerr << "can't get here. in element_value." << std::endl;
+			std::wcerr << "can't get here. in element_value." << std::endl;
 			assert(false);
 		}
 	}

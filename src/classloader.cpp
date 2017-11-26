@@ -56,7 +56,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 				wstring _true = temp.substr(0, temp.size()-1);	// "java.lang.Object;" --> "java.lang.Object"
 				std::wcout << layer << " " << _true << std::endl;
 				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
-				std::cout << (inner == nullptr) << std::endl;
+				std::wcout << (inner == nullptr) << std::endl;
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
@@ -121,11 +121,11 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 void BootStrapClassLoader::print()
 {
 	std::wcout << "===------------ ( BootStrapClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
-	std::cout << "total Classes num: " << system_classmap.size() << std::endl;
+	std::wcout << "total Classes num: " << system_classmap.size() << std::endl;
 	for (auto iter : system_classmap) {
 		std::wcout << "  " << iter.first << std::endl;
 	}
-	std::cout <<  "===----------------------------------------------------------------------------===" << std::endl;
+	std::wcout <<  "===----------------------------------------------------------------------------===" << std::endl;
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
@@ -237,9 +237,9 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
 void MyClassLoader::print()
 {
 	std::wcout << "===--------------- ( MyClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
-	std::cout << "total Classes num: " << this->classmap.size() << std::endl;
+	std::wcout << "total Classes num: " << this->classmap.size() << std::endl;
 	for (auto iter : this->classmap) {
 		std::wcout << "  " << iter.first << std::endl;
 	}
-	std::cout <<  "===------------------------------------------------------------------------===" << std::endl;
+	std::wcout <<  "===------------------------------------------------------------------------===" << std::endl;
 }

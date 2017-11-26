@@ -75,14 +75,14 @@ public:
 		return false;
 	}
 	void print_all_attribute_name() {		// for debug
-		std::cout << "===-------------- print attributes name -------------------===" << std::endl;
-		std::cout << "--- Runtime Visible Annotations: \n";
+		std::wcout << "===-------------- print attributes name -------------------===" << std::endl;
+		std::wcout << "--- Runtime Visible Annotations: \n";
 		if (rva != nullptr)
 			for (int i = 0; i < rva->num_annotations; i ++) {
 				std::wcout << rva->annotations[i].type << std::endl;
 			}
 		else std::wcout << "none." << std::endl;
-		std::cout << "--- Runtime Visible Parameter Annotations: \n";
+		std::wcout << "--- Runtime Visible Parameter Annotations: \n";
 		if (rvpa != nullptr)
 			for (int i = 0; i < num_RuntimeVisibleParameterAnnotation; i ++) {
 				for (int j = 0; j < rvpa[i].num_annotations; j ++) {
@@ -90,13 +90,13 @@ public:
 				}
 			}
 		else std::wcout << "none." << std::endl;
-		std::cout << "--- Runtime Visible Type Annotations: \n";
+		std::wcout << "--- Runtime Visible Type Annotations: \n";
 		if (rvta != nullptr)
 			for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
 				std::wcout << rvta[i].anno->type << std::endl;
 			}
 		else std::wcout << "none." << std::endl;
-		std::cout << "===--------------------------------------------------------===" << std::endl;
+		std::wcout << "===--------------------------------------------------------===" << std::endl;
 	}
 public:
 	bool operator== (const Method & rhs) const {

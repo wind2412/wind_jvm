@@ -30,7 +30,6 @@ wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv
 
 //	auto scapegoat = [](void *pp) -> void *{
 //		temp *real = (temp *)pp;
-//	std::cout << real->jvm << "...???" << std::endl;		// delete
 //		real->jvm->start(*real->arg);				// TODO: 原来如此......这个东西是被析构掉了。。。。。所以产生了未定义行为...... 由于当时在这里定义的，但是不知道为何，最后的 real->jvm，即 this 会经常变成 0x0, 0x4...但是还没有搞清楚为什么。
 //		return nullptr;
 //	};

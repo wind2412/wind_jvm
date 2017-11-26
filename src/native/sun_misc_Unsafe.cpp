@@ -20,13 +20,13 @@ static unordered_map<wstring, void*> methods = {
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	ArrayOop *_array = (ArrayOop *)_stack.front();	_stack.pop_front();
-	std::cout << "[arrayBaseOffset] " << _array->get_buf_offset() << std::endl;		// delete
+	std::wcout << "[arrayBaseOffset] " << _array->get_buf_offset() << std::endl;		// delete
 	_stack.push_back(new IntOop(_array->get_buf_offset()));
 }
 void JVM_ArrayIndexScale(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	ArrayOop *_array = (ArrayOop *)_stack.front();	_stack.pop_front();
-	std::cout << "[arrayScaleOffset] " << sizeof(intptr_t) << std::endl;		// delete
+	std::wcout << "[arrayScaleOffset] " << sizeof(intptr_t) << std::endl;		// delete
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
 void JVM_AddressSize(list<Oop *> & _stack){

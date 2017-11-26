@@ -112,7 +112,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 
 #ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
-	std::cout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
+	std::wcout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
 	if (this->fields_layout.size() != 0)		std::cout << "non-static as below:" << std::endl;
 	int counter = 0;
 	for (auto iter : this->fields_layout) {
@@ -123,7 +123,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	for (auto iter : this->static_fields_layout) {
 		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
 	}
-	std::cout << "===--------------------------------------------------------===" << std::endl;
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -176,12 +176,12 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 	}
 #ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime InterfacePool ---------------===" << std::endl;
-	std::cout << "interfaces: total " << this->interfaces.size() << std::endl;
+	std::wcout << "interfaces: total " << this->interfaces.size() << std::endl;
 	int counter = 0;
 	for (auto iter : this->interfaces) {
 		std::wcout << "  #" << counter++ << "  name: " << iter.first << std::endl;
 	}
-	std::cout << "===------------------------------------------------------------===" << std::endl;
+	std::wcout << "===------------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -213,12 +213,12 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 	}
 #ifdef KLASS_DEBUG
 	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
-	std::cout << "methods: total " << this->methods.size() << std::endl;
+	std::wcout << "methods: total " << this->methods.size() << std::endl;
 	int counter = 0;
 	for (auto iter : this->methods) {
 		std::wcout << "  #" << counter++ << "  " << iter.first << std::endl;
 	}
-	std::cout << "===---------------------------------------------------------===" << std::endl;
+	std::wcout << "===---------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -532,9 +532,9 @@ void InstanceKlass::initialize_final_static_field()
 			auto const_val_attr = iter.second.second->get_constant_value();
 			if (const_val_attr != nullptr) {
 				int index = const_val_attr->constantvalue_index;
-				std::cout << "ConstantValue_attribute point to index: " << index << std::endl;		// delete
+				std::wcout << "ConstantValue_attribute point to index: " << index << std::endl;		// delete
 				auto _pair = (*this->rt_pool)[index - 1];
-				std::cout << "initialize ConstantValue_attribute !" << std::endl;		// delete
+				std::wcout << "initialize ConstantValue_attribute !" << std::endl;		// delete
 				switch (_pair.first) {
 					case CONSTANT_Long:{
 						this->set_static_field_value(iter.first, new LongOop(boost::any_cast<long>(_pair.second)));

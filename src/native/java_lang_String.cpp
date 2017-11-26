@@ -59,6 +59,18 @@ bool java_string_equal_to::operator() (Oop* const & lhs, Oop* const & rhs) const
 
 
 /*===---------------- java_lang_string ----------------===*/
+wstring java_lang_string::stringOop_to_wstring(InstanceOop *stringoop) {
+	wstringstream ss;
+	Oop *result;
+	bool temp = stringoop->get_field_value(L"value:[C", &result);
+	assert(temp == true);
+	// get string literal
+	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
+		ss << ((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
+	}
+	return ss.str();
+}
+
 wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	wstringstream ss;
 	Oop *result;

@@ -112,17 +112,17 @@ bool RtJarDirectory::find_file(StringSplitter && ss) const
 void RtJarDirectory::print() const
 {
 	#ifdef DEBUG
-	std::cout << "*********************************" << endl;
+	std::wcout << "*********************************" << endl;
 	wcout.imbue(std::locale(""));
 	this->print(0);
-	std::cout << "*********************************" << endl;
+	std::wcout << "*********************************" << endl;
 	#endif
 }
 
 void RtJarDirectory::print(int level) const
 {
-	for(int i = 0; i < level; i ++)	std::cout << "\t";
-	wcout << this->name << endl;
+	for(int i = 0; i < level; i ++)	std::wcout << "\t";
+	std::wcout << this->name << endl;
 	if (this->subdir != nullptr) {
 		for(auto & sub : *subdir) {
 			(*sub).print(level+1);
@@ -147,7 +147,7 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	cmd << L"mkdir " << uncompressed_dir << L" > /dev/null 2>&1";
 	system(wstring_to_utf8(cmd.str()).c_str());
 	cmd.str(L"");
-	std::cout << "unzipping rt.jar... please wait.\n";
+	std::wcout << "unzipping rt.jar... please wait.\n";
 	cmd << L"unzip " << rtjar_pos << L" -d " << uncompressed_dir << L" > /dev/null 2>&1";
 	system(wstring_to_utf8(cmd.str()).c_str());
 	if (status == -1) {  	// http://blog.csdn.net/cheyo/article/details/6595955 [shell 命令是否执行成功的判定]
@@ -155,7 +155,7 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	} else {  
 		if (WIFEXITED(status)) {  
 			if (0 == WEXITSTATUS(status)) {  
-				std::cout << "unzipping succeed.\n";
+				std::wcout << "unzipping succeed.\n";
 				return true;
 			}  
 			else {  
@@ -189,7 +189,4 @@ JarLister::JarLister() : rjd(L"root")
 			this->rjd.add_file(StringSplitter(utf8_to_wstring(s)));
 		}
 	}
-//	std::cout << "haha JarLister! " << this << std::endl;	// delete
-//	this->rjd.print();		// delete.
-//	sleep(3);				// delete.
 }
