@@ -41,7 +41,28 @@ void JVM_StopThread(list<Oop *> & _stack){
 }
 void JVM_IsThreadAlive(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+#ifdef DEBUG
+	std::wcout << "the java.lang.Thread obj's address: [" << _this << "]." << std::endl;
+#endif
+	Oop *result;
+	assert(_this->get_field_value(L"eetop:J", &result));
+	LongOop *tid = (LongOop *)result;
+	assert(tid->value != 0);	// simple check
+	int ret = pthread_kill((pthread_t)tid, 0);
+	if (ret == 0) {
+		_stack.push_back(new IntOop(1));
+#ifdef DEBUG
+	std::wcout << "Thread pthread_t: [" << tid->value << "] is alive! " << std::endl;
+#endif
+	} else if (ret == ESRCH) {
+		_stack.push_back(new IntOop(0));
+#ifdef DEBUG
+	std::wcout << "Thread pthread_t: [" << tid->value << "] is dead... " << std::endl;
+#endif
+	} else {
+		// EINVAL
+		assert(false);
+	}
 }
 void JVM_SuspendThread(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -54,7 +75,7 @@ void JVM_ResumeThread(list<Oop *> & _stack){
 void JVM_SetThreadPriority(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	IntOop *i = (IntOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	// TODO: finish it...
 }
 void JVM_Yield(list<Oop *> & _stack){			// static
 	assert(false);

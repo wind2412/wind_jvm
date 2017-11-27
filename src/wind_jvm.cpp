@@ -95,7 +95,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 		}
 		assert(this->vm_stack.size() == 0);
 
-		// load System.class		// 需要在 Main ThreadGroup 之前执行。因为它的初始化会调用 System。因而会自动触发 <clinit> 的。需要提前把 System.class 设为 initialized.
+		// 3.3 load System.class		// 需要在 Main ThreadGroup 之前执行。因为它的初始化会调用 System。因而会自动触发 <clinit> 的。需要提前把 System.class 设为 initialized.
 		// 这里要 hack 一下。不执行 System.<clinit> 了，而是手动执行。因为 Java 类库当中的 java/lang/System 这个类，在 <clinit> 中由于 putStatic，
 		// 会自动执行 java/lang/Console 的 <clinit>。而这个 <clinit> 会执行 <sun/misc/JavaLangAccess>registerShutdownHook:(IZLjava/lang/Runnable;)V invokeInterface 方法。
 		// 但是，真正的引用指向的是 null！！因为这个 sun/misc/JavaLangAccess 引用是经过 java/lang/System::initializeSystemClass() 来设置的......
@@ -114,12 +114,6 @@ void wind_jvm::start(const vector<wstring> & argv)
 		BytecodeEngine::initial_clinit(PrintStream_klass, *this);
 		auto SecurityManager_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/SecurityManager"));
 		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
-		system_klass->set_state(Klass::KlassState::Initialized);		// set state.
-		// invoke the method...
-		shared_ptr<Method> _initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
-		this->add_frame_and_execute(_initialize_system_class, {});
-
-		assert(false);
 
 		// 3.5 COMPLETELY create the [Main] ThreadGroup obj.
 		{	// 注意：这里创建了针对此 main 的第二个 System ThreadGroup !!用第一个 System ThreadGroup 作为参数！
@@ -136,12 +130,14 @@ void wind_jvm::start(const vector<wstring> & argv)
 			this->add_frame_and_execute(target_method, list);
 		}
 
-		std::wcout << "this is overrrrrr!!" << std::endl;		// delete
+		// 3.7 又需要 hack 一波。因为 java.security.util.Debug 这货需要调用 System 的各种东西，甚至是标准输入输出。因此不能初始化它。要延迟。
+		auto Security_DEBUG_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/security/util/Debug"));
+		Security_DEBUG_klass->set_state(Klass::KlassState::Initializing);
 
 		// 4. [complete] the Thread obj using the [uncomplete] main_threadgroup.
 		{
 			std::list<Oop *> list;
-			list.push_back(init_thread);		// $0 = this
+			list.push_back(init_thread);			// $0 = this
 			list.push_back(main_threadgroup);	// $1 = [main_threadGroup]
 			list.push_back(java_lang_string::intern(L"main"));	// $2 = L"main"
 			// execute method: java/lang/Thread.<init>:(ThreadGroup, String)V --> public Method.
@@ -150,6 +146,20 @@ void wind_jvm::start(const vector<wstring> & argv)
 			this->add_frame_and_execute(target_method, list);
 		}
 
+		std::wcout << "this is overrrrrr!!" << std::endl;		// delete
+		std::wcout << "init_thread oop: " << init_thread << std::endl;	// delete
+
+		// 3.3 Complete! invoke the method...
+		// java/lang/System::initializeSystemClass(): "Initialize the system class.  Called after thread initialization." So it must be created after the thread.
+		shared_ptr<Method> _initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
+		this->add_frame_and_execute(_initialize_system_class, {});
+		system_klass->set_state(Klass::KlassState::Initialized);		// set state.
+
+		assert(false);
+
+		// 3.7 Complete!
+		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
+		Security_DEBUG_klass->set_state(Klass::KlassState::Initialized);
 
 
 

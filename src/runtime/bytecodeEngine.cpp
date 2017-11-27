@@ -178,6 +178,39 @@ wstring BytecodeEngine::get_real_value(Oop *oop)
 	return ss.str();
 }
 
+Oop* copy_BasicOop_value(Oop *oop)		// aux
+{
+	if (oop->get_ooptype() == OopType::_BasicTypeOop) {
+		BasicTypeOop *basic = (BasicTypeOop *)oop;
+		switch(basic->get_type()) {
+			case Type::BOOLEAN:
+			case Type::BYTE:
+			case Type::SHORT:
+			case Type::INT:
+				return new IntOop(((IntOop *)basic)->value);
+			case Type::CHAR:
+				return new CharOop(((CharOop *)basic)->value);
+			case Type::DOUBLE:
+				return new DoubleOop(((DoubleOop *)basic)->value);
+			case Type::FLOAT:
+				return new FloatOop(((DoubleOop *)basic)->value);
+			case Type::LONG:
+				return new LongOop(((DoubleOop *)basic)->value);
+			default:
+				assert(false);
+		}
+	}
+}
+
+Oop *if_BasicType_then_copy_else_return_only(Oop *oop)
+{
+	if (oop != nullptr && oop->get_ooptype() == OopType::_BasicTypeOop) {
+		return copy_BasicOop_value(oop);		// 我设置如果是 BasicType 类型，那就复制一份 value。
+	} else {
+		return oop;							// 如果是 Reference 类型，那就直接 指针复制。
+	}
+}
+
 bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
 {
 	bool result;
@@ -901,7 +934,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			}
 
 			case 0x59:{		// dup
-				op_stack.push(op_stack.top());
+				op_stack.push(if_BasicType_then_copy_else_return_only(op_stack.top()));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) only dup from stack." << std::endl;
 #endif
@@ -910,12 +943,34 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 			case 0x5a:{		// dup_x1
 				Oop *val1 = op_stack.top();	op_stack.pop();
 				Oop *val2 = op_stack.top();	op_stack.pop();
-				op_stack.push(val1);
+				op_stack.push(if_BasicType_then_copy_else_return_only(val1));
 				op_stack.push(val2);
 				op_stack.push(val1);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) only dup_x1 from stack." << std::endl;
 #endif
+				break;
+			}
+
+			case 0x5c:{		// dup2
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				if (val1->get_ooptype() == OopType::_BasicTypeOop && 		// case 2
+						(((BasicTypeOop *)val1)->get_type() == Type::LONG || ((BasicTypeOop *)val1)->get_type() == Type::DOUBLE)) {
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val1);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) dup_2[1] from stack." << std::endl;
+#endif
+				} else {
+					Oop *val2 = op_stack.top();	op_stack.pop();
+					op_stack.push(if_BasicType_then_copy_else_return_only(val2));
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val2);
+					op_stack.push(val1);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) dup_2[2] from stack." << std::endl;
+#endif
+				}
 				break;
 			}
 
@@ -1343,6 +1398,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// boolean, short, char, int
+			}
+			case 0xad:{		// lreturn
+				// TODO: monitor...
+				jvm.pc = backup_pc;
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) return an long value from stack: "<< ((LongOop*)op_stack.top())->value << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+#endif
+				return op_stack.top();	// long
 			}
 
 
