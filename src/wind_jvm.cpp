@@ -15,6 +15,11 @@
 #include "runtime/thread.hpp"
 #include <boost/regex.hpp>
 
+Lock thread_num_lock;
+int all_thread_num;
+
+Lock wcout_lock;
+
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
 	real->thread->start(*real->arg);
@@ -30,29 +35,30 @@ void vm_thread::launch()
 	// 在这里，需要初始化全局变量。线程还没有开启。
 	init_native();
 
-	bool inited = jvm.inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
+	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
 	pthread_create(&tid, nullptr, scapegoat, &p);
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
 		pthread_join(tid, nullptr);
 
-		std::wcout << "run `main()` over!!!" << std::endl;		// delete
+		std::wcout << "run `" << this->method->get_name() << "()` over!!!" << std::endl;		// delete
 	}
 }
 
 void vm_thread::start(list<Oop *> & arg)
 {
-	if (jvm.inited() == false) {
+	if (wind_jvm::inited() == false) {
 		assert(method == nullptr);			// if this is the init thread, method will be nullptr. this thread will get `main()` automatically.
 		assert(arg.size() == 0);
 
-		jvm.inited() = true;					// important!
+		wind_jvm::inited() = true;			// important!
 		vm_thread::init_and_do_main();		// init global variables and execute `main()` function.
 	} else {
 		// if this is not the thread[0], detach itself is okay because no one will pthread_join it.
 		pthread_detach(pthread_self());
 		assert(this->vm_stack.size() == 0);	// check
+		assert(arg.size() == 1);				// run() only has one argument `this`.
 
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg));
 		this->execute();
@@ -76,7 +82,7 @@ void vm_thread::execute()
 				assert(false);		// for test. Is empty method valid ??? I dont know...
 			}
 			pc = code->code;
-			Oop * return_val = BytecodeEngine::execute(*this, vm_stack.back());
+			Oop * return_val = BytecodeEngine::execute(*this, vm_stack.back(), this->thread_no);
 			if (cur_frame.method->is_void()) {		// TODO: in fact, this can be delete. Because It is of no use.
 				assert(return_val == nullptr);
 				// do nothing
@@ -92,7 +98,7 @@ Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std:
 	// for defense:
 	int frame_num = this->vm_stack.size();
 	this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
-	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
+	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back(), this->thread_no);
 	this->vm_stack.pop_back();
 	assert(frame_num == this->vm_stack.size());
 	return result;
@@ -262,23 +268,29 @@ void vm_thread::init_and_do_main()
 	// second execute [public static void main].
 
 	// new a String[].
-	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(jvm.argv().size());
+	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
 	auto iter = system_classmap.find(L"java/lang/String.class");
 	assert(iter != system_classmap.end());
 	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
-	for (int i = 0; i < jvm.argv().size(); i ++) {
-		(*string_arr_oop)[i] = java_lang_string::intern(jvm.argv()[i]);
+	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
+		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
 	}
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
 }
 
-wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv)
+void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
 	wind_jvm::main_class_name() = boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
 
-	this->threads().push_back(vm_thread(nullptr, {}, *this));
-	this->threads().front().launch();		// begin this thread.
+	vm_thread *init_thread;
+	wind_jvm::lock().lock();
+	{
+		wind_jvm::threads().push_back(vm_thread(nullptr, {}));
+		init_thread = &wind_jvm::threads().back();
+	}
+	wind_jvm::lock().unlock();
+	init_thread->launch();		// begin this thread.
 }

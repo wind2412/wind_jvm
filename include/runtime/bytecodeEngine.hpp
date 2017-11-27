@@ -53,7 +53,7 @@ class vm_thread;
 
 struct BytecodeEngine {
 public:
-	static Oop * execute(vm_thread & thread, StackFrame & cur_frame);
+	static Oop * execute(vm_thread & thread, StackFrame & cur_frame, int thread_no);
 public:	// aux
 	static vector<Type> parse_arg_list(const wstring & descriptor);
 	static void initial_clinit(shared_ptr<InstanceKlass>, vm_thread & thread);

@@ -10,6 +10,7 @@
 #include <cassert>
 #include "native/native.hpp"
 #include "runtime/thread.hpp"
+#include "wind_jvm.hpp"
 
 /*===-------------- from hotspot -------------------*/
 static unordered_map<wstring, void*> methods = {
@@ -31,24 +32,8 @@ static unordered_map<wstring, void*> methods = {
     {L"setNativeName:(" STR L")V",		(void *)&JVM_SetNativeThreadName},
 };
 
-struct aux {		// pthread aux struct...
-	InstanceOop *_this;
-	shared_ptr<Method> method;
-};
-
-static void *scapegoat_thread(void *m)
-{
-//	pthread_detach(pthread_self());
-//	aux *tmp = (aux *)m;
-//	tmp->method....		// 莫非需要另开一个虚拟机....???
-//
-//
-//	delete tmp;
-	return nullptr;
-}
-
 void JVM_StartThread(list<Oop *> & _stack){		// static
-	assert(false);
+//	return;		// delete	// 这里之后会有 bug......	 // TODO:
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
 	assert(_this->get_field_value(L"eetop:J", &result));
@@ -59,11 +44,17 @@ void JVM_StartThread(list<Oop *> & _stack){		// static
 	shared_ptr<Method> run = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
 	assert(run != nullptr && !run->is_abstract());
 	// set and start a thread.
-	aux *tmp = new aux;
-	tmp->_this = _this;
-	tmp->method = run;
-	pthread_create((pthread_t *)&tid->value, nullptr, scapegoat_thread, (void *)tmp);
+	vm_thread *new_thread;
+	wind_jvm::lock().lock();
+	{
+		wind_jvm::threads().push_back(vm_thread(run, {_this}));		// 1. create a thread obj.
+		new_thread = &wind_jvm::threads().back();
+	}
+	wind_jvm::lock().unlock();
+	// start!
+	new_thread->launch();
 }
+
 void JVM_StopThread(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *obj = (Oop *)_stack.front();	_stack.pop_front();

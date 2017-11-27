@@ -24,18 +24,26 @@ struct temp {		// pthread aux struct...
 	std::list<Oop *> *arg;
 };
 
+extern Lock thread_num_lock;
+extern int all_thread_num;
+
 class vm_thread {
 	friend BytecodeEngine;
 private:
 	temp p;			// pthread aux struct. must be global!!!
 	shared_ptr<Method> method;
-	const std::list<Oop *> & arg;
+	std::list<Oop *> arg;
+//	const std::list<Oop *> & arg;		// 卧槽我是白痴.....又一次用错了引用...start0 里边是局部变量...我竟然直接通过引用把局部变量引了过来......QAQ
 	list<StackFrame> vm_stack;	// 改成了 list...... 因为 vector 的扩容会导致内部迭代器失效......把 vector 作为栈的话，扩容是经常性的...... 故而选用伸缩性更好的 list......
 	uint8_t *pc;		// pc, pointing to the code segment: inside the Method->code.
-	wind_jvm & jvm;
+	int thread_no;
 public:
-	vm_thread(shared_ptr<Method> method, const std::list<Oop *> & arg, wind_jvm & jvm) 	// usually `main()` or `run()` method.
-																: method(method), arg(arg), pc(0), jvm(jvm) {}
+	vm_thread(shared_ptr<Method> method, const std::list<Oop *> & arg) 	// usually `main()` or `run()` method.
+																: method(method), arg(arg), pc(0) {
+		LockGuard lg(thread_num_lock);
+		std::wcout << "this thread_no is " << all_thread_num << std::endl;		// delete
+		this->thread_no = all_thread_num ++;
+	}
 public:
 	void launch();
 	void start(std::list<Oop *> & arg);
@@ -49,10 +57,6 @@ class wind_jvm {
 	friend BytecodeEngine;
 	friend vm_thread;
 private:
-	static Lock & lock() {
-		static Lock lock;
-		return lock;
-	};		// to lock the threads to prevent the thread's add.
 	static bool & inited() {
 		static bool inited = false;
 		return inited;
@@ -65,12 +69,16 @@ private:
 		static vector<wstring> argv;
 		return argv;
 	};
+public:
+	static Lock & lock() {
+		static Lock lock;
+		return lock;
+	};		// to lock the threads to prevent the thread's add.
 	static list<vm_thread> & threads() {
 		static list<vm_thread> threads;
 		return threads;
 	};
-public:
-	wind_jvm(const wstring & main_class_name, const vector<wstring> & argv);		// TODO: singleton.
+	static void run(const wstring & main_class_name, const vector<wstring> & argv);		// TODO: can only run for one time ????
 };
 
 
