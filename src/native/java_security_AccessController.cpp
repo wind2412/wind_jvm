@@ -19,13 +19,16 @@ static unordered_map<wstring, void*> methods = {
 };
 
 // this method, I simplified it to just run the `run()` method.
-void JVM_DoPrivileged(list<Oop *> & _stack){		// static
-	Oop *pa = (Oop *)_stack.front();	_stack.pop_front();
-	wind_jvm & vm = (*(wind_jvm *)_stack.back());	_stack.pop_back();
+void JVM_DoPrivileged (list<Oop*>& _stack)
+{
+	// static
+	Oop* pa = (Oop*) (_stack.front ());
+	_stack.pop_front ();
+	vm_thread & thread = (*(vm_thread*) (_stack.back ()));
+	_stack.pop_back ();
 	assert(pa != nullptr);
-
 	// TODO: 不支持泛型的代价。以后补上。
-	shared_ptr<Method> method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" VOD);		// TODO: 我这里看来不支持泛型啊......
+	shared_ptr<Method> method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" VOD);
 	if (method == nullptr) {
 		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
 		if (method == nullptr) {
@@ -33,8 +36,8 @@ void JVM_DoPrivileged(list<Oop *> & _stack){		// static
 		}
 	}
 	assert(method != nullptr);
-	Oop *result = vm.add_frame_and_execute(method, {pa});		// load the `this` obj
-	_stack.push_back(result);
+	Oop* result = thread.add_frame_and_execute (method, { pa }); // load the `this` obj
+	_stack.push_back (result);
 }
 
 // I don't get a snapshot... return nullptr.

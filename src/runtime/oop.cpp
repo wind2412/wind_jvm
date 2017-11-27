@@ -51,19 +51,19 @@ bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				/
 	}
 	int offset = iter->second.first;
 
-	// volatile [0]
-	bool is_volatile = iter->second.second->is_volatile();
-	// volatile [1]
-	if (is_volatile) {
-		this->fields[offset]->enter_monitor();
-	}
+//	// volatile [0]
+//	bool is_volatile = iter->second.second->is_volatile();
+//	// volatile [1]
+//	if (is_volatile) {
+//		this->fields[offset]->enter_monitor();
+//	}
 	// field value not 0, maybe basic type.
 	*result = this->fields[offset];
-	// volatile [2]
-	if (is_volatile) {
-		this->fields[offset]->leave_monitor();
-	}
-	return true;
+//	// volatile [2]
+//	if (is_volatile) {
+//		this->fields[offset]->leave_monitor();
+//	}
+//	return true;
 }
 
 void InstanceOop::set_field_value(const wstring & signature, Oop *value)
@@ -76,18 +76,18 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 	}
 	int offset = iter->second.first;
 
-	// volatile [0]
-	bool is_volatile = iter->second.second->is_volatile();
-	// volatile [1]
-	if (is_volatile) {
-		this->fields[offset]->enter_monitor();
-	}
+//	// volatile [0]		// TODO:
+//	bool is_volatile = iter->second.second->is_volatile();
+//	// volatile [1]
+//	if (is_volatile) {
+//		this->fields[offset]->enter_monitor();
+//	}
 	// field value not 0, maybe basic type.
 	this->fields[offset] = value;
-	// volatile [2]
-	if (is_volatile) {
-		this->fields[offset]->leave_monitor();
-	}
+//	// volatile [2]
+//	if (is_volatile) {
+//		this->fields[offset]->leave_monitor();
+//	}
 
 }
 

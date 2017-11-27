@@ -49,14 +49,14 @@ public:
 	void reset_return_pc(uint8_t *return_pc) { this->return_pc = return_pc; }
 };
 
-class wind_jvm;
+class vm_thread;
 
 struct BytecodeEngine {
 public:
-	static Oop * execute(wind_jvm & jvm, StackFrame & cur_frame);
+	static Oop * execute(vm_thread & thread, StackFrame & cur_frame);
 public:	// aux
 	static vector<Type> parse_arg_list(const wstring & descriptor);
-	static void initial_clinit(shared_ptr<InstanceKlass>, wind_jvm & jvm);
+	static void initial_clinit(shared_ptr<InstanceKlass>, vm_thread & thread);
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
 	static wstring get_real_value(Oop *oop);
 };

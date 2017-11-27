@@ -14,7 +14,7 @@
 using std::list;
 using std::string;
 
-void JVM_DoPrivileged(list<Oop *> & _stack);
+void JVM_DoPrivileged (list<Oop*>& _stack);
 void JVM_GetStackAccessControlContext(list<Oop *> & _stack);
 
 

@@ -17,38 +17,122 @@
 
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
-	real->jvm->start(*real->arg);
+	real->thread->start(*real->arg);
 	return nullptr;
 };
 
-wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv) : main_class_name(boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/")), pc(0)
+void vm_thread::launch()
 {
 	// start one thread
-//	temp p;				// p 变成局部变量之后会引发大 bug ？？！！卧槽 ？？？！！		// 重点！！ 看来是要变成全局变量才行... ！！很可能是析构掉了？？
-	p.jvm = this;
-	p.arg = &argv;
-
-//	auto scapegoat = [](void *pp) -> void *{
-//		temp *real = (temp *)pp;
-//		real->jvm->start(*real->arg);				// TODO: 原来如此......这个东西是被析构掉了。。。。。所以产生了未定义行为...... 由于当时在这里定义的，但是不知道为何，最后的 real->jvm，即 this 会经常变成 0x0, 0x4...但是还没有搞清楚为什么。
-//		return nullptr;
-//	};
+	p.thread = this;
+	p.arg = &const_cast<std::list<Oop *> &>(arg);
 
 	// 在这里，需要初始化全局变量。线程还没有开启。
-	// TODO: 各种 system_map 这类，以及全局的 BootStrapLoader 这类，线程没有加锁，全可以直接访问，多线程不安全。别忘了加！！
 	init_native();
 
+	bool inited = jvm.inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
 	pthread_create(&tid, nullptr, scapegoat, &p);
+
+	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
+		pthread_join(tid, nullptr);
+
+		std::wcout << "run `main()` over!!!" << std::endl;		// delete
+	}
 }
 
-void wind_jvm::start(const vector<wstring> & argv)
+void vm_thread::start(list<Oop *> & arg)
 {
-	// detach itself.
-	pthread_detach(pthread_self());
+	if (jvm.inited() == false) {
+		assert(method == nullptr);			// if this is the init thread, method will be nullptr. this thread will get `main()` automatically.
+		assert(arg.size() == 0);
 
-	// TODO: 这里在多线程下会发生什么？？？
+		jvm.inited() = true;					// important!
+		vm_thread::init_and_do_main();		// init global variables and execute `main()` function.
+	} else {
+		// if this is not the thread[0], detach itself is okay because no one will pthread_join it.
+		pthread_detach(pthread_self());
+		assert(this->vm_stack.size() == 0);	// check
 
+		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg));
+		this->execute();
+	}
+}
+
+void vm_thread::execute()
+{
+	while(!vm_stack.empty()) {		// run over when stack is empty...
+		StackFrame & cur_frame = vm_stack.back();
+		if (cur_frame.method->is_native()) {
+			pc = nullptr;
+			// TODO: native.
+			std::cerr << "Doesn't support native now." << std::endl;
+			assert(false);
+		} else {
+			auto code = cur_frame.method->get_code();
+			// TODO: support Code attributes......
+			if (code->code_length == 0) {
+				std::cerr << "empty method??" << std::endl;
+				assert(false);		// for test. Is empty method valid ??? I dont know...
+			}
+			pc = code->code;
+			Oop * return_val = BytecodeEngine::execute(*this, vm_stack.back());
+			if (cur_frame.method->is_void()) {		// TODO: in fact, this can be delete. Because It is of no use.
+				assert(return_val == nullptr);
+				// do nothing
+			} else {
+				cur_frame.op_stack.push(return_val);
+			}
+		}
+		vm_stack.pop_back();	// another half push_back() is in wind_jvm() constructor.
+	}
+}
+
+Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
+	// for defense:
+	int frame_num = this->vm_stack.size();
+	this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
+	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
+	this->vm_stack.pop_back();
+	assert(frame_num == this->vm_stack.size());
+	return result;
+}
+
+MirrorOop *vm_thread::get_caller_class_CallerSensitive()
+{
+	// back-trace. this method is called from: sun_reflect_Reflection.cpp:JVM_GetCallerClass()
+	int level = 0;
+	int total_levelnum = this->vm_stack.size();
+	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it, ++level) {
+		shared_ptr<Method> m = it->method;
+		if (level == 0 || level == 1) {
+			// if level == 0, this method must be `getCallerClass`.
+			if (level == 0) {
+				if (m->get_name() != L"getCallerClass" || m->get_descriptor() != L"()Ljava/lang/Class;")
+					assert(false);
+			}
+			// must be @CallerSensitive
+			if (!m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
+				assert(false);
+			}
+		} else {
+			// TODO: openjdk: is_ignored_by_security_stack_walk(), but didn't implement the third switch because I didn't understand it...
+			if (m->get_name() == L"invoke:(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") {
+				continue;	// java/lang/Reflection/Method.invoke(), ignore.
+			}
+			if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
+				continue;
+			}
+			// TODO: 第三点名没有明白......有待研究...
+		}
+		m->print_all_attribute_name();		// delete
+		return m->get_klass()->get_mirror();
+	}
+	assert(false);
+}
+
+void vm_thread::init_and_do_main()
+{
 	// init.
 	{
 		java_lang_class::init();		// must init !!!
@@ -161,8 +245,6 @@ void wind_jvm::start(const vector<wstring> & argv)
 		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
 		Security_DEBUG_klass->set_state(Klass::KlassState::Initialized);
 
-
-
 	}
 
 	// for test
@@ -170,7 +252,7 @@ void wind_jvm::start(const vector<wstring> & argv)
 	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 
 	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
-	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(main_class_name);		// this time, "java.lang.Object" has been convert to "java/lang/Object".
+	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
 	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
 	assert(main_method != nullptr);
 	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
@@ -180,85 +262,23 @@ void wind_jvm::start(const vector<wstring> & argv)
 	// second execute [public static void main].
 
 	// new a String[].
-	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(argv.size());
+	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(jvm.argv().size());
 	auto iter = system_classmap.find(L"java/lang/String.class");
 	assert(iter != system_classmap.end());
 	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
-	for (int i = 0; i < argv.size(); i ++) {
-		(*string_arr_oop)[i] = java_lang_string::intern(argv[i]);
+	for (int i = 0; i < jvm.argv().size(); i ++) {
+		(*string_arr_oop)[i] = java_lang_string::intern(jvm.argv()[i]);
 	}
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
+
 }
 
-void wind_jvm::execute()
+wind_jvm::wind_jvm(const wstring & main_class_name, const vector<wstring> & argv)
 {
-	while(!vm_stack.empty()) {		// run over when stack is empty...
-		StackFrame & cur_frame = vm_stack.back();
-		if (cur_frame.method->is_native()) {
-			pc = nullptr;
-			// TODO: native.
-			std::cerr << "Doesn't support native now." << std::endl;
-			assert(false);
-		} else {
-			auto code = cur_frame.method->get_code();
-			// TODO: support Code attributes......
-			if (code->code_length == 0) {
-				std::cerr << "empty method??" << std::endl;
-				assert(false);		// for test. Is empty method valid ??? I dont know...
-			}
-			pc = code->code;
-			Oop * return_val = BytecodeEngine::execute(*this, vm_stack.back());
-			if (cur_frame.method->is_void()) {		// TODO: in fact, this can be delete. Because It is of no use.
-				assert(return_val == nullptr);
-				// do nothing
-			} else {
-				cur_frame.op_stack.push(return_val);
-			}
-		}
-		vm_stack.pop_back();	// another half push_back() is in wind_jvm() constructor.
-	}
-}
+	wind_jvm::main_class_name() = boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/");
+	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
 
-Oop * wind_jvm::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
-	// for defense:
-	int frame_num = this->vm_stack.size();
-	this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
-	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back());
-	this->vm_stack.pop_back();
-	assert(frame_num == this->vm_stack.size());
-	return result;
-}
-
-MirrorOop *wind_jvm::get_caller_class_CallerSensitive()
-{
-	// back-trace. this method is called from: sun_reflect_Reflection.cpp:JVM_GetCallerClass()
-	int level = 0;
-	int total_levelnum = this->vm_stack.size();
-	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it, ++level) {
-		shared_ptr<Method> m = it->method;
-		if (level == 0 || level == 1) {
-			// if level == 0, this method must be `getCallerClass`.
-			if (level == 0) {
-				if (m->get_name() != L"getCallerClass" || m->get_descriptor() != L"()Ljava/lang/Class;")
-					assert(false);
-			}
-			// must be @CallerSensitive
-			if (!m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
-				assert(false);
-			}
-		} else {
-			// TODO: openjdk: is_ignored_by_security_stack_walk(), but didn't implement the third switch because I didn't understand it...
-			if (m->get_name() == L"invoke:(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") {
-				continue;	// java/lang/Reflection/Method.invoke(), ignore.
-			}
-			if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
-				continue;
-			}
-			// TODO: 第三点名没有明白......有待研究...
-		}
-		m->print_all_attribute_name();		// delete
-		return m->get_klass()->get_mirror();
-	}
-	assert(false);
+	this->threads().push_back(vm_thread(nullptr, {}, *this));
+	this->threads().front().launch();		// begin this thread.
 }

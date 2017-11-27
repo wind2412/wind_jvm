@@ -214,7 +214,7 @@ void JVM_GetClassName(list<Oop *> & _stack){
 	_stack.push_back(str);
 }
 void JVM_ForClassName(list<Oop *> & _stack){		// static
-	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
+	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
 	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 //	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
 	bool initialize = ((IntOop *)_stack.front())->value;	_stack.pop_front();		// 虚拟机内部全都使用 Int！！
@@ -230,7 +230,7 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
 		if (initialize) {
 			if (klass->get_type() == ClassType::InstanceClass)	// not an ArrayKlass
-				BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(klass), vm);
+				BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(klass), thread);
 		}
 		_stack.push_back(klass->get_mirror());
 	}

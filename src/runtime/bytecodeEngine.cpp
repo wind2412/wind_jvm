@@ -322,21 +322,21 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	return result;
 }
 
-void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jvm & jvm)
+void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thread & thread)
 {
 	if (new_klass->get_state() == Klass::KlassState::NotInitialized) {
 		std::wcout << "initializing <class>: [" << new_klass->get_name() << "]" << std::endl;
 		new_klass->set_state(Klass::KlassState::Initializing);		// important.
 		// recursively initialize its parent first !!!!! So java.lang.Object must be the first !!!
 		if (new_klass->get_parent() != nullptr)	// prevent this_klass is the java.lang.Object.
-			BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(new_klass->get_parent()), jvm);
+			BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(new_klass->get_parent()), thread);
 		// if static field has ConstantValue_attribute (final field), then initialize it.
 		new_klass->initialize_final_static_field();
 		// then initialize this_klass, call <clinit>.
 		std::wcout << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;
 		shared_ptr<Method> clinit = new_klass->get_this_class_method(L"<clinit>:()V");		// **IMPORTANT** only search in this_class for `<clinit>` !!!
 		if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。
-			jvm.add_frame_and_execute(clinit, {});		// no return value
+			thread.add_frame_and_execute(clinit, {});		// no return value
 		} else {
 			std::wcout << "(DEBUG) no <clinit>." << std::endl;
 		}
@@ -346,9 +346,9 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, wind_jv
 
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
 // TODO: 注意！！以下，所有代码，不应该出现 ByteOop、BooleanOop、ShortOop ！！ 取而代之的应当是 IntOop ！！
-Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
+Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
-	assert(&cur_frame == &jvm.vm_stack.back());
+	assert(&cur_frame == &thread.vm_stack.back());
 	shared_ptr<Method> method = cur_frame.method;
 	uint32_t code_length = method->get_code()->code_length;
 	stack<Oop *> & op_stack = cur_frame.op_stack;
@@ -357,11 +357,11 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	shared_ptr<InstanceKlass> klass = method->get_klass();
 	rt_constant_pool & rt_pool = *klass->get_rtpool();
 
-	uint8_t *backup_pc = jvm.pc;
-	uint8_t * & pc = jvm.pc;
+	uint8_t *backup_pc = thread.pc;
+	uint8_t * & pc = thread.pc;
 	pc = code_begin;
 
-	std::wcout << "[Now, it's StackFrame #" << jvm.vm_stack.size() - 1 << "]." << std::endl;
+	std::wcout << "[Now, it's StackFrame #" << thread.vm_stack.size() - 1 << "]." << std::endl;
 
 	while (pc < code_begin + code_length) {
 		std::wcout << L"(DEBUG) <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
@@ -1391,41 +1391,41 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 			case 0xac:{		// ireturn
 				// TODO: monitor...
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// boolean, short, char, int
 			}
 			case 0xad:{		// lreturn
 				// TODO: monitor...
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an long value from stack: "<< ((LongOop*)op_stack.top())->value << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// long
 			}
 
 
 			case 0xae:{		// freturn
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an float value from stack: "<< ((FloatOop*)op_stack.top())->value << "f" << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// float
 			}
 			case 0xaf:{		// dreturn
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an double value from stack: "<< ((DoubleOop*)op_stack.top())->value << "ld"<< std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return op_stack.top();	// double
 				break;
@@ -1434,24 +1434,24 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 
 			case 0xb0:{		// areturn
 				// TODO: monitor... 我在 invokeStatic 那些方法里边 monitorexit 了。相比于在这里，会有延迟。最后在解决。
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 				Oop *oop = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
 	if (oop != 0)
 		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << oop << std::endl;
 	else
 		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 //				assert(method->return_type() == oop->get_klass()->get_name());
 				return oop;	// boolean, short, char, int
 			}
 			case 0xb1:{		// return
 				// TODO: monitor...
-				jvm.pc = backup_pc;
+				thread.pc = backup_pc;
 #ifdef DEBUG
 	std::wcout << "(DEBUG) only return." << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << jvm.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return nullptr;
 			}
@@ -1461,13 +1461,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
 				// initialize the new_class... <clinit>
 				shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
-				initial_clinit(new_klass, jvm);
+				initial_clinit(new_klass, thread);
 				// parse the field to RUNTIME!!
 				new_field->if_didnt_parse_then_parse();		// **important!!!**
 				if (new_field->get_type() == Type::OBJECT) {
 					// TODO: <clinit> of the Field object oop......
 					assert(new_field->get_type_klass() != nullptr);
-					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), jvm);
+					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
 				}
 				// get the [static Field] value and save to the stack top
 				Oop *new_top;
@@ -1485,13 +1485,13 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
 				// initialize the new_class... <clinit>
 				shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
-				initial_clinit(new_klass, jvm);
+				initial_clinit(new_klass, thread);
 				// parse the field to RUNTIME!!
 				new_field->if_didnt_parse_then_parse();		// **important!!!**
 				if (new_field->get_type() == Type::OBJECT) {
 					// TODO: <clinit> of the Field object oop......
 					assert(new_field->get_type_klass() != nullptr);
-					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), jvm);
+					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
 				}
 				// get the stack top and save to the [static Field]
 				Oop *top = op_stack.top();	op_stack.pop();
@@ -1599,15 +1599,15 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	std::wcout << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 #endif
 						arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeVirtual 和 invokeInterface，所以应该 ref 指向的是真的。
-						arg_list.push_back((Oop *)&jvm);
+						arg_list.push_back((Oop *)&thread);
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
 						pc = 0;
-						jvm.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
+						thread.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);
 						// 然后弹出并恢复 pc......
-						jvm.vm_stack.pop_back();
+						thread.vm_stack.pop_back();
 						pc = backup_pc;
 						// return value.
 						if (!new_method->is_void()) {
@@ -1622,7 +1622,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 #ifdef DEBUG
 	std::wcout << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 #endif
-					Oop *result = jvm.add_frame_and_execute(target_method, arg_list);
+					Oop *result = thread.add_frame_and_execute(target_method, arg_list);
 					if (!target_method->is_void()) {
 						op_stack.push(result);
 #ifdef DEBUG
@@ -1649,7 +1649,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				}
 				// initialize the new_class... <clinit>
 				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
-				initial_clinit(new_klass, jvm);
+				initial_clinit(new_klass, thread);
 #ifdef DEBUG
 				std::wcout << "(DEBUG)";
 				if (new_method->is_private()) {
@@ -1713,15 +1713,16 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 							arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
 						else
 							arg_list.push_back(new_method->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
-						arg_list.push_back((Oop *)&jvm);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。
+						arg_list.push_back((Oop *)&thread);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。	--- 后来由于加上了 Thread，所以名字改成了 thread 而已。
+
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
 						pc = 0;
-						jvm.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
+						thread.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);
 						// 然后弹出并恢复 pc......
-						jvm.vm_stack.pop_back();
+						thread.vm_stack.pop_back();
 						pc = backup_pc;
 						// return value.
 						if (!new_method->is_void()) {
@@ -1739,7 +1740,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 	else if (*pc == 0xb8)
 		std::wcout << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
-					Oop *result = jvm.add_frame_and_execute(new_method, arg_list);
+					Oop *result = thread.add_frame_and_execute(new_method, arg_list);
 					if (!new_method->is_void()) {
 						op_stack.push(result);
 #ifdef DEBUG
@@ -1771,7 +1772,7 @@ Oop * BytecodeEngine::execute(wind_jvm & jvm, StackFrame & cur_frame) {		// 卧�
 				assert(klass->get_type() == ClassType::InstanceClass);		// TODO: 并不知道对不对...猜的.
 				auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
 				// if didnt init then init
-				initial_clinit(real_klass, jvm);
+				initial_clinit(real_klass, thread);
 				auto oop = real_klass->new_instance();
 				op_stack.push(oop);
 #ifdef DEBUG

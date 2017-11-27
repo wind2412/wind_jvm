@@ -31,23 +31,24 @@ static unordered_map<wstring, void*> methods = {
     {L"setNativeName:(" STR L")V",		(void *)&JVM_SetNativeThreadName},
 };
 
-static struct aux {		// pthread aux struct...
+struct aux {		// pthread aux struct...
 	InstanceOop *_this;
 	shared_ptr<Method> method;
 };
 
 static void *scapegoat_thread(void *m)
 {
-	pthread_detach(pthread_self());
-	aux *tmp = (aux *)m;
-	tmp->method....		// 莫非需要另开一个虚拟机....???
-
-
-	delete tmp;
+//	pthread_detach(pthread_self());
+//	aux *tmp = (aux *)m;
+//	tmp->method....		// 莫非需要另开一个虚拟机....???
+//
+//
+//	delete tmp;
 	return nullptr;
 }
 
 void JVM_StartThread(list<Oop *> & _stack){		// static
+	assert(false);
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
 	assert(_this->get_field_value(L"eetop:J", &result));
