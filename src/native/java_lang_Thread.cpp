@@ -31,8 +31,37 @@ static unordered_map<wstring, void*> methods = {
     {L"setNativeName:(" STR L")V",		(void *)&JVM_SetNativeThreadName},
 };
 
+static struct aux {		// pthread aux struct...
+	InstanceOop *_this;
+	shared_ptr<Method> method;
+};
+
+static void *scapegoat_thread(void *m)
+{
+	pthread_detach(pthread_self());
+	aux *tmp = (aux *)m;
+	tmp->method....		// 莫非需要另开一个虚拟机....???
+
+
+	delete tmp;
+	return nullptr;
+}
+
 void JVM_StartThread(list<Oop *> & _stack){		// static
-	assert(false);
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	Oop *result;
+	assert(_this->get_field_value(L"eetop:J", &result));
+	LongOop *tid = (LongOop *)result;
+	assert(tid->value == 0);			// must be 0. if not 0, it must be started already.
+
+	// first, find the `run()` method in `this`.
+	shared_ptr<Method> run = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
+	assert(run != nullptr && !run->is_abstract());
+	// set and start a thread.
+	aux *tmp = new aux;
+	tmp->_this = _this;
+	tmp->method = run;
+	pthread_create((pthread_t *)&tid->value, nullptr, scapegoat_thread, (void *)tmp);
 }
 void JVM_StopThread(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -47,7 +76,27 @@ void JVM_IsThreadAlive(list<Oop *> & _stack){
 	Oop *result;
 	assert(_this->get_field_value(L"eetop:J", &result));
 	LongOop *tid = (LongOop *)result;
-	assert(tid->value != 0);	// simple check
+//	assert(tid->value != 0);	// simple check
+	/**
+	 * bug report: When creating object of java/lang/ref/Reference.ReferenceHandler( extends java.lang.Thread ), it will test using `setDaemon`.
+	 * but this time, `eetop` is not settled, will be 0. As we see it will check isAlive ---- if it's alive, will throw Exception.
+	 * so we should deprecate the `assert(tid->value != 0)` before, and when check it is 0, return false instead.
+	 * public final void setDaemon(boolean on) {		// this is Thread.setDaemon() function. we can see, `isAlive()` called.
+        checkAccess();
+        if (isAlive()) {
+            throw new IllegalThreadStateException();
+        }
+        daemon = on;
+	   }
+	 */
+	if (tid->value == 0) {
+#ifdef DEBUG
+	std::wcout << "This Thread is an empty obj, only alloc memory but not settled pthread_t. It didn't call the `start0` method! " << std::endl;
+#endif
+		_stack.push_back(new IntOop(0));
+		return;
+	}
+
 	int ret = pthread_kill((pthread_t)tid, 0);
 	if (ret == 0) {
 		_stack.push_back(new IntOop(1));

@@ -87,6 +87,7 @@ public:
 public:
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
 	bool is_final() { return (access_flags & ACC_FINAL) == ACC_FINAL; }
+	bool is_volatile() { return (access_flags & ACC_VOLATILE) == ACC_VOLATILE; }
 public:
 	ConstantValue_attribute *get_constant_value() { return constant_value; }
 	wstring parse_signature();
