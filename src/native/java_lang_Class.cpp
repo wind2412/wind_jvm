@@ -285,6 +285,10 @@ void JVM_GetClassModifiers(list<Oop *> & _stack){
 }
 void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
+	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+
+
 	assert(false);
 }
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){

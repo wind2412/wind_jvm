@@ -53,6 +53,7 @@ public:
 public:
 	void enter_monitor() { m.enter(); }
 	void wait() { m.wait(); }
+	void wait(long macro_sec) { m.wait(macro_sec); }
 	void notify() { m.notify(); }
 	void notify_all() { m.notify_all(); }
 	void leave_monitor() { m.leave(); }

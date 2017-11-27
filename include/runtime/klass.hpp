@@ -14,11 +14,13 @@
 #include <vector>
 #include <memory>
 #include <utility>
+#include <bitset>
 
 using std::unordered_map;
 using std::vector;
 using std::shared_ptr;
 using std::pair;
+using std::bitset;
 
 //#define KLASS_DEBUG
 
@@ -129,6 +131,9 @@ private:
 													// 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
 													// 而且，也要把 oop 的 get_static 和 set_static 改成一样的逻辑......QAQ
 													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
+	// should add message to recode whether this field is parent klass's field, for java/lang/Class.getDeclaredFields0()...
+	unordered_map<int, bool> is_this_klass_field;		// don't use vector<bool>...		// use fields_layout.second.first as index.
+	// layouts.
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_num = 0;

@@ -10,6 +10,7 @@
 
 #include <boost/noncopyable.hpp>
 #include <pthread.h>
+#include <sys/time.h>
 
 // this class object, will be embedded into [Oop's header].
 // TODO: 每个 unix 函数调用都有返回值！我都没有判断（逃
@@ -32,6 +33,16 @@ public:
 	}
 	void wait() {
 		pthread_cond_wait(&_cond, &_mutex);
+	}
+	void wait(long timesec) {	// 参数 long 是毫秒级别。				// TODO: 头一次使用 linux 的这些函数...可能有 bug ？
+		struct timeval val;		// 毫秒级别。timespec 是纳秒级别。
+		gettimeofday(&val, NULL);
+		val.tv_usec += timesec;
+		// convert:
+		struct timespec spec;
+		spec.tv_sec = val.tv_sec;
+		spec.tv_nsec = val.tv_usec * 1000;	// 毫秒变成纳秒。
+		pthread_cond_timedwait(&_cond, &_mutex, &spec);	// 此函数只能接受 spec 参数。即纳秒级。	// 而且这货使用的是绝对时间，不是相对时间！
 	}
 	void notify() {
 		pthread_cond_signal(&_cond);

@@ -73,8 +73,10 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	// 1. super_klass
 	if (this->parent != nullptr) {		// if this_klass is **NOT** java.lang.Object
 		auto & super_map = std::static_pointer_cast<InstanceKlass>(this->parent)->fields_layout;
-		for (auto iter : super_map) {
+		std::wcout << "now this klass is ..." << this->get_name() << "... super klass is ..." << this->parent->get_name() << std::endl;
+		for (auto iter : super_map) {		// 注意... unordered_map 乱序存储... 所以也不可能按照顺序来... 想要直接使用 vector<bool> 来指定一个 field 是否是自己的，使用下标来存取是落空了...因为顺序都不定...push_back 肯定是从 1..2..3.. 挨个走，而从 super 那里读取到的 map 却是乱序的 1..4..2.. 不断使用 reserve 或许可以。 我就懒一点，使用 unordered_map <int, bool> 好了... 暴力省事。虽然先计算出来所有的 field 数目才是好主意...
 			this->fields_layout[iter.first] = iter.second;
+			this->is_this_klass_field.insert(make_pair(this->fields_layout[iter.first].first, false));		// 不是自己的 field
 		}
 		this->total_non_static_fields_num = std::static_pointer_cast<InstanceKlass>(this->parent)->total_non_static_fields_num;
 	}
@@ -84,6 +86,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 		for (auto field_iter : layout) {
 			this->fields_layout[iter.first] = make_pair(total_non_static_fields_num, field_iter.second.second);
 			total_non_static_fields_num ++;
+			this->is_this_klass_field.insert(make_pair(this->fields_layout[iter.first].first, false));		// 不是自己的 field
 		}
 	}
 	// 3. this_klass
@@ -97,6 +100,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 			total_static_fields_num ++;	// offset +++
 		} else {		// non-static field
 			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_non_static_fields_num, metaField)));
+			this->is_this_klass_field.insert(make_pair(total_non_static_fields_num, true));		// 是自己的 field
 			total_non_static_fields_num ++;
 		}
 		ss.str(L"");

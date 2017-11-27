@@ -27,8 +27,9 @@ void JVM_IHashCode(list<Oop *> & _stack){
 }
 void JVM_MonitorWait(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	LongOop *l1 = (LongOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	long val = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	// wait!!
+	_this->wait(val);
 }
 void JVM_MonitorNotify(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
