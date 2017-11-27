@@ -63,7 +63,7 @@ bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				/
 //	if (is_volatile) {
 //		this->fields[offset]->leave_monitor();
 //	}
-//	return true;
+	return true;
 }
 
 void InstanceOop::set_field_value(const wstring & signature, Oop *value)
