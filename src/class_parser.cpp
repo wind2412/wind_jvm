@@ -4,7 +4,6 @@
 #include <cassert>
 #include <fstream>
 #include <sstream>
-#include <arpa/inet.h>
 #include <locale>
 #include <vector>
 #include <unordered_map>
@@ -910,17 +909,24 @@ std::ifstream & operator >> (std::ifstream & f, Deprecated_attribute & i) {
 
 std::ifstream & operator >> (std::ifstream & f, const_value_t & i) {
 	i.const_value_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.const_value_index);
 	return f;	
 }
 
 std::ifstream & operator >> (std::ifstream & f, enum_const_value_t & i) {
 	i.type_name_index = read2(f);
 	i.const_name_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.type_name_index);
+	i.stub.inject(i.const_name_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, class_info_t & i) {
 	i.class_info_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.class_info_index);
 	return f;
 }
 
@@ -930,6 +936,11 @@ std::ifstream & operator >> (std::ifstream & f, array_value_t & i) {
 		i.values = new element_value[i.num_values];
 	for(int pos = 0; pos < i.num_values; pos ++) {
 		f >> i.values[pos];
+	}
+	// CodeStub
+	i.stub.inject(i.num_values);
+	for (int pos = 0; pos < i.num_values; pos ++) {
+		i.stub += i.values[pos].stub;
 	}
 	return f;
 }
@@ -976,6 +987,9 @@ std::ifstream & operator >> (std::ifstream & f, element_value & i) {
 			assert(false);
 		}
 	}
+	// CodeStub
+	i.stub.inject(i.tag);
+	i.stub += i.value->stub;
 	return f;
 }
 element_value::~element_value() { delete value; }
@@ -984,6 +998,9 @@ element_value::~element_value() { delete value; }
 std::ifstream & operator >> (std::ifstream & f, annotation::element_value_pairs_t & i) {
 	i.element_name_index = read2(f);
 	f >> i.value;
+	// CodeStub
+	i.stub.inject(i.element_name_index);
+	i.stub += i.value.stub;
 	return f;
 }
 
@@ -995,6 +1012,12 @@ std::ifstream & operator >> (std::ifstream & f, annotation & i) {
 	for(int pos = 0; pos < i.num_element_value_pairs; pos ++) {
 		f >> i.element_value_pairs[pos];
 	}
+	// CodeStub
+	i.stub.inject(i.type_index);
+	i.stub.inject(i.num_element_value_pairs);
+	for(int pos = 0; pos < i.num_element_value_pairs; pos ++) {
+		i.stub += i.element_value_pairs[pos].stub;
+	}
 	return f;
 }
 
@@ -1003,17 +1026,24 @@ annotation::~annotation() { delete[] element_value_pairs; }
 // type_annotation
 std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_target & i) {
 	i.type_parameter_index = read1(f);
+	// CodeStub
+	i.stub.inject(i.type_parameter_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::supertype_target & i) {
 	i.supertype_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.supertype_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_bound_target & i) {
 	i.type_parameter_index = read1(f);
 	i.bound_index = read1(f);
+	// CodeStub
+	i.stub.inject(i.type_parameter_index);
+	i.stub.inject(i.bound_index);
 	return f;
 }
 
@@ -1023,11 +1053,15 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::empty_target & 
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::formal_parameter_target & i) {
 	i.formal_parameter_index = read1(f);
+	// CodeStub
+	i.stub.inject(i.formal_parameter_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::throws_target & i) {
 	i.throws_type_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.throws_type_index);
 	return f;
 }
 
@@ -1035,6 +1069,10 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target
 	i.start_pc = read2(f);
 	i.length = read2(f);
 	i.index = read2(f);
+	// CodeStub
+	i.stub.inject(i.start_pc);
+	i.stub.inject(i.length);
+	i.stub.inject(i.index);
 	return f;
 }
 
@@ -1045,6 +1083,11 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target
 	for(int pos = 0; pos < i.table_length; pos ++) {
 		f >> i.table[pos];
 	}
+	// CodeStub
+	i.stub.inject(i.table_length);
+	for(int pos = 0; pos < i.table_length; pos ++) {
+		i.stub += i.table[pos].stub;
+	}
 	return f;
 }
 
@@ -1052,23 +1095,33 @@ type_annotation::localvar_target::~localvar_target()	{ delete[] table; }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::catch_target & i) {
 	i.exception_table_index = read2(f);
+	// CodeStub
+	i.stub.inject(i.exception_table_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::offset_target & i) {
 	i.offset = read2(f);
+	// CodeStub
+	i.stub.inject(i.offset);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::type_argument_target & i) {
 	i.offset = read2(f);
 	i.type_argument_index = read1(f);
+	// CodeStub
+	i.stub.inject(i.offset);
+	i.stub.inject(i.type_argument_index);
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path::path_t & i) {
 	i.type_path_kind = read1(f);
 	i.type_argument_index = read1(f);
+	// CodeStub
+	i.stub.inject(i.type_path_kind);
+	i.stub.inject(i.type_argument_index);
 	return f;
 }
 
@@ -1078,6 +1131,11 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path & i) 
 		i.path = new type_annotation::type_path::path_t[i.path_length];
 	for(int pos = 0; pos < i.path_length; pos ++) {
 		f >> i.path[pos];
+	}
+	// CodeStub
+	i.stub.inject(i.path_length);
+	for(int pos = 0; pos < i.path_length; pos ++) {
+		i.stub += i.path[pos].stub;
 	}
 	return f;
 }
@@ -1133,6 +1191,11 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
 	f >> i.target_path;
 	i.anno = new annotation;
 	f >> *i.anno;
+	// CodeStub
+	i.stub.inject(i.target_type);
+	i.stub += i.target_info->stub;
+	i.stub += i.target_path.stub;
+	i.stub += i.anno->stub;
 	return f;
 }
 
@@ -1148,6 +1211,11 @@ std::ifstream & operator >> (std::ifstream & f, parameter_annotations_t & i) {
 	for(int pos = 0; pos < i.num_annotations; pos ++) {
 		f >> i.annotations[pos];
 	}
+	// CodeStub
+	i.stub.inject(i.num_annotations);
+	for(int pos = 0; pos < i.num_annotations; pos ++) {
+		i.stub += i.annotations[pos].stub;
+	}
 	return f;
 }
 
@@ -1156,12 +1224,18 @@ parameter_annotations_t::~parameter_annotations_t() { delete[] annotations; }
 std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.parameter_annotations;
+	// check
+//	std::wcout << "RVA length: " << i.attribute_length << ", stub length: " << i.parameter_annotations.stub.stub.size() << std::endl;	// delete
+	assert(i.parameter_annotations.stub.stub.size() == i.attribute_length);		// delete
 	return f;
 }
 
 std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.parameter_annotations;
+	// check
+//	std::wcout << "RIvA length: " << i.attribute_length << ", stub length: " << i.parameter_annotations.stub.stub.size() << std::endl;	// delete
+	assert(i.parameter_annotations.stub.stub.size() == i.attribute_length);		// delete
 	return f;
 }
 
@@ -1173,6 +1247,13 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleParameterAnnotatio
 	for(int pos = 0; pos < i.num_parameters; pos ++) {
 		f >> i.parameter_annotations[pos];
 	}
+	// check
+	int total_anno_length = 0;
+	total_anno_length += 1;
+	for (int pos = 0; pos < i.num_parameters; pos ++) {
+		total_anno_length += i.parameter_annotations[pos].stub.stub.size();
+	}
+	assert(i.attribute_length == total_anno_length);
 	return f;
 }
 RuntimeVisibleParameterAnnotations_attribute::~RuntimeVisibleParameterAnnotations_attribute() { delete[] parameter_annotations; }
@@ -1185,6 +1266,13 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleParameterAnnotat
 	for(int pos = 0; pos < i.num_parameters; pos ++) {
 		f >> i.parameter_annotations[pos];
 	}
+	// check
+	int total_anno_length = 0;
+	total_anno_length += 1;
+	for (int pos = 0; pos < i.num_parameters; pos ++) {
+		total_anno_length += i.parameter_annotations[pos].stub.stub.size();
+	}
+	assert(i.attribute_length == total_anno_length);
 	return f;
 }
 RuntimeInvisibleParameterAnnotations_attribute::~RuntimeInvisibleParameterAnnotations_attribute() { delete[] parameter_annotations; }
@@ -1197,6 +1285,13 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleTypeAnnotations_at
 	for(int pos = 0; pos < i.num_annotations; pos ++) {
 		f >> i.annotations[pos];
 	}
+	// check
+	int total_anno_length = 0;
+	total_anno_length += 1;
+	for (int pos = 0; pos < i.num_annotations; pos ++) {
+		total_anno_length += i.annotations[pos].stub.stub.size();
+	}
+	assert(i.attribute_length == total_anno_length);
 	return f;
 }
 RuntimeVisibleTypeAnnotations_attribute::~RuntimeVisibleTypeAnnotations_attribute() { delete[] annotations; }
@@ -1209,6 +1304,13 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleTypeAnnotations_
 	for(int pos = 0; pos < i.num_annotations; pos ++) {
 		f >> i.annotations[pos];
 	}
+	// check
+	int total_anno_length = 0;
+	total_anno_length += 1;
+	for (int pos = 0; pos < i.num_annotations; pos ++) {
+		total_anno_length += i.annotations[pos].stub.stub.size();
+	}
+	assert(i.attribute_length == total_anno_length);
 	return f;
 }
 RuntimeInvisibleTypeAnnotations_attribute::~RuntimeInvisibleTypeAnnotations_attribute() { delete[] annotations; }

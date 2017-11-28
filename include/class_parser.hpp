@@ -3,6 +3,8 @@
 
 #include <iostream>
 #include <unordered_map>
+#include <vector>
+#include <arpa/inet.h>
 
 //#define DEBUG
 
@@ -79,12 +81,57 @@
 
 // attention!!! these peek() functions is in normal order!! but when you read(), the order is reversed!! in little endian!!
 
+struct CodeStub;
+
 u1 peek1(std::ifstream & f);	// peek u1
 u2 peek2(std::ifstream & f);
 u4 peek4(std::ifstream & f);
 u1 read1(std::ifstream & f);
 u2 read2(std::ifstream & f);
 u4 read4(std::ifstream & f);
+
+/*===----------- hexdump stub ---------------===*/
+// to save the ClassFile hex code stub... for Reflection...
+struct CodeStub {
+	std::vector<u1> stub;	// TODO: 改成 vector！！可以适应不定长度的变长策略......
+	void inject(u1 code) {
+		stub.push_back(code);
+	}
+	void inject(u2 code) {	// 已经存入变量中的小端序。(变量内部存储的顺序)
+		u2 real_hex = htons(code);		// 还原回 hexdump 的大端序。
+		inject((u1)((real_hex >> 8) & 0xFF));	// !! 先写入高字节。按顺序写入。
+		inject((u1)(real_hex & 0xFF));
+	}
+	void inject(u4 code) {
+		u4 real_hex = htonl(code);		// 还原回 hexdump 的大端序。
+		inject((u1)((real_hex >> 24) & 0xFF));
+		inject((u1)((real_hex >> 16) & 0xFF));
+		inject((u1)((real_hex >> 8) & 0xFF));
+		inject((u1)(real_hex & 0xFF));
+	}
+	void inject(u1 *bytes, int num) {
+		for (int i = 0; i < num; i ++) {
+			inject(bytes[i]);
+		}
+	}
+	void inject(u2 *bytes, int num) {
+		for (int i = 0; i < num; i ++) {
+			inject(bytes[i]);
+		}
+	}
+
+	CodeStub & operator+= (const CodeStub & rhs) {
+		this->stub.insert(this->stub.end(), rhs.stub.begin(), rhs.stub.end());
+		return *this;
+	}
+
+	CodeStub operator+ (const CodeStub & rhs) {
+		CodeStub tmp;
+		tmp += *this;
+		tmp += rhs;
+		return tmp;
+	}
+};
 
 /*===----------- constant pool --------------===*/
 
@@ -476,7 +523,8 @@ struct Deprecated_attribute : public attribute_info {
 //	friend std::ifstream & operator >> (std::ifstream & f, element_value & i);
 //};
 
-struct value_t {	
+struct value_t {
+	CodeStub stub;
 };
 
 struct const_value_t : public value_t {
@@ -500,6 +548,7 @@ struct element_value {
 	value_t *value = nullptr;	// [1]
 	friend std::ifstream & operator >> (std::ifstream & f, element_value & i);
 	~element_value();
+	CodeStub stub;
 };
 
 struct annotation : public value_t {
@@ -509,10 +558,12 @@ struct annotation : public value_t {
 		u2 element_name_index;
 		element_value value;
 		friend std::ifstream & operator >> (std::ifstream & f, annotation::element_value_pairs_t & i);
+		CodeStub stub;
      } *element_value_pairs = nullptr;		// [num_element_value_pairs]
 
 	friend std::ifstream & operator >> (std::ifstream & f, annotation & i);
 	~annotation();
+	CodeStub stub;
 };
 
 struct array_value_t : public value_t { 
@@ -524,7 +575,9 @@ struct array_value_t : public value_t {
 
 struct type_annotation {
 	// target_type
-	struct target_info_t {};
+	struct target_info_t {
+		CodeStub stub;
+	};
 	struct type_parameter_target : target_info_t {
 		u1 type_parameter_index;
 		friend std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_target & i);
@@ -556,6 +609,7 @@ struct type_annotation {
 			u2 length;
 			u2 index;
 			friend std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target::table_t & i);
+			CodeStub stub;
 		} *table = nullptr;				// [table_length];
 		friend std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target & i);
 		~localvar_target();
@@ -580,19 +634,22 @@ struct type_annotation {
 			u1 type_path_kind;
 			u1 type_argument_index;
 			friend std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path::path_t & i);
+			CodeStub stub;
 		} *path = nullptr;				// [path_length];
 		friend std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path & i);
 		~type_path();
+		CodeStub stub;
 	};
 	
 	// basic
 	u1 target_type;
 	target_info_t *target_info = nullptr;	// [1]
 	type_path target_path;
-	annotation *anno = nullptr;
+	annotation *anno = nullptr;				// [1]
 	
 	friend std::ifstream & operator >> (std::ifstream & f, type_annotation & i);
 	~type_annotation();
+	CodeStub stub;
 };
 
 // aux data-structure
@@ -601,6 +658,7 @@ struct parameter_annotations_t {	// extract from Runtime_XXX_Annotations_attribu
 	annotation *annotations = nullptr;	// [num_annotations]
 	friend std::ifstream & operator >> (std::ifstream & f, parameter_annotations_t & i);
 	~parameter_annotations_t();
+	CodeStub stub;
 };
 
 struct RuntimeVisibleAnnotations_attribute : public attribute_info {

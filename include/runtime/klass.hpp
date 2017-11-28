@@ -156,7 +156,7 @@ private:
 	u2 signature_index = 0;
 	BootstrapMethods_attribute *bm = nullptr;
 
-	Parameter_annotations_t *rva = nullptr;
+	Parameter_annotations_t *rva = nullptr;		// TODO: 最终因为 java/lang/reflection/Field 的原因，必须要按照 openjdk 的方式来重新 parse Annotations。即，Array<u1> 的格式......难受得很......唉QAQ
 
 	u2 num_RuntimeVisibleTypeAnnotations;
 	TypeAnnotation *rvta = nullptr;
