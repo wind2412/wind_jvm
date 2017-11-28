@@ -1227,6 +1227,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleAnnotations_attrib
 	// check
 //	std::wcout << "RVA length: " << i.attribute_length << ", stub length: " << i.parameter_annotations.stub.stub.size() << std::endl;	// delete
 	assert(i.parameter_annotations.stub.stub.size() == i.attribute_length);		// delete
+	i.parameter_annotations.stub.print();		// delete
 	return f;
 }
 
@@ -1287,7 +1288,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleTypeAnnotations_at
 	}
 	// check
 	int total_anno_length = 0;
-	total_anno_length += 1;
+	total_anno_length += 2;
 	for (int pos = 0; pos < i.num_annotations; pos ++) {
 		total_anno_length += i.annotations[pos].stub.stub.size();
 	}
@@ -1306,7 +1307,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleTypeAnnotations_
 	}
 	// check
 	int total_anno_length = 0;
-	total_anno_length += 1;
+	total_anno_length += 2;
 	for (int pos = 0; pos < i.num_annotations; pos ++) {
 		total_anno_length += i.annotations[pos].stub.stub.size();
 	}

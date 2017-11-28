@@ -111,25 +111,32 @@ struct CodeStub {
 	}
 	void inject(u1 *bytes, int num) {
 		for (int i = 0; i < num; i ++) {
-			inject(bytes[i]);
+			inject((u1)bytes[i]);
 		}
 	}
 	void inject(u2 *bytes, int num) {
 		for (int i = 0; i < num; i ++) {
-			inject(bytes[i]);
+			inject((u2)bytes[i]);
 		}
 	}
-
 	CodeStub & operator+= (const CodeStub & rhs) {
 		this->stub.insert(this->stub.end(), rhs.stub.begin(), rhs.stub.end());
 		return *this;
 	}
-
 	CodeStub operator+ (const CodeStub & rhs) {
 		CodeStub tmp;
 		tmp += *this;
 		tmp += rhs;
 		return tmp;
+	}
+	void print() {
+		std::wcout << "===---------------- CodeStub -------------------===" << std::endl;
+		for (int i = 0; i < stub.size(); i ++) {
+			std::wcout << std::hex << (unsigned)stub[i] << " ";
+			if ((i+1) % 8 == 0) std::wcout << std::endl;
+		}
+		std::wcout << std::endl;
+		std::wcout << "===---------------------------------------------===" << std::endl;
 	}
 };
 
@@ -563,7 +570,7 @@ struct annotation : public value_t {
 
 	friend std::ifstream & operator >> (std::ifstream & f, annotation & i);
 	~annotation();
-	CodeStub stub;
+//	CodeStub stub;		// 卧槽...... 竟然在这里多写了一个.....QAQ 找了一下午 bug......
 };
 
 struct array_value_t : public value_t { 
