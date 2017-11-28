@@ -74,14 +74,14 @@ public:
 #endif
 		if (iter == java_lang_string::get_string_table().end()) {
 			java_lang_string::get_string_table().insert(stringoop);
-#ifdef STRING_DEBUG
+//#ifdef STRING_DEBUG
 	std::wcout << java_lang_string::print_stringOop((InstanceOop *)stringoop) << std::endl;
-#endif
+//#endif
 			return stringoop;
 		} else {
-#ifdef STRING_DEBUG
+//#ifdef STRING_DEBUG
 	std::wcout << java_lang_string::print_stringOop((InstanceOop *)*iter) << std::endl;
-#endif
+//#endif
 			return *iter;
 		}
 	}

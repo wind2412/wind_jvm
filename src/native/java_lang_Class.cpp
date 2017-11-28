@@ -377,6 +377,16 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 		(*field_arr)[i] = v[i];
 	}
 
+#ifdef DEBUG
+	std::wcout << "===-------------- getClassDeclaredFields Pool -------------===" << std::endl;
+	for (int i = 0; i < v.size(); i ++) {
+		Oop *result;
+		assert(v[i]->get_field_value(L"name:Ljava/lang/String;", &result));
+		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << std::endl;
+	}
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
+#endif
+
 	_stack.push_back(field_arr);
 }
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){

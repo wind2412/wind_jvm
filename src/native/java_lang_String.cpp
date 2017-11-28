@@ -69,6 +69,9 @@ wstring java_lang_string::stringOop_to_wstring(InstanceOop *stringoop) {
 	bool temp = stringoop->get_field_value(L"value:[C", &result);
 	assert(temp == true);
 	// get string literal
+	if (result == nullptr) {
+		return L"";			// ！bug report ！ 如果找到一个 `value:[C` 的 field， 却发现是 null，说明未被赋值！！也就是，是由于 String s = new String() 产生的！！是一个全新的 String！！所以 [C 根本没有被初始化，保持默认值的 null！！
+	}
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
 		ss << ((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
 	}
@@ -84,9 +87,10 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	ss << "string length: [" << ((TypeArrayOop *)result)->get_length() << "] ";
 	// get string literal
 	ss << "string is: --> [\"";
-	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-		ss << ((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
-	}
+	if (result != nullptr)		// bug report, 见上！
+		for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
+			ss << ((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
+		}
 	ss << "\"]";
 	// get hash value
 	Oop *int_oop_hash;
