@@ -117,7 +117,7 @@ void Field_info::if_didnt_parse_then_parse()
 		}
 		case L'[':{
 			type = Type::ARRAY;
-			auto loader = this->klass->get_classloader();
+			auto loader = this->klass->get_classloader();			// 这里，即使是 BasicTypeArray 也会有 Klass！！	// 只有 BasicType 是没有的！！
 			if (loader == nullptr) {
 				this->true_type = BootStrapClassLoader::get_bootstrap().loadClass(descriptor);
 			} else {
@@ -135,10 +135,12 @@ void Field_info::if_didnt_parse_then_parse()
 }
 
 wstring Field_info::parse_signature() {
-	assert(signature_index != 0);
+	if (signature_index == 0) return L"";
 	auto _pair = (*klass->get_rtpool())[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
-	return boost::any_cast<wstring>(_pair.second);
+	wstring signature = boost::any_cast<wstring>(_pair.second);
+	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
+	return signature;
 }
 
 Field_info::~Field_info () {

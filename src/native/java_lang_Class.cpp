@@ -287,9 +287,97 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
 
+	// check
+	auto klass = _this->get_klass();
+	assert(klass->get_type() == ClassType::InstanceClass);
 
+	// get all fields-layout from the mirror's `mirrored_who`.
+	const auto & all_fields = _this->get_mirrored_all_fields();
 
-	assert(false);
+	// load java/lang/reflect/Field and [Ljava/lang/reflect/Field;.
+	auto Field_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Field"));
+	assert(Field_klass != nullptr);
+	auto Field_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Field;"));
+	assert(Field_arr_klass != nullptr);
+	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	assert(Byte_arr_klass != nullptr);
+
+	// create [Java] java/lang/reflect/Field[] from [C++] shared_ptr<Field_info>.
+	vector<InstanceOop *> v;		// temp save, because we don't know the Field[]'s length now. We should make a traverse.
+	for (const auto & iter : all_fields) {
+		const shared_ptr<Field_info> & field = iter.second.second;
+		if (_this->is_the_field_owned_by_this(iter.second.first)) {
+			if (public_only && !field->is_public()) continue;
+
+			// create a Field oop obj.
+			auto field_oop = Field_klass->new_instance();
+
+			// important!!! Because I used the lazy parsing the Field's klass(like java/lang/Class.classLoader, the ClassLoader is not parsed), so we should
+			// parse here.
+			field->if_didnt_parse_then_parse();
+
+			// fill in!		// see: openjdk: share/vm/runtime/reflection.cpp
+			field_oop->set_field_value(L"clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
+			field_oop->set_field_value(L"slot:I", new IntOop(iter.second.first));			// TODO: 不知道这里设置的对不对??
+			field_oop->set_field_value(L"name:Ljava/lang/String;", java_lang_string::intern(iter.first));
+
+			// judge whether it is a basic type?
+			if (field->get_type_klass() != nullptr) {		// It is an obj/objArray/TypeArray.
+				field_oop->set_field_value(L"type:Ljava/lang/Class;", field->get_type_klass()->get_mirror());
+			} else {										// It is a BasicType.
+				wstring descriptor = field->get_descriptor();
+				if (descriptor.size() == 1) {		// BasicType, like `I`, `J`, `S`...
+					switch(descriptor[0]) {
+						case L'Z':
+						case L'B':
+						case L'C':
+						case L'S':
+						case L'I':
+						case L'F':
+						case L'J':
+						case L'D':{
+							MirrorOop *basic_mirror = java_lang_class::get_basic_type_mirror(descriptor);
+							assert(basic_mirror != nullptr);
+							field_oop->set_field_value(L"type:Ljava/lang/Class;", basic_mirror);
+							break;
+						}
+						default:
+							assert(false);
+					}
+				}
+			}
+			// 注意：field 属性也有 Annotation，因此 ACC_ANNOTATION 也会被设置上！但是，参加 class_parser.hpp 开头，field 在 jvm 规范中是不允许设置 ACC_ANNOTATION 的！
+			// 这里在 openjdk 中也有提到。
+			field_oop->set_field_value(L"modifiers:I", new IntOop(field->get_flag() & (~ACC_ANNOTATION)));
+			field_oop->set_field_value(L"override:Z", new IntOop(false));
+			// set Generic Signature.
+			wstring template_signature = field->parse_signature();
+			if (template_signature != L"")
+				field_oop->set_field_value(L"signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
+			// set Annotation...
+			// 我完全没有搞清楚为什么 openjdk 那里要额外设置 TypeAnnotations ??? 这一项按照源码，分明是 java/lang/reflect/Field 通过 native 去读取的啊...
+			// 很多东西都设置好了，除了 TypeAnnotations，因为它是自己取的啊，通过 Field::private native byte[] getTypeAnnotationBytes0(); 方法...
+			// 而且我调试了一波，发现 jdk8 的 annotations 并没有走那条 oop Reflection::new_field(fieldDescriptor* fd, bool intern_name, TRAPS) 的 set_type_annotations.
+			// 应该是没有用处的。所以我仅仅设置 annotations。
+			CodeStub *stub = field->get_rva();		// RuntimeVisibleAnnotations' bytecode
+			if (stub) {
+				ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+				for (int i = 0; i < stub->stub.size(); i ++) {
+					(*byte_arr)[i] = new IntOop(stub->stub[i]);
+				}
+				field_oop->set_field_value(L"annotations:[B", byte_arr);
+			}
+
+			v.push_back(field_oop);
+		}
+	}
+
+	ArrayOop *field_arr = Field_arr_klass->new_instance(v.size());
+	for (int i = 0; i < v.size(); i ++) {
+		(*field_arr)[i] = v[i];
+	}
+
+	_stack.push_back(field_arr);
 }
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

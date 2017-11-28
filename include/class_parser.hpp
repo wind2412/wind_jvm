@@ -98,16 +98,14 @@ struct CodeStub {
 		stub.push_back(code);
 	}
 	void inject(u2 code) {	// 已经存入变量中的小端序。(变量内部存储的顺序)
-		u2 real_hex = htons(code);		// 还原回 hexdump 的大端序。
-		inject((u1)((real_hex >> 8) & 0xFF));	// !! 先写入高字节。按顺序写入。
-		inject((u1)(real_hex & 0xFF));
+		inject((u1)((code >> 8) & 0xFF));	// !! 先写入高字节。按顺序写入。
+		inject((u1)(code & 0xFF));
 	}
 	void inject(u4 code) {
-		u4 real_hex = htonl(code);		// 还原回 hexdump 的大端序。
-		inject((u1)((real_hex >> 24) & 0xFF));
-		inject((u1)((real_hex >> 16) & 0xFF));
-		inject((u1)((real_hex >> 8) & 0xFF));
-		inject((u1)(real_hex & 0xFF));
+		inject((u1)((code >> 24) & 0xFF));
+		inject((u1)((code >> 16) & 0xFF));
+		inject((u1)((code >> 8) & 0xFF));
+		inject((u1)(code & 0xFF));
 	}
 	void inject(u1 *bytes, int num) {
 		for (int i = 0; i < num; i ++) {

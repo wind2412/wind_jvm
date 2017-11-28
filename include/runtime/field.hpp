@@ -84,7 +84,10 @@ public:
 	Type get_type() { return type; }
 	shared_ptr<Klass> get_type_klass() { assert(get_state() == Parsed); return true_type; }	// small lock to keep safe.
 	void if_didnt_parse_then_parse();			// **VERY IMPORTANT**!!!
+	u2 get_flag() { return access_flags; }
+	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
 public:
+	bool is_public() { return (access_flags & ACC_PUBLIC) == ACC_PUBLIC; }
 	bool is_static() { return (access_flags & ACC_STATIC) == ACC_STATIC; }
 	bool is_final() { return (access_flags & ACC_FINAL) == ACC_FINAL; }
 	bool is_volatile() { return (access_flags & ACC_VOLATILE) == ACC_VOLATILE; }

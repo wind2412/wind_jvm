@@ -117,6 +117,7 @@ class InstanceOop;
  */
 class InstanceKlass : public Klass {
 	friend InstanceOop;
+	friend MirrorOop;
 private:
 //	ClassFile *cf;		// origin non-dynamic constant pool
 	ClassLoader *loader;

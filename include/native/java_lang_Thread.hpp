@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 /*===-------------- from hotspot -------------------*/
 enum ThreadPriority {        // JLS 20.20.1-3

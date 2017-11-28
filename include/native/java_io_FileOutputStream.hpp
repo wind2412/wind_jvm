@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_FOS_InitIDs(list<Oop *> & _stack);
 

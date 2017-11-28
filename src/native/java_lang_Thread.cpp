@@ -33,7 +33,7 @@ static unordered_map<wstring, void*> methods = {
 };
 
 void JVM_StartThread(list<Oop *> & _stack){		// static
-//	return;		// delete	// 这里之后会有 bug......	 // TODO:
+	return;					// TODO: I close here!!!
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
 	assert(_this->get_field_value(L"eetop:J", &result));

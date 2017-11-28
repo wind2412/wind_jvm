@@ -13,7 +13,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_FD_InitIDs(list<Oop *> & _stack);
 

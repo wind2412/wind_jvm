@@ -13,6 +13,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
+#include <list>
 #include "runtime/oop.hpp"
 #include "utils/lock.hpp"
 
@@ -20,6 +21,7 @@ using std::wstring;
 using std::shared_ptr;
 using std::unordered_set;
 using std::wstringstream;
+using std::list;
 
 // this code is from javaClasses.hpp, openjdk8 hotspot src code. T is jchar, (unsigned short).
 //template <typename T> static unsigned int hash_code(T* s, int len) {
@@ -84,5 +86,15 @@ public:
 		}
 	}
 };
+
+
+
+void JVM_Intern(list<Oop *> & _stack);
+
+
+
+void *java_lang_string_search_method(const wstring & signature);
+
+
 
 #endif /* INCLUDE_RUNTIME_JAVA_LANG_STRING_HPP_ */

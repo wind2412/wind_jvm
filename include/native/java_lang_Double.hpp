@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_DoubleToRawLongBits(list<Oop *> & _stack);
 void JVM_LongBitsToDouble(list<Oop *> & _stack);

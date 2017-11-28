@@ -97,6 +97,13 @@ public:
 	MirrorOop(shared_ptr<Klass> mirrored_who);
 public:
 	shared_ptr<Klass> get_mirrored_who() { return mirrored_who; }
+	const auto & get_mirrored_all_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->fields_layout; }
+	bool is_the_field_owned_by_this(int offset) {
+		auto & this_fields_map = std::static_pointer_cast<InstanceKlass>(mirrored_who)->is_this_klass_field;
+		auto iter = this_fields_map.find(offset);
+		assert (iter != this_fields_map.end());
+		return iter->second;
+	}
 };
 
 class ArrayOop : public Oop {

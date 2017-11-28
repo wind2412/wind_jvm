@@ -43,7 +43,7 @@ struct Element_value {
 };
 
 // 对 annotation 的封装
-// 只不过，这时这个 annotation 所在的类还没有被加载。可以设置为在生成的时候被加载～
+// TODO: 只不过，这时这个 annotation 所在的类还没有被加载。可以设置为在生成的时候被加载～
 struct Annotation : public Value_t {
 	wstring type;				// annotation.[type_index]，指向了一个 CONSTANT_Utf8_info。这个 utf8 表示了此 annotation 的真实类型。
 	int num_element_value_pairs;
@@ -52,9 +52,10 @@ struct Annotation : public Value_t {
 		Element_value value;
 
 		Element_value_pairs_t(cp_info **constant_pool, const annotation::element_value_pairs_t & v);
-     } *element_value_pairs = nullptr;		// [num_element_value_pairs]
+	} *element_value_pairs = nullptr;		// [num_element_value_pairs]
+	CodeStub stub;
 
-    Annotation(cp_info **constant_pool, const annotation & v);
+	Annotation(cp_info **constant_pool, const annotation & v);
 	~Annotation();
 public:
 	bool match_annotation_name(const wstring & name) { return name == type; }
@@ -73,6 +74,7 @@ struct Array_value_t : public Value_t {
 struct Parameter_annotations_t {	// extract from Runtime_XXX_Annotations_attributes
 	u2 num_annotations;
 	Annotation *annotations = nullptr;	// [num_annotations]
+	CodeStub stub;
 
 	Parameter_annotations_t(cp_info **constant_pool, const parameter_annotations_t & v);
 	~Parameter_annotations_t();

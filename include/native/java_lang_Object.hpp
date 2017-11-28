@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_IHashCode(list<Oop *> & _stack);
 void JVM_MonitorWait(list<Oop *> & _stack);

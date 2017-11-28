@@ -6,9 +6,13 @@
  */
 
 #include "native/java_lang_String.hpp"
-#include "runtime/oop.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
+#include <vector>
+#include <algorithm>
+#include <cassert>
+#include "wind_jvm.hpp"
+#include "native/native.hpp"
 
 // hash func
 size_t java_string_hash::operator()(Oop* const & ptr) const noexcept		// TODO: 原先写的是 Oop *，在 g++ 上报错，在 clang++ 上不报错...!!  而且 g++ 规定 const 必须要加......
@@ -106,3 +110,37 @@ Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	stringoop->set_field_value(L"value:[C", charsequence);		// 直接钦定 value 域，并且 encode，可以 decode 为 TypeArrayOop* 。原先设计为 Oop* 全是 shared_ptr<Oop>，不过这样到了这步，引用计数将会不准...因为 shared_ptr 无法变成 uint_64，所以就会使用 shared_ptr::get()。所以去掉了 shared_ptr<Oop>，成为了 Oop *。
 	return stringoop;
 }
+
+
+/*===----------------------- Native -----------------------------===*/
+
+static unordered_map<wstring, void*> methods = {
+    {L"intern:()" STR,				(void *)&JVM_Intern},
+};
+
+void JVM_Intern(list<Oop *> & _stack){		// static
+	// this is a java.lang.String alloc on the heap.
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();		// this string oop begin Interned.
+	// now use java_lang_string::intern to alloc it on the StringTable.
+	InstanceOop *rt_pool_str = (InstanceOop *)java_lang_string::intern(java_lang_string::stringOop_to_wstring(_this));
+
+	_stack.push_back(rt_pool_str);
+}
+
+
+
+// 返回 fnPtr.
+void *java_lang_string_search_method(const wstring & signature)
+{
+	auto iter = methods.find(signature);
+	if (iter != methods.end()) {
+		return (*iter).second;
+	}
+	return nullptr;
+}
+
+
+
+
+
+

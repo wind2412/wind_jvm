@@ -50,6 +50,7 @@ bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				/
 		assert(false);
 	}
 	int offset = iter->second.first;
+	iter->second.second->if_didnt_parse_then_parse();		// important !!
 
 //	// volatile [0]
 //	bool is_volatile = iter->second.second->is_volatile();
@@ -75,6 +76,7 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 		assert(false);
 	}
 	int offset = iter->second.first;
+	iter->second.second->if_didnt_parse_then_parse();		// important!!
 
 //	// volatile [0]		// TODO:
 //	bool is_volatile = iter->second.second->is_volatile();

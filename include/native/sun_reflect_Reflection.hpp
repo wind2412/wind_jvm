@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_GetCallerClass(list<Oop *> & _stack);
 

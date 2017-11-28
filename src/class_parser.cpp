@@ -1227,7 +1227,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleAnnotations_attrib
 	// check
 //	std::wcout << "RVA length: " << i.attribute_length << ", stub length: " << i.parameter_annotations.stub.stub.size() << std::endl;	// delete
 	assert(i.parameter_annotations.stub.stub.size() == i.attribute_length);		// delete
-	i.parameter_annotations.stub.print();		// delete
+//	i.parameter_annotations.stub.print();		// delete
 	return f;
 }
 

@@ -12,7 +12,6 @@
 #include <list>
 
 using std::list;
-using std::string;
 
 void JVM_CurrentTimeMillis(list<Oop *> & _stack);
 void JVM_NanoTime(list<Oop *> & _stack);

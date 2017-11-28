@@ -398,6 +398,7 @@ bool InstanceKlass::get_static_field_value(const wstring & signature, Oop **resu
 	}
 	int offset = iter->second.first;
 	*result = this->static_fields[offset];
+	iter->second.second->if_didnt_parse_then_parse();		// like: get_static_field_value of: java/lang/Class.classLoader Field, if `java.lang.ClassLoader` klass is not parsed, then parse it.
 	return true;
 }
 
@@ -415,6 +416,7 @@ void InstanceKlass::set_static_field_value(const wstring & signature, Oop *value
 	}
 	int offset = iter->second.first;
 	this->static_fields[offset] = value;
+	iter->second.second->if_didnt_parse_then_parse();		// important!! parse it!!
 }
 
 shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
