@@ -33,6 +33,9 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
 		if (method == nullptr) {
 			method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" FLD);
+			if (method == nullptr) {
+				method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()Lsun/reflect/ReflectionFactory;");
+			}
 		}
 	}
 	assert(method != nullptr);

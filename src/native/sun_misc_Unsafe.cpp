@@ -15,6 +15,7 @@ static unordered_map<wstring, void*> methods = {
     {L"arrayBaseOffset:(" CLS ")I",				(void *)&JVM_ArrayBaseOffset},
     {L"arrayIndexScale:(" CLS ")I",				(void *)&JVM_ArrayIndexScale},
     {L"addressSize:()I",							(void *)&JVM_AddressSize},
+    {L"objectFieldOffset:([" FLD STR ")J",		(void *)&JVM_ObjectFieldOffset},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -30,6 +31,15 @@ void JVM_ArrayIndexScale(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
 void JVM_AddressSize(list<Oop *> & _stack){
+	_stack.push_back(new IntOop(sizeof(intptr_t)));
+}
+// see: http://hllvm.group.iteye.com/group/topic/37940
+void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用这些函数...因为我根本不知道正确的实现是什么.....
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	field->get_field_offset(field->get_field_value())
+
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
 

@@ -96,6 +96,7 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	Oop *int_oop_hash;
 	assert(stringoop->get_field_value(L"hash:I", &int_oop_hash) == true);
 	ss << " hash is: [" << ((IntOop *)int_oop_hash)->value << "]";
+	ss << " address is: [" << stringoop << "]";
 	return ss.str();
 }
 

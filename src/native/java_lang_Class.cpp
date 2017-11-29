@@ -112,6 +112,10 @@ MirrorOop *java_lang_class::get_basic_type_mirror(const wstring & signature) {	/
 	return nullptr;
 }
 
+wstring java_lang_class::get_typename_from_mirror(MirrorOop *mirror) {
+
+}
+
 void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, ClassLoader *loader) {
 	// set java_mirror
 	// this if only for Primitive Array/Primitive Type.
@@ -324,7 +328,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 			// fill in!		// see: openjdk: share/vm/runtime/reflection.cpp
 			field_oop->set_field_value(L"clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
 			field_oop->set_field_value(L"slot:I", new IntOop(iter.second.first));			// TODO: 不知道这里设置的对不对??
-			field_oop->set_field_value(L"name:Ljava/lang/String;", java_lang_string::intern(iter.first));
+			field_oop->set_field_value(L"name:Ljava/lang/String;", java_lang_string::intern(field->get_name()));		// bug report... 原先写得是 iter.first，结果那是 name+type... 这里只要 name......
 
 			// judge whether it is a basic type?
 			if (field->get_type_klass() != nullptr) {		// It is an obj/objArray/TypeArray.
@@ -387,7 +391,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	for (int i = 0; i < v.size(); i ++) {
 		Oop *result;
 		assert(v[i]->get_field_value(L"name:Ljava/lang/String;", &result));
-		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << std::endl;
+		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << ", address: [" << result << ']' << std::endl;
 	}
 	std::wcout << "===--------------------------------------------------------===" << std::endl;
 #endif

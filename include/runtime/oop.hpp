@@ -78,6 +78,8 @@ public:		// 以下 8 个方法全部用来赋值。
 	void set_static_field_value(shared_ptr<Field_info> field, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
 	bool get_static_field_value(const wstring & signature, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
 	void set_static_field_value(const wstring & signature, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
+public:
+	int get_field_offset(const wstring & signature);		// for Unsafe.
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);

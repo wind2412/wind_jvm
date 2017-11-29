@@ -19,6 +19,7 @@ using std::list;
 void JVM_ArrayBaseOffset(list<Oop *> & _stack);
 void JVM_ArrayIndexScale(list<Oop *> & _stack);
 void JVM_AddressSize(list<Oop *> & _stack);
+void JVM_ObjectFieldOffset(list<Oop *> & _stack);
 
 void *sun_misc_unsafe_search_method(const wstring & str);
 

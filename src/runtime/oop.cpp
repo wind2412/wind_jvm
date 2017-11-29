@@ -93,6 +93,31 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 
 }
 
+int InstanceOop::get_field_offset(const wstring & signature)
+{
+	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
+	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+	if (iter == instance_klass->fields_layout.end()) {
+		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	iter->second.second->if_didnt_parse_then_parse();		// important !!
+
+//	// volatile [0]
+//	bool is_volatile = iter->second.second->is_volatile();
+//	// volatile [1]
+//	if (is_volatile) {
+//		this->fields[offset]->enter_monitor();
+//	}
+	// field value not 0, maybe basic type.
+//	// volatile [2]
+//	if (is_volatile) {
+//		this->fields[offset]->leave_monitor();
+//	}
+	return (char *)&this->fields[offset] - (char *)this;
+}
+
 /*===----------------  MirrorOop  -------------------===*/
 MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who)			// 注意：在使用 lldb 调试的时候：输入 mirrored_who 其实是在输出 this->mirrored_who...... 而不是这个形参的...... 形参的 mirrored_who 的输出要使用 fr v mirrored_who 来进行打印！......
 					: InstanceOop(std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))),
