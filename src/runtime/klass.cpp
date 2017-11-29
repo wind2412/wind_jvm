@@ -107,9 +107,11 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.
-	if (total_static_fields_num != 0)		// be careful!!!!
-		this->static_fields = new Oop*[total_static_fields_num];
-	memset(this->static_fields, 0, total_static_fields_num * sizeof(Oop *));	// bzero!!
+//	if (total_static_fields_num != 0)		// be careful!!!!
+//		this->static_fields = new Oop*[total_static_fields_num];
+//	memset(this->static_fields, 0, total_static_fields_num * sizeof(Oop *));	// bzero!!
+
+	this->static_fields.resize(total_static_fields_num, nullptr);		// alloc and bzero!!
 
 	// initialize static BasicTypeOop...
 	initialize_field(this->static_fields_layout, this->static_fields);
@@ -487,7 +489,7 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	return nullptr;
 }
 
-void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields)
+void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields)
 {
 	for (auto & iter : fields_layout) {
 		// ** 如果是 static 的 get_field，那么需要根据 signature 去 parent 去找。不过这里只是初始化，parent 的 static 域会被自己初始化，不用此子类管。 **
@@ -618,7 +620,6 @@ InstanceKlass::~InstanceKlass() {
 	for (int i = 0; i < total_static_fields_num; i ++) {
 		delete static_fields[i];
 	}
-	delete[] static_fields;
 };
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/
@@ -704,7 +705,7 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
 
-	assert(loader == nullptr);		// TODO 这一点我也非常迷惑...... BasicType[][][] Klass 可以由 自己定义的 AppClassLoader 加载吗 ??????
+	assert(loader == nullptr);
 
 	for (int i = 0; i < dimension; i ++) {
 		ss << L"[";

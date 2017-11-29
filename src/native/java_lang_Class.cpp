@@ -52,6 +52,7 @@ void java_lang_class::init() {		// must execute this method before jvm!!!
 	state() = Inited;
 }
 
+// 注：内部根本没有 [[I 这类的 mirror，它们的 mirror 全是 I ！！
 void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Class load!!!
 	assert(state() == Inited);
 	assert(system_classmap.find(L"java/lang/Class.class") != system_classmap.end());		// java.lang.Class must be loaded !!
@@ -70,7 +71,9 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 			switch (name[0]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
 					// insert into.
-					get_single_basic_type_mirrors().insert(make_pair(name, std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr)));
+					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+					basic_type_mirror->set_extra(name);			// set the name `I`, `J` if it's a primitve type.
+					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
 					break;
 				}
 				default:{
@@ -110,10 +113,6 @@ MirrorOop *java_lang_class::get_basic_type_mirror(const wstring & signature) {	/
 	}
 	assert(iter != basic_type_mirrors.end());
 	return nullptr;
-}
-
-wstring java_lang_class::get_typename_from_mirror(MirrorOop *mirror) {
-
 }
 
 void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, ClassLoader *loader) {
@@ -354,6 +353,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 							assert(false);
 					}
 				}
+				else assert(false);
 			}
 			// 注意：field 属性也有 Annotation，因此 ACC_ANNOTATION 也会被设置上！但是，参加 class_parser.hpp 开头，field 在 jvm 规范中是不允许设置 ACC_ANNOTATION 的！
 			// 这里在 openjdk 中也有提到。

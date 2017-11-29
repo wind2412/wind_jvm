@@ -14,17 +14,20 @@ InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::
 	this->field_length = klass->non_static_field_num();
 	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
 	if (this->field_length != 0) {
-		fields = new Oop*[this->field_length];			// TODO: not gc control......
-		memset(fields, 0, this->field_length * sizeof(Oop *));		// 啊啊啊啊全部清空别忘了！！
+//		fields = new Oop*[this->field_length];			// TODO: not gc control......
+//		memset(fields, 0, this->field_length * sizeof(Oop *));		// 啊啊啊啊全部清空别忘了！！
+
+		fields.resize(this->field_length, nullptr);
+
 	}
 
 	// initialize BasicTypeOop...
 	klass->initialize_field(klass->fields_layout, this->fields);
 }
 
-InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.field_length), fields(new Oop*[this->field_length])	// TODO: not gc control......
+InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.field_length), fields(rhs.fields)	// TODO: not gc control......
 {
-	memcpy(this->fields, rhs.fields, sizeof(Oop *) * this->field_length);		// shallow copy
+//	memcpy(this->fields, rhs.fields, sizeof(Oop *) * this->field_length);		// shallow copy
 }
 
 bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)
@@ -115,6 +118,7 @@ int InstanceOop::get_field_offset(const wstring & signature)
 //	if (is_volatile) {
 //		this->fields[offset]->leave_monitor();
 //	}
+	std::wcout << "this: [" << this << "], " << signature << ":[" << &this->fields << "]" << std::endl;
 	return (char *)&this->fields[offset] - (char *)this;
 }
 

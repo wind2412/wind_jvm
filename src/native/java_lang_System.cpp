@@ -136,6 +136,7 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.version"), java_lang_string::intern(L"52.0")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.management.compiler"), java_lang_string::intern(L"nop")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.io.unicode.encoding"), java_lang_string::intern(L"UnicodeBig")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.reflect.noCaches"), java_lang_string::intern(L"true")});	// 直接魔改了（逃
 //	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.ext.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/ext:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java")});
 //	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.endorsed.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/endorsed")});
 //	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib")});

@@ -65,7 +65,7 @@ public:
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
 private:
 	int field_length;
-	Oop **fields = nullptr;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
+	vector<Oop *> fields;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
 public:
 	InstanceOop(shared_ptr<InstanceKlass> klass);
 	InstanceOop(const InstanceOop & rhs);		// shallow copy
@@ -88,15 +88,18 @@ public:
 		for (int i = 0; i < field_length; i ++) {
 			delete fields[i];
 		}
-		delete[] fields;
 	}
 };
 
 class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.
 private:
 	shared_ptr<Klass> mirrored_who;		// this Oop being instantiation, must after java.lang.Class loaded !!!
+	wstring extra;						// bad design... if it's basic type like int, long, use the `extra`. this time , mirrored_who == nullptr.
 public:
-	MirrorOop(shared_ptr<Klass> mirrored_who);
+	wstring get_extra() { return extra; }
+	void set_extra(const wstring & s) { extra = s; }
+public:
+	MirrorOop(shared_ptr<Klass> mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
 public:
 	shared_ptr<Klass> get_mirrored_who() { return mirrored_who; }
 	const auto & get_mirrored_all_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->fields_layout; }

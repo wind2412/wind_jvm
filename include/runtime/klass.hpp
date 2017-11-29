@@ -139,7 +139,10 @@ private:
 	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_num = 0;
 	int total_static_fields_num = 0;
-	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
+//	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
+	vector<Oop *> static_fields;		// 为了支持 Unsafe 的原子操作，整个 field 必须和 this 有完全相等的距离。因此如果像 Oop ** 一样挂在外边，一个 GC 之后距离肯定变。
+									// 实在是太恶心了。居然到这一步才发现 java 的 Unsafe 竟然计算的是绝对距离。但是也没法改了。毕竟我的内存布局和 jvm 的几乎不同。它的
+									// Fields 直接挂在此类的后边...
 	// static methods + vtable + itable
 	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
 	vector<shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
@@ -175,7 +178,7 @@ public:
 	void initialize_final_static_field();
 	wstring parse_signature();
 private:
-	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, Oop **fields );		// initializer for parse_fields() and InstanceOop's Initialization
+	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);	// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!

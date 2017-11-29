@@ -1933,8 +1933,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "(DEBUG) So push 1 onto the stack." << std::endl;
 #endif
 					}
-					else
-						op_stack.push(ref);		// re-push.		// "op_stack will not change if op_stack's top is null."
+//					else							// bug...
+//						op_stack.push(ref);		// re-push.		// "op_stack will not change if op_stack's top is null."
 					break;
 				}
 				// 2. if ref is not null, judge its type
