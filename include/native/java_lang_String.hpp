@@ -61,26 +61,27 @@ public:
 	static inline __attribute__((always_inline)) Oop *intern(const wstring & str) {		// intern 用到的次数非常多。建议内联。
 		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
 		LockGuard lg(getLock());
-		auto iter = java_lang_string::get_string_table().find(stringoop);
-//#ifndef DEBUG		// 查了半天得到结论，应该是 mac 系统内部以及 clang++ 内部的共同的 bug 造成的吧。
-//#define DEBUG
-//#endif
-#ifdef STRING_DEBUG
+//#ifdef STRING_DEBUG
 	std::wcout << "===-------------- origin string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
 		std::wcout << java_lang_string::print_stringOop((InstanceOop *)iter) << std::endl;	// TODO: map 的 iter 是 pair... set 的 iter 就是元素自身..... 都忘光了......
 	}
 	std::wcout << "===-------------------------------------------===" << std::endl;
-#endif
+//#endif
+		auto iter = java_lang_string::get_string_table().find(stringoop);
+//#ifndef DEBUG		// 查了半天得到结论，应该是 mac 系统内部以及 clang++ 内部的共同的 bug 造成的吧。
+//#define DEBUG
+//#endif
 		if (iter == java_lang_string::get_string_table().end()) {
+			assert(java_lang_string::get_string_table().find(stringoop) == java_lang_string::get_string_table().end());
 			java_lang_string::get_string_table().insert(stringoop);
 //#ifdef STRING_DEBUG
-	std::wcout << java_lang_string::print_stringOop((InstanceOop *)stringoop) << std::endl;
+	std::wcout << java_lang_string::print_stringOop((InstanceOop *)stringoop) << " (insert in)" << std::endl;
 //#endif
 			return stringoop;
 		} else {
 //#ifdef STRING_DEBUG
-	std::wcout << java_lang_string::print_stringOop((InstanceOop *)*iter) << std::endl;
+	std::wcout << java_lang_string::print_stringOop((InstanceOop *)*iter) << " (return directly)" << std::endl;
 //#endif
 			return *iter;
 		}

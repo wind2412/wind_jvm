@@ -292,7 +292,12 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	assert(klass->get_type() == ClassType::InstanceClass);
 
 	// get all fields-layout from the mirror's `mirrored_who`.
-	const auto & all_fields = _this->get_mirrored_all_fields();
+	auto all_fields = _this->get_mirrored_all_fields();			// make a copy...
+	auto & all_static_fields = _this->get_mirrored_all_static_fields();
+	for (auto iter : all_static_fields) {
+		assert(all_fields.find(iter.first) == all_fields.end());
+		all_fields[iter.first] = iter.second;		// fill in.
+	}
 
 	// load java/lang/reflect/Field and [Ljava/lang/reflect/Field;.
 	auto Field_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Field"));
