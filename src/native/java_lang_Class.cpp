@@ -84,15 +84,11 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		else if (name.size() == 2 && name[0] == L'[') {
 			switch (name[1]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
-//					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
-//					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
-//					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
-//					basic_type_mirror->set_mirrored_who(arr_klass);
-//					std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
-				auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
-				auto basic_type_mirror_iter = get_single_basic_type_mirrors().find(wstring(1, name[1]));
-				assert(basic_type_mirror_iter != get_single_basic_type_mirrors().end());
-				std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
+					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
+					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
+					basic_type_mirror->set_mirrored_who(arr_klass);
+					arr_klass->set_mirror(basic_type_mirror);
 					break;
 				}
 				default:{
