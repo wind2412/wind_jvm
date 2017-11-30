@@ -40,6 +40,7 @@ private:
 
 	u1 num_RuntimeVisibleParameterAnnotation = 0;
 	Parameter_annotations_t *rvpa = nullptr;		// [n]
+	CodeStub _rvpa;
 
 	// RuntimeTypeAnnotation [of Method]
 	u2 num_RuntimeVisibleTypeAnnotations = 0;
@@ -73,6 +74,7 @@ public:
 	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }
 	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
+	u2 get_flag() { return access_flags; }
 public:
 	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();
 	vector<MirrorOop *> parse_argument_list();
@@ -119,6 +121,8 @@ public:
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	wstring parse_signature();
 	void print() { std::wcout << name << ":" << descriptor; }
+	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
+	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
 
 	~Method() {
 		for (int i = 0; i < attributes_count; i ++) {

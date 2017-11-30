@@ -681,6 +681,7 @@ struct RuntimeVisibleParameterAnnotations_attribute : public attribute_info {
 	parameter_annotations_t *parameter_annotations = nullptr;		// [num_parameters];
 	friend std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleParameterAnnotations_attribute & i);
 	~RuntimeVisibleParameterAnnotations_attribute();
+	CodeStub stub;
 };
 
 struct RuntimeInvisibleParameterAnnotations_attribute : public attribute_info {

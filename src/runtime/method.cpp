@@ -68,13 +68,14 @@ Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **cons
 				constructor(this->rva, constant_pool, enter);
 				break;
 			}
-			case 16:{	// RuntimeVisibleTypeAnnotation
+			case 16:{	// RuntimeVisibleParameterAnnotation
 				auto enter_ptr = ((RuntimeVisibleParameterAnnotations_attribute *)this->attributes[i]);
 				this->num_RuntimeVisibleParameterAnnotation = enter_ptr->num_parameters;
 				this->rvpa = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t) * this->num_RuntimeVisibleParameterAnnotation);
 				for (int pos = 0; pos < this->num_RuntimeVisibleParameterAnnotation; pos ++) {
 					constructor(&this->rvpa[pos], constant_pool, enter_ptr->parameter_annotations[pos]);
 				}
+				this->_rvpa = enter_ptr->stub;
 				break;
 			}
 			case 18:{		// RuntimeVisibleTypeAnnotation
@@ -113,22 +114,25 @@ Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **cons
 
 wstring Method::parse_signature()
 {
-	assert(signature_index != 0);
+	if (signature_index == 0) return L"";
 	auto _pair = (*klass->get_rtpool())[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
-	return boost::any_cast<wstring>(_pair.second);
+	wstring signature = boost::any_cast<wstring>(_pair.second);
+	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
+	return signature;
 }
 
 vector<MirrorOop *> Method::if_didnt_parse_exceptions_then_parse()
 {
 	if (!parsed) {
 		parsed = true;
-		for (int i = 0; i < exceptions->number_of_exceptions; i ++) {
-			auto rt_pool = this->klass->get_rtpool();
-			assert((*rt_pool)[exceptions->exception_index_table[i]-1].first == CONSTANT_Class);
-			auto excp_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[exceptions->exception_index_table[i]-1].second);
-			exceptions_tb[excp_klass->get_name()] = excp_klass;
-		}
+		if (exceptions != nullptr)
+			for (int i = 0; i < exceptions->number_of_exceptions; i ++) {
+				auto rt_pool = this->klass->get_rtpool();
+				assert((*rt_pool)[exceptions->exception_index_table[i]-1].first == CONSTANT_Class);
+				auto excp_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[exceptions->exception_index_table[i]-1].second);
+				exceptions_tb[excp_klass->get_name()] = excp_klass;
+			}
 	}
 
 	vector<MirrorOop *> v;
@@ -187,7 +191,17 @@ vector<MirrorOop *> Method::parse_argument_list()
 			v.push_back(klass->get_mirror());
 		} else {		// ArrayType
 			assert(args[i][0] == L'[');
-//			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);....
+			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
+			assert(klass != nullptr);
+			v.push_back(klass->get_mirror());
 		}
 	}
+#ifdef DEBUG
+	std::wcout << "===---------------- arg list (Runtime of " << descriptor << ") -----------------===" << std::endl;
+	for (int i = 0; i < v.size(); i ++) {
+		std::wcout << v[i]->get_klass()->get_name() << std::endl;
+	}
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
+#endif
+	return v;
 }

@@ -1255,6 +1255,11 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleParameterAnnotatio
 		total_anno_length += i.parameter_annotations[pos].stub.stub.size();
 	}
 	assert(i.attribute_length == total_anno_length);
+	// CodeStub
+	i.stub.inject(i.num_parameters);
+	for(int pos = 0; pos < i.num_parameters; pos ++) {
+		i.stub += i.parameter_annotations[pos].stub;
+	}
 	return f;
 }
 RuntimeVisibleParameterAnnotations_attribute::~RuntimeVisibleParameterAnnotations_attribute() { delete[] parameter_annotations; }

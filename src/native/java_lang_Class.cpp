@@ -142,15 +142,18 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Cl
 				get_single_basic_type_mirrors().insert(make_pair(klass->get_name(), mirror));
 			}
 			klass->set_mirror(mirror);	// set java_mirror
+#ifdef DEBUG
+	std::wcout << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
+#endif
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {
 			MirrorOop *mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
 			klass->set_mirror(mirror);	// set java_mirror
+#ifdef DEBUG
+	std::wcout << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
+#endif
 		} else {
 			assert(false);
 		}
-#ifdef DEBUG
-//	std::wcout << "===----------- BasicType / BasicTypeArray"
-#endif
 	}
 }
 
@@ -444,18 +447,25 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	assert(false);
 }
 void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
+
+	std::wcout << "hahahahah" << std::endl;
+
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
 	assert(_this->get_klass()->get_type() == ClassType::InstanceClass);
 
-	// get all ctors
-	vector<shared_ptr<Method>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_constructors();
-
 	// load java/lang/reflect/Constructor
 	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Constructor"));
 	assert(klass != nullptr);
+	auto Ctor_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Constructor;"));
+	assert(Ctor_arr_klass != nullptr);
+	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	assert(Byte_arr_klass != nullptr);
 
-	vector<InstanceOop *> oop_ctors;
+	// get all ctors
+	vector<shared_ptr<Method>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_constructors();
+
+	vector<InstanceOop *> v;
 
 	// become java/lang/reflect/Constructor
 	for (auto method : ctors) {
@@ -464,11 +474,68 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 		ctor_oop->set_field_value(L"clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
 		ctor_oop->set_field_value(L"slot:I", new IntOop(0));			// 反正我是用不上的。因为是 unordered_map。
 
+		// parse arg list.
+		vector<MirrorOop *> args = method->parse_argument_list();
+		// create [Ljava/lang/Class arr obj.
+		shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+		auto class_array_obj = class_arr_klass->new_instance(args.size());
+		for (int i = 0; i < args.size(); i ++) {
+			(*class_array_obj)[i] = args[i];
+		}
+		ctor_oop->set_field_value(L"parameterTypes:[Ljava/lang/Class;", class_array_obj);
 
+
+		// parse exceptions list.
+		vector<MirrorOop *> excepts = method->if_didnt_parse_exceptions_then_parse();
+		// create [Ljava/lang/Class arr obj.
+		auto except_array_obj = class_arr_klass->new_instance(excepts.size());
+		for (int i = 0; i < excepts.size(); i ++) {
+			(*except_array_obj)[i] = excepts[i];
+		}
+		ctor_oop->set_field_value(L"exceptionTypes:[Ljava/lang/Class;", except_array_obj);
+
+		ctor_oop->set_field_value(L"modifiers:I", new IntOop(method->get_flag() & (~ACC_ANNOTATION)));
+		ctor_oop->set_field_value(L"override:Z", new IntOop(false));
+		wstring template_signature = method->parse_signature();
+		if (template_signature != L"")
+			ctor_oop->set_field_value(L"signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
+
+		// set RuntimeVisiableAnnotations
+		CodeStub *stub = method->get_rva();		// RuntimeVisibleAnnotations' bytecode
+		if (stub) {
+			ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+			for (int i = 0; i < stub->stub.size(); i ++) {
+				(*byte_arr)[i] = new IntOop(stub->stub[i]);
+			}
+			ctor_oop->set_field_value(L"annotations:[B", byte_arr);
+		}
+		// set RuntimeVisiableParameterAnnotations
+		stub = method->get_rvpa();		// RuntimeVisibleParameterAnnotations' bytecode
+		if (stub) {
+			ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+			for (int i = 0; i < stub->stub.size(); i ++) {
+				(*byte_arr)[i] = new IntOop(stub->stub[i]);
+			}
+			ctor_oop->set_field_value(L"parameterAnnotations:[B", byte_arr);
+		}
+
+		v.push_back(ctor_oop);
 	}
 
+	ArrayOop *ctor_arr = Ctor_arr_klass->new_instance(v.size());
+	for (int i = 0; i < v.size(); i ++) {
+		(*ctor_arr)[i] = v[i];
+	}
 
-	assert(false);
+#ifdef DEBUG
+	std::wcout << "===-------------- getClassDeclaredCtors Pool (" << klass->get_name() << ")-------------===" << std::endl;
+	for (int i = 0; i < ctors.size(); i ++) {
+		std::wcout << i << ". " << ctors[i]->get_name() << ":" << ctors[i]->get_descriptor() << std::endl;
+	}
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
+#endif
+
+	_stack.push_back(ctor_arr);
 }
 void JVM_GetProtectionDomain(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

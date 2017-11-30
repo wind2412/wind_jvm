@@ -570,10 +570,12 @@ void InstanceKlass::initialize_final_static_field()
 
 wstring InstanceKlass::parse_signature()
 {
-	assert(signature_index != 0);
+	if (signature_index == 0) return L"";
 	auto _pair = (*this->rt_pool)[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
-	return boost::any_cast<wstring>(_pair.second);
+	wstring signature = boost::any_cast<wstring>(_pair.second);
+	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
+	return signature;
 }
 
 bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
@@ -789,8 +791,7 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	for (int i = 0; i < dimension; i ++) {
 		ss << L"[";
 	}
-//	ss << L"L" << element_klass->get_name() << L";";
-	ss << element_klass->get_name();	// TODO
+	ss << L"L" << element_klass->get_name() << L";";
 	this->name = ss.str();
 	// 2. set java_mirror
 	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
