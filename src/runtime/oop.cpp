@@ -96,13 +96,14 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 
 }
 
-int InstanceOop::get_field_offset(const wstring & signature)
+int InstanceOop::get_all_field_offset(const wstring & signature)
 {
+	// first, search in non-static field.
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 	if (iter == instance_klass->fields_layout.end()) {
-		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
-		assert(false);
+		// then, search in static field.
+		return get_static_field_offset(signature);
 	}
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
@@ -120,15 +121,34 @@ int InstanceOop::get_field_offset(const wstring & signature)
 //	}
 
 	// 不行，完全支持不了。java 默认所有 同一 klass 的 obj 都是相同的内存布局。我把 fields 挂在外边计算和 this 的距离，根本算不出来！每次都不同！！
-	// 只有一种手段可以解决 ———— 变绝对距离成相对距离，就像分布式系统变绝对时间为相对逻辑时间一样！！这样应该可以完美解决！！
+	// [√] 只有一种手段可以解决 ———— 变绝对距离成相对距离，就像分布式系统变绝对时间为相对逻辑时间一样！！这样应该可以完美解决！！
 	// 方法即是：
 	// 这里存放的不是绝对距离，我会把语义完全改变，成为 “和此 oop 存放的 field 的起始地址的相对距离”，而不是 “和此 oop 的 this 指针的绝对距离”！！
 	// 这样，GC 也可以用多种算法了！！看来也可以支持复制算法了！开森～
 #ifdef DEBUG
-	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << signature << ":[" << &this->fields[offset] << "]" << std::endl;
+	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
 #endif
 //	return (char *)&this->fields[offset] - (char *)this;
 	return offset;	// vector 是连续内存。
+}
+
+int InstanceOop::get_static_field_offset(const wstring & signature)
+{
+	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
+	auto iter = instance_klass->static_fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+	if (iter == instance_klass->static_fields_layout.end()) {
+		std::wcerr << "didn't find static field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		assert(false);
+	}
+	int offset = iter->second.first;
+	iter->second.second->if_didnt_parse_then_parse();		// important !!
+
+	// TODO: volatile?
+
+#ifdef DEBUG
+	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], (static)" << signature << ":[" << &this->fields[offset] << "(encoding: " << offset + instance_klass->non_static_field_num() << ")]" << std::endl;
+#endif
+	return offset + instance_klass->non_static_field_num();		// 这里需要注意。由于 static 和 non-static 我是分别存放的，而 unsafe 中指定的 offset 是唯一的。这就造成我不知道去 static 里边找还是 non-static 里边找。“两个都找，找到就ok” 的策略一定会引入软件漏洞。因此，采用编码，让 non-static 和 static 的编号永远不会重合。根据 non-static-field-size 来判断去哪里找。
 }
 
 /*===----------------  MirrorOop  -------------------===*/

@@ -177,6 +177,8 @@ public:
 	shared_ptr<Method> get_static_void_main();
 	void initialize_final_static_field();
 	wstring parse_signature();
+public:
+	vector<Oop *> & get_static_fields_addr() { return static_fields; }
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:

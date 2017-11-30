@@ -11,6 +11,7 @@
 #include <cassert>
 #include "native/native.hpp"
 #include "native/java_lang_String.hpp"
+#include "utils/os.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"arrayBaseOffset:(" CLS ")I",				(void *)&JVM_ArrayBaseOffset},
@@ -18,6 +19,7 @@ static unordered_map<wstring, void*> methods = {
     {L"addressSize:()I",							(void *)&JVM_AddressSize},
     {L"objectFieldOffset:(" FLD ")J",			(void *)&JVM_ObjectFieldOffset},
     {L"getIntVolatile:(" OBJ "J)I",				(void *)&JVM_GetIntVolatile},
+    {L"compareAndSwapInt:(" OBJ "JII)Z",			(void *)&JVM_CompareAndSwapInt},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -74,7 +76,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 	shared_ptr<InstanceKlass> outer_klass = std::static_pointer_cast<InstanceKlass>(outer_klass_mirror->get_mirrored_who());
 
 	// try to new a obj
-	int offset = outer_klass->new_instance()->get_field_offset(descriptor);			// TODO: GC!!
+	int offset = outer_klass->new_instance()->get_all_field_offset(descriptor);			// TODO: GC!!
 
 #ifdef DEBUG
 	std::wcout << "(DEBUG) the field which names [ " << descriptor << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
@@ -88,18 +90,57 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
 	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
 
+	// I don't know...
+	assert(obj->get_klass()->get_type() == ClassType::InstanceClass);
+
 #ifdef DEBUG
 	std::wcout << "(DEBUG) [dangerous] will get an int from obj oop:[" << obj << "], which klass_name is: [" <<
-			std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_name() << "], offset: [" << offset << "]: ";
+			std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_name() << "], offset: [" << offset << "]: " << std::endl;
 #endif
+	Oop *target;
+	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
+		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
+		target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+	} else {		// it's in non-static field.
+		target = obj->get_fields_addr()[offset];
+	}
 	// 非常危险...
-	Oop *target = obj->get_fields_addr()[offset];
 	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
-	_stack.push_back(new IntOop(((IntOop *)target)->value));
+
+	int value = *((volatile int *)&((volatile IntOop *)target)->value);		// volatile
+	_stack.push_back(new IntOop(value));
 #ifdef DEBUG
-	std::wcout << "int value is [" << ((IntOop *)target)->value << "] " << std::endl;
+	std::wcout << "(DEBUG) ---> int value is [" << ((IntOop *)target)->value << "] " << std::endl;
+#endif
+
+}
+
+void JVM_CompareAndSwapInt(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	int expected = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	int x = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+	Oop *target;
+	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
+		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
+		target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+	} else {		// it's in non-static field.
+		target = obj->get_fields_addr()[offset];
+	}
+	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
+
+	// CAS, from x86 assembly, and openjdk.
+	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)target)->value, expected) == expected));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << ((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
+
+
+
+
 
 // 返回 fnPtr.
 void *sun_misc_unsafe_search_method(const wstring & signature)
