@@ -338,7 +338,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 
 
 	// check
-	auto klass = _this->get_klass();
+	auto klass = _this->get_mirrored_who();
 	assert(klass->get_type() == ClassType::InstanceClass);
 
 	// get all fields-layout from the mirror's `mirrored_who`.
@@ -361,7 +361,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	vector<InstanceOop *> v;		// temp save, because we don't know the Field[]'s length now. We should make a traverse.
 	for (const auto & iter : all_fields) {
 		const shared_ptr<Field_info> & field = iter.second.second;
-		if (_this->is_the_field_owned_by_this(iter.second.first)) {
+		if (field->is_static() || _this->is_the_field_owned_by_this(iter.second.first)) {
 			if (public_only && !field->is_public()) continue;
 
 			// create a Field oop obj.
@@ -434,7 +434,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "===-------------- getClassDeclaredFields Pool -------------===" << std::endl;
+	std::wcout << "===-------------- getClassDeclaredFields Pool (" << klass->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < v.size(); i ++) {
 		Oop *result;
 		assert(v[i]->get_field_value(L"name:Ljava/lang/String;", &result));

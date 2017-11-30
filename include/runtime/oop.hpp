@@ -79,7 +79,8 @@ public:		// 以下 8 个方法全部用来赋值。
 	bool get_static_field_value(const wstring & signature, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
 	void set_static_field_value(const wstring & signature, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
 public:
-	int get_field_offset(const wstring & signature);		// for Unsafe.
+	int get_field_offset(const wstring & signature);					// for Unsafe.
+	const vector<Oop *> & get_fields_addr() { return fields; }		// for Unsafe.
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);
@@ -108,9 +109,15 @@ public:
 	bool is_the_field_owned_by_this(int offset) {
 		auto & this_fields_map = std::static_pointer_cast<InstanceKlass>(mirrored_who)->is_this_klass_field;
 		auto iter = this_fields_map.find(offset);
-		assert (iter != this_fields_map.end());
+//assert(iter != this_fields_map.end());
+//		std::wcout << "searching..." << iter->
+		assert (iter != this_fields_map.end()); // 那么一定在 static field 中。this 的 field 没有！调用者需要在 static field 中找。
 		return iter->second;
 	}
+//	bool is_the_static_field_owned_by_this(const wstring & signature) {
+//		auto & this_static_field_map = std::static_pointer_cast<InstanceKlass>(mirrored_who)->static_fields_layout;
+//		return this_static_field_map.find(signature) != this_static_field_map.end();
+//	}
 };
 
 class ArrayOop : public Oop {

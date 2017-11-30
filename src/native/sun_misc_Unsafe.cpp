@@ -17,6 +17,7 @@ static unordered_map<wstring, void*> methods = {
     {L"arrayIndexScale:(" CLS ")I",				(void *)&JVM_ArrayIndexScale},
     {L"addressSize:()I",							(void *)&JVM_AddressSize},
     {L"objectFieldOffset:(" FLD ")J",			(void *)&JVM_ObjectFieldOffset},
+    {L"getIntVolatile:(" OBJ "J)I",				(void *)&JVM_GetIntVolatile},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -39,7 +40,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();	// java/lang/reflect/Field obj.
 
-	// 需要 new 一个对象... 实测...
+	// 需要 new 一个对象... 实测...				// TODO: 还要支持 static 的！这时不用 new 对象了。
 	Oop *oop;
 	assert(field->get_field_value(L"name:Ljava/lang/String;", &oop));
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
@@ -76,12 +77,29 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 	int offset = outer_klass->new_instance()->get_field_offset(descriptor);			// TODO: GC!!
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) the field which names [ " << descriptor << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its oop." << std::endl;
+	std::wcout << "(DEBUG) the field which names [ " << descriptor << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(offset));		// 这时候万一有了 GC，我的内存布局就全都变了...
 }
 
+void JVM_GetIntVolatile(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) [dangerous] will get an int from obj oop:[" << obj << "], which klass_name is: [" <<
+			std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_name() << "], offset: [" << offset << "]: ";
+#endif
+	// 非常危险...
+	Oop *target = obj->get_fields_addr()[offset];
+	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
+	_stack.push_back(new IntOop(((IntOop *)target)->value));
+#ifdef DEBUG
+	std::wcout << "int value is [" << ((IntOop *)target)->value << "] " << std::endl;
+#endif
+}
 
 // 返回 fnPtr.
 void *sun_misc_unsafe_search_method(const wstring & signature)

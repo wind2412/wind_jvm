@@ -253,7 +253,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	std::wcout << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is normal class but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			} else {							// b2. klass is a normal class, too
-				if (ref_klass == klass || ref_klass->get_parent() == klass) {
+				if (ref_klass == klass || std::static_pointer_cast<InstanceKlass>(ref_klass)->check_parent(std::static_pointer_cast<InstanceKlass>(klass))) {
 					result = true;
 				} else {
 					result = false;
@@ -899,8 +899,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				Oop *array_ref = op_stack.top();	op_stack.pop();
 				assert(array_ref != nullptr && array_ref->get_ooptype() == OopType::_ObjArrayOop);
-				if (value != nullptr)
-					assert(value->get_ooptype() == OopType::_InstanceOop);
+//				if (value != nullptr) {
+//					std::wcout << value->get_ooptype() << ((ObjArrayOop *)array_ref)->get_dimension() << std::endl;
+//					assert(value->get_ooptype() == OopType::_InstanceOop);		// 不做检查了。因为也会有把 一个[[[Ljava.lang.String; 放到 [Ljava.lang.Object;的 [1] 中去的。
+//				}
 				InstanceOop *real_value = (InstanceOop *)value;
 				ObjArrayOop *real_array = (ObjArrayOop *)array_ref;
 				assert(real_array->get_length() > index);

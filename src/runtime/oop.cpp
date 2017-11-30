@@ -118,8 +118,17 @@ int InstanceOop::get_field_offset(const wstring & signature)
 //	if (is_volatile) {
 //		this->fields[offset]->leave_monitor();
 //	}
-	std::wcout << "this: [" << this << "], " << signature << ":[" << &this->fields << "]" << std::endl;
-	return (char *)&this->fields[offset] - (char *)this;
+
+	// 不行，完全支持不了。java 默认所有 同一 klass 的 obj 都是相同的内存布局。我把 fields 挂在外边计算和 this 的距离，根本算不出来！每次都不同！！
+	// 只有一种手段可以解决 ———— 变绝对距离成相对距离，就像分布式系统变绝对时间为相对逻辑时间一样！！这样应该可以完美解决！！
+	// 方法即是：
+	// 这里存放的不是绝对距离，我会把语义完全改变，成为 “和此 oop 存放的 field 的起始地址的相对距离”，而不是 “和此 oop 的 this 指针的绝对距离”！！
+	// 这样，GC 也可以用多种算法了！！看来也可以支持复制算法了！开森～
+#ifdef DEBUG
+	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << signature << ":[" << &this->fields[offset] << "]" << std::endl;
+#endif
+//	return (char *)&this->fields[offset] - (char *)this;
+	return offset;	// vector 是连续内存。
 }
 
 /*===----------------  MirrorOop  -------------------===*/
