@@ -624,8 +624,20 @@ InstanceKlass::~InstanceKlass() {
 	}
 };
 
+vector<shared_ptr<Method>> InstanceKlass::get_constructors()
+{
+	vector<shared_ptr<Method>> v;
+	for (auto iter : this->methods) {
+		if (iter.second->get_name() == L"<init>") {
+			v.push_back(iter.second);
+		}
+	}
+	assert(v.size() >= 1);
+	return v;
+}
+
 /*===---------------    MirrorKlass (aux)    --------------------===*/
-MirrorOop *MirrorKlass::new_mirror(shared_ptr<InstanceKlass> mirrored_who, ClassLoader *loader) {
+MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *loader) {
 	// 注意 mirrored_who 可以为 nullptr。因为在数组类使用了 new_mirror(nullptr, nullptr).
 	LockGuard lg(system_classmap_lock);
 	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
@@ -777,7 +789,8 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	for (int i = 0; i < dimension; i ++) {
 		ss << L"[";
 	}
-	ss << element_klass->get_name();
+//	ss << L"L" << element_klass->get_name() << L";";
+	ss << element_klass->get_name();	// TODO
 	this->name = ss.str();
 	// 2. set java_mirror
 	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);

@@ -134,7 +134,7 @@ void JVM_CompareAndSwapInt(list<Oop *> & _stack){
 	// CAS, from x86 assembly, and openjdk.
 	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)target)->value, expected) == expected));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << ((IntOop *)_stack.back())->value << "]." << std::endl;
+	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 

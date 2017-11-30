@@ -13,7 +13,7 @@
 #include "system_directory.hpp"
 #include "classloader.hpp"
 #include "runtime/thread.hpp"
-#include <boost/regex.hpp>
+#include <regex>
 
 Lock thread_num_lock;
 int all_thread_num;
@@ -300,7 +300,7 @@ void vm_thread::init_and_do_main()
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
-	wind_jvm::main_class_name() = boost::regex_replace(main_class_name, boost::wregex(L"\\."), L"/");
+	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
 
 	vm_thread *init_thread;

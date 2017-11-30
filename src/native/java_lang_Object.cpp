@@ -45,7 +45,8 @@ void JVM_Clone(list<Oop *> & _stack){
 }
 void Java_java_lang_object_getClass(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	assert(_this != nullptr);
+	_stack.push_back(_this->get_klass()->get_mirror());
 }
 
 // 返回 fnPtr.

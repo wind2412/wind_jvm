@@ -55,7 +55,7 @@ struct BytecodeEngine {
 public:
 	static Oop * execute(vm_thread & thread, StackFrame & cur_frame, int thread_no);
 public:	// aux
-	static vector<Type> parse_arg_list(const wstring & descriptor);
+	static vector<wstring> parse_arg_list(const wstring & descriptor);
 	static void initial_clinit(shared_ptr<InstanceKlass>, vm_thread & thread);
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
 	static wstring get_real_value(Oop *oop);

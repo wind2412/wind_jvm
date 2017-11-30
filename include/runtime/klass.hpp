@@ -209,6 +209,8 @@ public:
 	InstanceOop* new_instance();
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
+public:		// for reflection.
+	vector<shared_ptr<Method>> get_constructors();
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
@@ -223,7 +225,7 @@ class MirrorKlass : public InstanceKlass {		// this class, only used to static_c
 private:
 	MirrorKlass();
 public:
-	MirrorOop *new_mirror(shared_ptr<InstanceKlass> mirrored_who, ClassLoader *loader);
+	MirrorOop *new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *loader);
 };
 
 class ArrayKlass : public Klass {

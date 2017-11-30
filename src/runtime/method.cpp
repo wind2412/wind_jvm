@@ -1,6 +1,10 @@
 #include "runtime/method.hpp"
 #include "runtime/klass.hpp"
 #include "utils/utils.hpp"
+#include "runtime/oop.hpp"
+#include "runtime/bytecodeEngine.hpp"
+#include "native/java_lang_Class.hpp"
+#include "classloader.hpp"
 
 Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool) : klass(klass) {
 	assert(constant_pool[mi.name_index-1]->tag == CONSTANT_Utf8);
@@ -113,4 +117,77 @@ wstring Method::parse_signature()
 	auto _pair = (*klass->get_rtpool())[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
 	return boost::any_cast<wstring>(_pair.second);
+}
+
+vector<MirrorOop *> Method::if_didnt_parse_exceptions_then_parse()
+{
+	if (!parsed) {
+		parsed = true;
+		for (int i = 0; i < exceptions->number_of_exceptions; i ++) {
+			auto rt_pool = this->klass->get_rtpool();
+			assert((*rt_pool)[exceptions->exception_index_table[i]-1].first == CONSTANT_Class);
+			auto excp_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[exceptions->exception_index_table[i]-1].second);
+			exceptions_tb[excp_klass->get_name()] = excp_klass;
+		}
+	}
+
+	vector<MirrorOop *> v;
+	for (auto iter : exceptions_tb) {
+		v.push_back(iter.second->get_mirror());
+	}
+	return v;
+}
+
+vector<MirrorOop *> Method::parse_argument_list()
+{
+	vector<MirrorOop *> v;
+	vector<wstring> args = BytecodeEngine::parse_arg_list(this->descriptor);
+	for (int i = 0; i < args.size(); i ++) {
+		if (args[i].size() == 1) {		// primitive type
+			switch (args[i][0]) {
+				case L'Z':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"Z"));
+					break;
+				}
+				case L'B':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"B"));
+					break;
+				}
+				case L'S':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"S"));
+					break;
+				}
+				case L'C':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"C"));
+					break;
+				}
+				case L'I':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"I"));
+					break;
+				}
+				case L'F':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"F"));
+					break;
+				}
+				case L'J':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"J"));
+					break;
+				}
+				case L'D':{
+					v.push_back(java_lang_class::get_basic_type_mirror(L"D"));
+					break;
+				}
+				default:{
+					assert(false);
+				}
+			}
+		} else if (args[i][0] == L'L') {	// InstanceOop type
+			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
+			assert(klass != nullptr);
+			v.push_back(klass->get_mirror());
+		} else {		// ArrayType
+			assert(args[i][0] == L'[');
+//			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);....
+		}
+	}
 }

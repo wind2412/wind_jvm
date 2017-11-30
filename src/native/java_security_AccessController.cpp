@@ -27,16 +27,43 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 	vm_thread & thread = (*(vm_thread*) (_stack.back ()));
 	_stack.pop_back ();
 	assert(pa != nullptr);
-	// TODO: 不支持泛型的代价。以后补上。
+	// [x]不支持泛型的代价。以后补上。---- [√] 看来不需要支持了。注释掉的部分是以前的。因为后来发现，
+	// java 字节码中，由于 java 是伪泛型，因此编译器会除了用户指定泛型的 `run:() STR` 等之外，还产生一个原本的 `run:() OBJ`。虚拟机由于不支持泛型，会调用 SYNTHETIC 的 `run:() OBJ`。
+	// 而 `run:() OBJ` 会转调用特化的 `run:() STR`。而由于是编译器生成的，因此虽然函数签名完全一致，却并不造成重载。
+	// 可以试试：
+	/**
+	 *  interface A<T> {		// 其实是一个简化版的 AccessController.doPrivileged()。
+			T run();
+		}
+
+		class Generic<T> {
+
+			void run(A a) {
+
+			}
+
+			public static void main(String[] args) {
+				Generic<String> u = new Generic<>();
+				u.run(new A<String>(){
+					public String run() {
+						return new String();
+					}
+				});
+			}
+
+		编译运行之后会发现 Generic$1.class 内部类中，含有两个同样签名为 `run()` 的方法。
+		而 `run() OBJ` 自动转调用了 `run() STR`。
+	 */
 	shared_ptr<Method> method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" VOD);
 	if (method == nullptr) {
-		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
-		if (method == nullptr) {
-			method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" FLD);
-			if (method == nullptr) {
-				method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()Lsun/reflect/ReflectionFactory;");
-			}
-		}
+//		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
+//		if (method == nullptr) {
+//			method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" FLD);
+//			if (method == nullptr) {
+//				method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()Lsun/reflect/ReflectionFactory;");
+//			}
+//		}
+		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" OBJ);
 	}
 	assert(method != nullptr);
 	Oop* result = thread.add_frame_and_execute (method, { pa }); // load the `this` obj

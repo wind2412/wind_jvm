@@ -85,59 +85,62 @@ void StackFrame::clear_all() {					// used with `is_valid()`. if invalid, clear 
 
 /*===------------ BytecodeEngine ---------------===*/
 
-vector<Type> BytecodeEngine::parse_arg_list(const wstring & descriptor)
+vector<wstring> BytecodeEngine::parse_arg_list(const wstring & descriptor)
 {
-	vector<Type> arg_list;
+	vector<wstring> arg_list;
 	for (int i = 1; i < descriptor.size(); i ++) {		// ignore the first L'('.
 		// define
 		function<void(wchar_t)> recursive_arg = [&arg_list, &descriptor, &recursive_arg, &i](wchar_t cur) {
 			switch (descriptor[i]) {
 				case L'Z':{
-					arg_list.push_back(Type::BOOLEAN);
+					arg_list.push_back(L"Z");
 					break;
 				}
 				case L'B':{
-					arg_list.push_back(Type::BYTE);
+					arg_list.push_back(L"B");
 					break;
 				}
 				case L'C':{
-					arg_list.push_back(Type::CHAR);
+					arg_list.push_back(L"C");
 					break;
 				}
 				case L'S':{
-					arg_list.push_back(Type::SHORT);
+					arg_list.push_back(L"S");
 					break;
 				}
 				case L'I':{
-					arg_list.push_back(Type::INT);
+					arg_list.push_back(L"I");
 					break;
 				}
 				case L'F':{
-					arg_list.push_back(Type::FLOAT);
+					arg_list.push_back(L"F");
 					break;
 				}
 				case L'J':{
-					arg_list.push_back(Type::LONG);
+					arg_list.push_back(L"J");
 					break;
 				}
 				case L'D':{
-					arg_list.push_back(Type::DOUBLE);
+					arg_list.push_back(L"D");
 					break;
 				}
 				case L'L':{
-					arg_list.push_back(Type::OBJECT);
+					int origin = i;
 					while(descriptor[i] != L';') {
 						i ++;
 					}
+//					arg_list.push_back(descriptor.substr(origin + 1, i - origin - 1));	// 不包括 L 和 ;.	// deprecated.
+					arg_list.push_back(descriptor.substr(origin, i - origin + 1));	// 包括 L 和 ;.	// 变成 klass 的时候再删除。
 					break;
 				}
 				case L'[':{
-					arg_list.push_back(Type::ARRAY);
 					while(descriptor[i] == L'[') {
 						i ++;
 					}
 					recursive_arg(descriptor[i]);	// will push_back a wrong answer
-					arg_list.pop_back();					// will pop_back it.
+					wstring temp = L"[" + arg_list.back();
+					arg_list.pop_back();				// will pop_back it.
+					arg_list.push_back(temp);
 					break;
 				}
 			}
@@ -148,6 +151,13 @@ vector<Type> BytecodeEngine::parse_arg_list(const wstring & descriptor)
 		}
 		recursive_arg(descriptor[i]);
 	}
+#ifdef DEBUG
+	std::wcout << "===------------------  arg list (" << descriptor << ")  ----------------===" << std::endl;
+	for (int i = 0; i < arg_list.size(); i ++) {
+		std::wcout << i << ". " << arg_list[i] << std::endl;
+	}
+	std::wcout << "===---------------------------------------------------------===" << std::endl;
+#endif
 	return arg_list;
 }
 
@@ -164,7 +174,7 @@ wstring BytecodeEngine::get_real_value(Oop *oop)
 				ss << ((IntOop *)oop)->value;
 				break;
 			case Type::CHAR:
-				ss << ((CharOop *)oop)->value;
+				ss << (wchar_t)((CharOop *)oop)->value;
 				break;
 			case Type::FLOAT:
 				ss << ((FloatOop *)oop)->value;
@@ -1028,6 +1038,20 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 
 
+			case 0x68:{		// imul
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val1 * val2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) sub int value from stack: "<< val1 << " * " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
+
+
+
 			case 0x6a:{		// fmul
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
@@ -1259,6 +1283,18 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				}
 
+				break;
+			}
+
+
+			case 0x92:{		// i2c
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();		// TODO: 变成 byte 型的数据。希望我用的 wchar_t 不会有问题... 最好改一改.....
+				char new_val = (char)val;
+				op_stack.push(new IntOop((int)new_val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert int: [" << val << "f] to char: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
 				break;
 			}
 

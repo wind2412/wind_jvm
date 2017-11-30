@@ -191,8 +191,8 @@ public:
 //};
 
 struct CharOop : public BasicTypeOop {
-	wchar_t value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......
-	CharOop(wchar_t value) : BasicTypeOop(Type::CHAR), value(value) {}
+	unsigned short value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......	// finally modified back to short...
+	CharOop(unsigned short value) : BasicTypeOop(Type::CHAR), value(value) {}
 };
 
 struct IntOop : public BasicTypeOop {

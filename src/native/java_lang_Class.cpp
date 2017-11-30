@@ -12,6 +12,7 @@
 #include "classloader.hpp"
 #include "native/native.hpp"
 #include "wind_jvm.hpp"
+#include <regex>
 
 /*===--------------------- java_lang_class ----------------------===*/
 java_lang_class::mirror_state & java_lang_class::state() {
@@ -83,18 +84,22 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		else if (name.size() == 2 && name[0] == L'[') {
 			switch (name[1]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
-					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
-					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
-					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
-					basic_type_mirror->set_mirrored_who(arr_klass);
+//					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+//					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
+//					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
+//					basic_type_mirror->set_mirrored_who(arr_klass);
 //					std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
+				auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
+				auto basic_type_mirror_iter = get_single_basic_type_mirrors().find(wstring(1, name[1]));
+				assert(basic_type_mirror_iter != get_single_basic_type_mirrors().end());
+				std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
 					break;
 				}
 				default:{
 					assert(false);
 				}
 			}
-		}
+		}		// fix up 的行列中不可能出现二维以上的 array。因为在一开始启动时这个函数就执行了。
 		else {
 			// I set java.lang.Class load at the first of jvm. So there can't be any user-loaded-klass. So find in the system_map.
 			auto iter = system_classmap.find(name);
@@ -112,7 +117,6 @@ MirrorOop *java_lang_class::get_basic_type_mirror(const wstring & signature) {	/
 	if ((iter = basic_type_mirrors.find(signature)) != basic_type_mirrors.end()) {
 		return (*iter).second;
 	}
-	assert(iter != basic_type_mirrors.end());
 	return nullptr;
 }
 
@@ -136,41 +140,21 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Cl
 			klass->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>(klass), loader));	// set java_mirror
 		}
 		else if (klass->get_type() == ClassType::TypeArrayClass) {
-			switch (std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type()) {
-				case Type::BOOLEAN:
-					klass->set_mirror(get_basic_type_mirror(L"[Z"));	// set java_mirror
-					break;
-				case Type::INT:
-					klass->set_mirror(get_basic_type_mirror(L"[I"));	// set java_mirror
-					break;
-				case Type::FLOAT:
-					klass->set_mirror(get_basic_type_mirror(L"[F"));	// set java_mirror
-					break;
-				case Type::DOUBLE:
-					klass->set_mirror(get_basic_type_mirror(L"[D"));	// set java_mirror
-					break;
-				case Type::LONG:
-					klass->set_mirror(get_basic_type_mirror(L"[J"));	// set java_mirror
-					break;
-				case Type::SHORT:
-					klass->set_mirror(get_basic_type_mirror(L"[S"));	// set java_mirror
-					break;
-				case Type::BYTE:
-					klass->set_mirror(get_basic_type_mirror(L"[B"));	// set java_mirror
-					break;
-				case Type::CHAR:
-					klass->set_mirror(get_basic_type_mirror(L"[C"));	// set java_mirror
-					break;
-				default:{
-					assert(false);
-				}
+			MirrorOop *mirror;
+			if ((mirror = get_basic_type_mirror(klass->get_name())) != nullptr) {
+				mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
+				get_single_basic_type_mirrors().insert(make_pair(klass->get_name(), mirror));
 			}
-			assert(klass->get_mirror() != nullptr);
+			klass->set_mirror(mirror);	// set java_mirror
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {
-			klass->set_mirror(std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass()->get_mirror());		// set to element class's mirror!
+			MirrorOop *mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
+			klass->set_mirror(mirror);	// set java_mirror
 		} else {
 			assert(false);
 		}
+#ifdef DEBUG
+//	std::wcout << "===----------- BasicType / BasicTypeArray"
+#endif
 	}
 }
 
@@ -229,7 +213,7 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 		assert(false);
 	} else {
 		std::wcout << klass_name << std::endl;
-		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);
+		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(std::regex_replace(klass_name, std::wregex(L"\\."), L"/"));
 		assert(klass != nullptr);		// wrong. Because user want to load a non-exist class.
 		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
 		if (initialize) {
@@ -253,7 +237,21 @@ void JVM_GetClassLoader(list<Oop *> & _stack){
 }
 void JVM_IsInterface(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	assert(_this != nullptr);
+	if (_this->get_mirrored_who()) {	// not primitive class
+		auto klass = _this->get_mirrored_who();
+		if (klass->get_type() == ClassType::InstanceClass) {
+			_stack.push_back(new IntOop(std::static_pointer_cast<InstanceKlass>(klass)->is_interface()));
+		} else {
+			_stack.push_back(new IntOop(false));
+		}
+	} else {
+		_stack.push_back(new IntOop(false));
+	}
+#ifdef DEBUG
+	wstring name = _this->get_mirrored_who() == nullptr ? _this->get_extra() : _this->get_mirrored_who()->get_name();
+	std::wcout << "(DEBUG) this klass: [" << name << "] is an interface ? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
 }
 void JVM_IsInstance(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -451,6 +449,29 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 }
 void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
+	assert(_this != nullptr);
+	assert(_this->get_klass()->get_type() == ClassType::InstanceClass);
+
+	// get all ctors
+	vector<shared_ptr<Method>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_constructors();
+
+	// load java/lang/reflect/Constructor
+	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Constructor"));
+	assert(klass != nullptr);
+
+	vector<InstanceOop *> oop_ctors;
+
+	// become java/lang/reflect/Constructor
+	for (auto method : ctors) {
+		auto ctor_oop = klass->new_instance();
+
+		ctor_oop->set_field_value(L"clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
+		ctor_oop->set_field_value(L"slot:I", new IntOop(0));			// 反正我是用不上的。因为是 unordered_map。
+
+
+	}
+
+
 	assert(false);
 }
 void JVM_GetProtectionDomain(list<Oop *> & _stack){

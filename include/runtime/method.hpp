@@ -4,13 +4,16 @@
 #include <string>
 #include <cassert>
 #include <memory>
+#include <unordered_map>
 #include "runtime/constantpool.hpp"
 #include "class_parser.hpp"
 #include "annotation.hpp"
 
 using std::wstring;
 using std::shared_ptr;
+using std::unordered_map;
 
+class MirrorOop;
 class InstanceKlass;
 
 /**
@@ -53,6 +56,9 @@ private:
 	TypeAnnotation *Code_rvta = nullptr;				// [n]
 
 	Exceptions_attribute *exceptions = nullptr;
+	bool parsed = false;
+	unordered_map<wstring, shared_ptr<Klass>> exceptions_tb;
+
 	u2 signature_index;
 	Element_value *ad = nullptr;
 //	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
@@ -67,6 +73,9 @@ public:
 	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }
 	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
+public:
+	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();
+	vector<MirrorOop *> parse_argument_list();
 public:
 	bool has_annotation_name_in_method(const wstring & name) {
 		if (rvpa != nullptr && rvpa->has_annotation_name(name)) return true;
