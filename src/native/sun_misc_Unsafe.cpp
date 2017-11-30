@@ -56,6 +56,8 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 			descriptor += (L"L" + mirrored_who->get_name() + L";");
 		} else if (mirrored_who->get_type() == ClassType::ObjArrayClass) {
 			assert(false);		// TODO: 因为我并不知道怎么写，而且怕写错...
+		} else if (mirrored_who->get_type() == ClassType::TypeArrayClass) {
+			descriptor += mirrored_who->get_name();
 		} else {
 			assert(false);		// TODO: 同上...
 		}
@@ -74,7 +76,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 	int offset = outer_klass->new_instance()->get_field_offset(descriptor);			// TODO: GC!!
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) the field which names [" << descriptor << "], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its oop." << std::endl;
+	std::wcout << "(DEBUG) the field which names [ " << descriptor << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its oop." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(offset));		// 这时候万一有了 GC，我的内存布局就全都变了...
