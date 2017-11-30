@@ -594,7 +594,9 @@ bool InstanceKlass::check_interfaces(const wstring & signature)		// 查看此 In
 		}
 	}
 	// 3. then if `this`'s parent has the interface, also okay.
-	return std::static_pointer_cast<InstanceKlass>(this->get_parent())->check_interfaces(signature);
+	if (this->get_parent() != nullptr)
+		return std::static_pointer_cast<InstanceKlass>(this->get_parent())->check_interfaces(signature);
+	return false;
 }
 
 shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)

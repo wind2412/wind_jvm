@@ -14,6 +14,7 @@
 
 static unordered_map<wstring, void*> methods = {
     {L"getCallerClass:()" CLS,				(void *)&JVM_GetCallerClass},
+    {L"getClassAccessFlags:(" CLS ")I",		(void *)&JVM_GetClassAccessFlags},
 };
 
 void JVM_GetCallerClass(list<Oop *> & _stack){		// static		// @CallerSensitive ! Very important stack-backtracing method!
@@ -21,6 +22,22 @@ void JVM_GetCallerClass(list<Oop *> & _stack){		// static		// @CallerSensitive !
 	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();		// 类似于得到 JNIEnv。
 	MirrorOop *result = thread->get_caller_class_CallerSensitive();
 	_stack.push_back(result);
+}
+
+void JVM_GetClassAccessFlags(list<Oop *> & _stack){		// static
+	MirrorOop *target = (MirrorOop *)_stack.front(); _stack.pop_front();
+	auto klass = target->get_mirrored_who();
+	if (klass == nullptr) {		// primitive type
+		_stack.push_back(new IntOop(	ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC ));
+#ifdef DEBUG
+	std::wcout << "type is [" << target->get_extra() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+	} else {
+		_stack.push_back(new IntOop(klass->get_access_flags()));
+#ifdef DEBUG
+	std::wcout << "klass is [" << klass->get_name() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+	}
 }
 
 // 返回 fnPtr.

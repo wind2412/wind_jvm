@@ -102,6 +102,7 @@ public:
 	MirrorOop(shared_ptr<Klass> mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
 public:
 	shared_ptr<Klass> get_mirrored_who() { return mirrored_who; }
+	void set_mirrored_who(shared_ptr<Klass> mirrored_who) { this->mirrored_who = mirrored_who; }
 	const auto & get_mirrored_all_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->fields_layout; }
 	const auto & get_mirrored_all_static_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->static_fields_layout; }
 	bool is_the_field_owned_by_this(int offset) {

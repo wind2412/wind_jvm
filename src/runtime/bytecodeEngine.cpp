@@ -63,6 +63,10 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
 			std::wcout << "the "<< i << " argument is java/lang/String: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "]" << std::endl;
 		}
+		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
+			wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
+			std::wcout << "the "<< i << " argument is java/lang/Class: [" << type << "]" << std::endl;
+		}
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
 			localVariableTable.at(i++) = nullptr;
@@ -375,13 +379,19 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0x01:{		// aconst_null
-				op_stack.push(0);		// TODO: 我只压入了 0.
+				op_stack.push(nullptr);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push null on stack." << std::endl;
 #endif
 				break;
 			}
-
+			case 0x02:{		// iconst_m1
+				op_stack.push(new IntOop(-1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push int -1 on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x03:{		// iconst_0
 				op_stack.push(new IntOop(0));
 #ifdef DEBUG
@@ -1153,6 +1163,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				op_stack.push(new LongOop(val2 & val1));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) do [" << val2 << " & " << val1 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+			case 0x80:{		// ior
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val2 | val1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val2 << " | " << val1 << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
 #endif
 				break;
 			}

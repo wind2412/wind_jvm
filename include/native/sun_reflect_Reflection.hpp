@@ -14,6 +14,7 @@
 using std::list;
 
 void JVM_GetCallerClass(list<Oop *> & _stack);
+void JVM_GetClassAccessFlags(list<Oop *> & _stack);
 
 void *sun_reflect_reflection_search_method(const wstring & signature);
 

@@ -52,7 +52,7 @@ void java_lang_class::init() {		// must execute this method before jvm!!!
 	state() = Inited;
 }
 
-// 注：内部根本没有 [[I 这类的 mirror，它们的 mirror 全是 I ！！
+// 注：内部根本没有 [[I, [[[[I 这类的 mirror，它们的 mirror 全是 [I ！！
 void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Class load!!!
 	assert(state() == Inited);
 	assert(system_classmap.find(L"java/lang/Class.class") != system_classmap.end());		// java.lang.Class must be loaded !!
@@ -83,10 +83,11 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		else if (name.size() == 2 && name[0] == L'[') {
 			switch (name[1]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
+					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
 					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
-					auto basic_type_mirror_iter = get_single_basic_type_mirrors().find(wstring(1, name[1]));
-					assert(basic_type_mirror_iter != get_single_basic_type_mirrors().end());
-					std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
+					basic_type_mirror->set_mirrored_who(arr_klass);
+//					std::static_pointer_cast<TypeArrayKlass>(arr_klass)->set_mirror((*basic_type_mirror_iter).second);
 					break;
 				}
 				default:{
@@ -137,28 +138,28 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Cl
 		else if (klass->get_type() == ClassType::TypeArrayClass) {
 			switch (std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type()) {
 				case Type::BOOLEAN:
-					klass->set_mirror(get_basic_type_mirror(L"Z"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[Z"));	// set java_mirror
 					break;
 				case Type::INT:
-					klass->set_mirror(get_basic_type_mirror(L"I"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[I"));	// set java_mirror
 					break;
 				case Type::FLOAT:
-					klass->set_mirror(get_basic_type_mirror(L"F"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[F"));	// set java_mirror
 					break;
 				case Type::DOUBLE:
-					klass->set_mirror(get_basic_type_mirror(L"D"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[D"));	// set java_mirror
 					break;
 				case Type::LONG:
-					klass->set_mirror(get_basic_type_mirror(L"J"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[J"));	// set java_mirror
 					break;
 				case Type::SHORT:
-					klass->set_mirror(get_basic_type_mirror(L"S"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[S"));	// set java_mirror
 					break;
 				case Type::BYTE:
-					klass->set_mirror(get_basic_type_mirror(L"B"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[B"));	// set java_mirror
 					break;
 				case Type::CHAR:
-					klass->set_mirror(get_basic_type_mirror(L"C"));	// set java_mirror
+					klass->set_mirror(get_basic_type_mirror(L"[C"));	// set java_mirror
 					break;
 				default:{
 					assert(false);
@@ -260,7 +261,41 @@ void JVM_IsInstance(list<Oop *> & _stack){
 }
 void JVM_IsAssignableFrom(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	MirrorOop *_that = (MirrorOop *)_stack.front();	_stack.pop_front();
+
+	assert(_this != nullptr);
+	assert(_that != nullptr);
+
+	if (_this->get_mirrored_who() == nullptr || _that->get_mirrored_who() == nullptr) {	// primitive type
+		if (_this == _that)	_stack.push_back(new IntOop(true));
+		else					_stack.push_back(new IntOop(false));
+#ifdef DEBUG
+	std::wcout << "compare with [" << _this->get_extra() << "] and [" << _that->get_extra() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+	} else {
+		// both are not primitive types.
+		auto sub = _this->get_klass();
+		auto super = _that->get_klass();
+		std::wcout << "compare with: " << sub->get_name() << " and " << super->get_name() << std::endl;
+		if (sub->get_type() == ClassType::InstanceClass && sub->get_type() == ClassType::InstanceClass) {
+			auto real_sub = std::static_pointer_cast<InstanceKlass>(sub);
+			auto real_super = std::static_pointer_cast<InstanceKlass>(super);
+			if (real_sub == real_super) {
+				_stack.push_back(new IntOop(true));
+			} else if (real_sub->check_interfaces(real_super) || real_sub->check_parent(real_super)) {
+				_stack.push_back(new IntOop(true));
+			} else {
+				_stack.push_back(new IntOop(false));
+			}
+#ifdef DEBUG
+	std::wcout << "compare with [" << real_sub->get_name() << "] and [" << real_super->get_name() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+		} else {
+			std::wcerr << "I don't know how about ArrayKlass here..." << std::endl;
+			assert(false);
+		}
+	}
+
 }
 void JVM_GetClassSigners(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -276,7 +311,18 @@ void JVM_IsArrayClass(list<Oop *> & _stack){
 }
 void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	if (_this->get_mirrored_who()) {
+		assert(_this->get_extra() == L"");
+		_stack.push_back(new IntOop(false));
+#ifdef DEBUG
+	std::wcout << "[" << _this->get_mirrored_who()->get_name() << "] is not a Primitive klass. return false." << std::endl;
+#endif
+	} else {
+		_stack.push_back(new IntOop(true));
+#ifdef DEBUG
+	std::wcout << "[" << _this->get_extra() << "] is a Primitive klass. return true." << std::endl;
+#endif
+	}
 }
 void JVM_GetComponentType(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -289,6 +335,7 @@ void JVM_GetClassModifiers(list<Oop *> & _stack){
 void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
+
 
 	// check
 	auto klass = _this->get_klass();
