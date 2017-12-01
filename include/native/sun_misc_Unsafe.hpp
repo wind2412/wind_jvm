@@ -23,6 +23,9 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack);
 void JVM_GetIntVolatile(list<Oop *> & _stack);
 void JVM_CompareAndSwapInt(list<Oop *> & _stack);
 void JVM_AllocateMemory(list<Oop *> & _stack);
+void JVM_PutLong(list<Oop *> & _stack);
+void JVM_GetByte(list<Oop *> & _stack);
+void JVM_FreeMemory(list<Oop *> & _stack);
 
 
 void *sun_misc_unsafe_search_method(const wstring & str);

@@ -21,6 +21,9 @@ static unordered_map<wstring, void*> methods = {
     {L"getIntVolatile:(" OBJ "J)I",				(void *)&JVM_GetIntVolatile},
     {L"compareAndSwapInt:(" OBJ "JII)Z",			(void *)&JVM_CompareAndSwapInt},
     {L"allocateMemory:(J)J",						(void *)&JVM_AllocateMemory},
+    {L"putLong:(JJ)V",							(void *)&JVM_PutLong},
+    {L"getByte:(J)B",							(void *)&JVM_GetByte},
+    {L"freeMemory:(J)V",							(void *)&JVM_FreeMemory},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -152,11 +155,46 @@ void JVM_AllocateMemory(list<Oop *> & _stack){
 		_stack.push_back(new LongOop((uintptr_t)addr));		// 地址放入。不过会转成 long。
 	}
 #ifdef DEBUG
-	std::wcout << "(DEBUG) malloc size of [" << size << "] at address: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
+	std::wcout << "(DEBUG) malloc size of [" << size << "] at address: [" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 
+void JVM_PutLong(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long addr = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	long val = ((LongOop *)_stack.front())->value;	_stack.pop_front();
 
+	*((long *)addr) = val;
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) put long val [" << val << "] at address: [" << std::hex << addr << "]." << std::endl;
+#endif
+}
+
+void JVM_GetByte(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long addr = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	uint8_t val = *((uint8_t *)addr);
+
+	_stack.push_back(new IntOop(val));
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get byte val [" << std::dec << val << "] at address: [" << std::hex << addr << "]." << std::endl;
+#endif
+}
+
+void JVM_FreeMemory(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long addr = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	::free((void *)addr);
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) free Memory of address: [" << std::hex << addr << "]." << std::endl;
+#endif
+
+}
 
 
 

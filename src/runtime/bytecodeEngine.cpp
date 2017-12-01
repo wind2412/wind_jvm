@@ -17,11 +17,16 @@
 #include <sstream>
 #include <functional>
 #include <boost/any.hpp>
+#include <map>
+#include <utility>
 
 using std::wstringstream;
 using std::list;
 using std::function;
 using std::shared_ptr;
+using std::map;
+using std::pair;
+using std::make_pair;
 
 /**
  * 小技能：
@@ -1508,6 +1513,49 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
+
+			case 0xab:{		// lookupswitch
+				int bc_num = pc - code_begin;
+				uint8_t *code = code_begin;
+				int origin_bc_num = bc_num;
+				if (bc_num % 4 != 0) {
+					bc_num += (4 - bc_num % 4);
+				} else {
+					bc_num += 4;
+				}
+				int ptr = bc_num;
+				// calculate basic values
+				int defaultbyte = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+				int npairs = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7]));
+				ptr += 8;
+				// create jump_table
+				map<int, int> jump_tbl;
+				for (int pos = 0; pos < npairs; pos ++) {
+					int match_value = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+					int jump_pos = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7])) + origin_bc_num;
+					ptr += 8;
+					jump_tbl.insert(make_pair(match_value, jump_pos));
+				}
+				jump_tbl.insert(make_pair(INT_MAX, defaultbyte + origin_bc_num));		// 额外多 insert 一个 default 跳转址
+				// jump begin~
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int key = ((IntOop *)op_stack.top())->value;
+				auto iter = jump_tbl.find(key);
+				if (iter == jump_tbl.end()) {
+					pc = (code_begin + jump_tbl[INT_MAX]);
+					pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) it is switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
+				} else {
+					pc = (code_begin + iter->second);
+					pc -= occupied;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) it is switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
+				}
+				break;
+			}
 			case 0xac:{		// ireturn
 				// TODO: monitor...
 				thread.pc = backup_pc;
