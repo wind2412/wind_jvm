@@ -1636,11 +1636,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 				std::wcout << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
 #endif
-				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);
 				shared_ptr<Method> target_method;
 				if (*pc == 0xb6){
-					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+					if (ref->get_klass()->get_type() == ClassType::InstanceClass) {
+						target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+					} else if (ref->get_klass()->get_type() == ClassType::TypeArrayClass || ref->get_klass()->get_type() == ClassType::ObjArrayClass) {
+						target_method = new_method;		// 那么 new_method 就是那个 target_method。因为数组没有 InstanceKlass，编译器会自动把 Object 的 Method 放上来。直接调用就可以～
+					} else {
+						assert(false);
+					}
 				} else {
+					assert(ref->get_klass()->get_type() == ClassType::InstanceClass);	// 接口一定是 Instance。
 					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
 				}
 				assert(target_method != nullptr);

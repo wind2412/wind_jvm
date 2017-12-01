@@ -205,7 +205,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
 		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
 		// add method into [all methods]
-		this->methods.insert(make_pair(ss.str(), method));
+		this->methods.insert(make_pair(ss.str(), make_pair(i, method)));
 		// override method into [vtable]
 		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });
 		if (iter == vtable.end()) {
@@ -425,7 +425,7 @@ shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signatur
 {
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	{
-		return (*iter).second;
+		return (*iter).second.second;
 	} else
 		return nullptr;
 }
@@ -439,7 +439,7 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bo
 //		std::cout << &this->methods << "  size:" << this->methods.size() << std::endl;
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	{
-		return (*iter).second;
+		return (*iter).second.second;
 	}
 	// search in parent class (parent 既可以代表接口，又可以代表类。如果此类是接口，那么 parent 是接口。如果此类是个类，那么 parent 也是类。parent 完全按照 this 而定。)
 	if (this->parent != nullptr)	// not java.lang.Object
@@ -462,7 +462,7 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	shared_ptr<Method> target;
 	// search in this->methods
 	auto iter = this->methods.find(signature);
-	if (iter != this->methods.end())	return (*iter).second;
+	if (iter != this->methods.end())	return (*iter).second.second;
 	// search in parent interfaceS
 	// 注意：接口使用 extends 代替 implements 关键字，可以有**多个父接口**！！
 	for (auto iter : this->interfaces) {
@@ -482,8 +482,8 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 shared_ptr<Method> InstanceKlass::get_static_void_main()
 {
 	for (auto iter : this->methods) {
-		if (iter.second->is_main()) {
-			return iter.second;
+		if (iter.second.second->is_main()) {
+			return iter.second.second;
 		}
 	}
 	return nullptr;
@@ -626,16 +626,26 @@ InstanceKlass::~InstanceKlass() {
 	}
 };
 
-vector<shared_ptr<Method>> InstanceKlass::get_constructors()
+vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()
 {
-	vector<shared_ptr<Method>> v;
+	vector<pair<int, shared_ptr<Method>>> v;
 	for (auto iter : this->methods) {
-		if (iter.second->get_name() == L"<init>") {
+		if (iter.second.second->get_name() == L"<init>") {
 			v.push_back(iter.second);
 		}
 	}
 	assert(v.size() >= 1);
 	return v;
+}
+
+shared_ptr<Method> InstanceKlass::search_method_in_slot(int slot)
+{
+	for (auto iter : this->methods) {
+		if (iter.second.first == slot) {
+			return iter.second.second;
+		}
+	}
+	assert(false);
 }
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/

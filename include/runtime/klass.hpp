@@ -146,7 +146,7 @@ private:
 	// static methods + vtable + itable
 	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
 	vector<shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
-	unordered_map<wstring, shared_ptr<Method>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !!
+	unordered_map<wstring, pair<int, shared_ptr<Method>>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !! [the `pair<int, ...>` 's int is the slot number. for: sun/reflect/NativeConstructorAccessorImpl-->newInstance0]
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
@@ -207,10 +207,11 @@ public:
 		return success1 || success2;
 	}
 	InstanceOop* new_instance();
+	shared_ptr<Method> search_method_in_slot(int slot);
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 public:		// for reflection.
-	vector<shared_ptr<Method>> get_constructors();
+	vector<pair<int, shared_ptr<Method>>> get_constructors();
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

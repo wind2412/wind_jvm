@@ -20,6 +20,7 @@
 #include "native/java_io_FileDescriptor.hpp"
 #include "native/java_io_FileOutputStream.hpp"
 #include "native/java_lang_String.hpp"
+#include "native/sun_reflect_NativeConstructorAccessorImpl.hpp"
 
 static unordered_map<wstring, function<void*(const wstring &)>> native_map;		// such as: {L"java/lang/Object", search [native method]'s method lambda for java/lang/Object}
 
@@ -39,6 +40,7 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"java/io/FileDescriptor"] = java_io_fileDescriptor_search_method;
 	native_map[L"java/io/FileOutputStream"] = java_io_fileOutputStream_search_method;
 	native_map[L"java/lang/String"] = java_lang_string_search_method;
+	native_map[L"sun/reflect/NativeConstructorAccessorImpl"] = sun_reflect_nativeConstructorAccessorImpl_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().

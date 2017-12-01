@@ -17,7 +17,7 @@ static unordered_map<wstring, void*> methods = {
 };
 
 void JVM_FOS_InitIDs(list<Oop *> & _stack){		// static
-	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
+	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
 	MirrorOop *klass_mirror = (MirrorOop *)_stack.back();	_stack.pop_back();
 	shared_ptr<InstanceKlass> fd_klass = std::static_pointer_cast<InstanceKlass>(klass_mirror->get_mirrored_who());
 

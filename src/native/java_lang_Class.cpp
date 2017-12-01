@@ -224,7 +224,28 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 }
 void JVM_GetSuperClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+
+	assert(_this != nullptr);
+
+	if (_this->get_mirrored_who() == nullptr) {	// primitive types
+		_stack.push_back(nullptr);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) primitive type [" << _this->get_extra() << "] doesn't have a super klass. return null." << std::endl;
+#endif
+	} else {
+		if (_this->get_mirrored_who()->get_parent() == nullptr) {
+			assert(_this->get_mirrored_who()->get_name() == L"java/lang/Object");
+			_stack.push_back(nullptr);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) java/lang/Object doesn't have a super klass. return null." << std::endl;
+#endif
+		} else {
+			_stack.push_back(_this->get_mirrored_who()->get_parent()->get_mirror());
+#ifdef DEBUG
+	std::wcout << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "] have a super klass: [" << _this->get_mirrored_who()->get_parent()->get_name() << "]. return it~" << std::endl;
+#endif
+		}
+	}
 }
 void JVM_GetClassInterfaces(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -327,7 +348,19 @@ void JVM_GetComponentType(list<Oop *> & _stack){
 }
 void JVM_GetClassModifiers(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+
+	if (_this->get_mirrored_who() == nullptr) {	// primitive types		// see openjdk.
+		_stack.push_back(new IntOop(ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) primitive type [" << _this->get_extra() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
+#endif
+	} else {
+		_stack.push_back(new IntOop(_this->get_mirrored_who()->get_access_flags()));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
+#endif
+	}
+
 }
 void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -448,11 +481,9 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 }
 void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 
-	std::wcout << "hahahahah" << std::endl;
-
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
-	assert(_this->get_klass()->get_type() == ClassType::InstanceClass);
+	assert(_this->get_mirrored_who()->get_type() == ClassType::InstanceClass);
 
 	// load java/lang/reflect/Constructor
 	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Constructor"));
@@ -463,16 +494,17 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	assert(Byte_arr_klass != nullptr);
 
 	// get all ctors
-	vector<shared_ptr<Method>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_constructors();
+	vector<pair<int, shared_ptr<Method>>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who())->get_constructors();
 
 	vector<InstanceOop *> v;
 
 	// become java/lang/reflect/Constructor
-	for (auto method : ctors) {
+	for (auto iter : ctors) {
+		shared_ptr<Method> method = iter.second;
 		auto ctor_oop = klass->new_instance();
 
 		ctor_oop->set_field_value(L"clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
-		ctor_oop->set_field_value(L"slot:I", new IntOop(0));			// 反正我是用不上的。因为是 unordered_map。
+		ctor_oop->set_field_value(L"slot:I", new IntOop(iter.first));
 
 		// parse arg list.
 		vector<MirrorOop *> args = method->parse_argument_list();
@@ -528,9 +560,9 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "===-------------- getClassDeclaredCtors Pool (" << klass->get_name() << ")-------------===" << std::endl;
+	std::wcout << "===-------------- getClassDeclaredCtors Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < ctors.size(); i ++) {
-		std::wcout << i << ". " << ctors[i]->get_name() << ":" << ctors[i]->get_descriptor() << std::endl;
+		std::wcout << i << ". " << ctors[i].second->get_name() << ":" << ctors[i].second->get_descriptor() << std::endl;
 	}
 	std::wcout << "===--------------------------------------------------------===" << std::endl;
 #endif
