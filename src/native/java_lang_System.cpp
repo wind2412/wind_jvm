@@ -170,11 +170,15 @@ void JVM_SetIn0(list<Oop *> & _stack){		// static
 }
 void JVM_SetOut0(list<Oop *> & _stack){		// static
 	InstanceOop *printstream = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	auto system = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System");
+	assert(system != nullptr);
+	std::static_pointer_cast<InstanceKlass>(system)->set_static_field_value(L"out:Ljava/io/PrintStream;", printstream);
 }
 void JVM_SetErr0(list<Oop *> & _stack){		// static
 	InstanceOop *printstream = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	auto system = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System");
+	assert(system != nullptr);
+	std::static_pointer_cast<InstanceKlass>(system)->set_static_field_value(L"err:Ljava/io/PrintStream;", printstream);
 }
 
 // 返回 fnPtr.
