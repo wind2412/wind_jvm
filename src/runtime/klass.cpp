@@ -375,10 +375,6 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signa
 bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, Oop **result)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
-
-	// TODO: 修改：惰性生成 BasicTypeOop 对象。如果检测到 result 是 0，且 type 是 basic type，那么就要生成一个 Int/CharOop... 对象。
-	// TODO: 而且 static field / field / BytecodeEngine 里边所有的 iload_0 / istore_0 也要改！！
-
 	return get_static_field_value(signature, result);
 }
 
@@ -502,11 +498,9 @@ void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr
 					case L'B':	// byte
 					case L'Z':	// boolean
 					case L'S':	// short
+					case L'C':	// char
 					case L'I':	// int
 						fields[offset] = new IntOop(0);
-						break;
-					case L'C':	// char
-						fields[offset] = new CharOop(0);
 						break;
 					case L'F':	// float
 						fields[offset] = new FloatOop(0);
@@ -696,12 +690,9 @@ ArrayOop* ArrayKlass::new_instance(int length)
 				case Type::BOOLEAN:					// 我全用 int[] 处理了。
 				case Type::BYTE:
 				case Type::SHORT:
+				case Type::CHAR:
 				case Type::INT:{
 					(*oop)[i] = new IntOop(0);		// default value
-					break;
-				}
-				case Type::CHAR:{
-					(*oop)[i] = new CharOop(0);		// default value
 					break;
 				}
 				case Type::DOUBLE:{

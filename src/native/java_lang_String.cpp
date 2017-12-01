@@ -30,7 +30,7 @@ size_t java_string_hash::operator()(Oop* const & ptr) const noexcept		// TODO: �
 	int length = ((TypeArrayOop *)value_field)->get_length();
 	int hash_val = 0;		// bug report: 在 java 中我使用的 hash 值是 int 型，而这里使用了 unsigned int 型... 造成了溢出之后值不正确的情况...
 	for (int i = 0; i < length; i ++) {
-		hash_val =  31 * hash_val + ((CharOop *)(*((TypeArrayOop *)value_field))[i])->value;
+		hash_val =  31 * hash_val + ((IntOop *)(*((TypeArrayOop *)value_field))[i])->value;
 	}
 	// 这里需要注意！！由于 java.lang.String 这个对象是被伪造出来，在 openjdk 的实现是：`value` field 被强行注入，但是 `hashcode` field 被惰性算出。这里算出之后会直接 save 到 oop 中！
 	// make a hashvalue cache
@@ -54,7 +54,7 @@ bool java_string_equal_to::operator() (Oop* const & lhs, Oop* const & rhs) const
 	int length_rhs = ((TypeArrayOop *)value_field_rhs)->get_length();
 	if (length_lhs != length_rhs)	return false;
 	for (int i = 0; i < length_lhs; i ++) {
-		if ( ((CharOop *)(*((TypeArrayOop *)value_field_lhs))[i])->value != ((CharOop *)(*((TypeArrayOop *)value_field_rhs))[i])->value) {
+		if ( ((IntOop *)(*((TypeArrayOop *)value_field_lhs))[i])->value != ((IntOop *)(*((TypeArrayOop *)value_field_rhs))[i])->value) {
 			return false;
 		}
 	}
@@ -73,7 +73,7 @@ wstring java_lang_string::stringOop_to_wstring(InstanceOop *stringoop) {
 		return L"";			// ！bug report ！ 如果找到一个 `value:[C` 的 field， 却发现是 null，说明未被赋值！！也就是，是由于 String s = new String() 产生的！！是一个全新的 String！！所以 [C 根本没有被初始化，保持默认值的 null！！
 	}
 	for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-		ss << (wchar_t)((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
+		ss << (wchar_t)((IntOop *)(*(TypeArrayOop *)result)[pos])->value;
 	}
 	return ss.str();
 }
@@ -89,7 +89,7 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 	ss << "string is: --> [\"";
 	if (result != nullptr)		// bug report, 见上！
 		for (int pos = 0; pos < ((TypeArrayOop *)result)->get_length(); pos ++) {
-			ss << (wchar_t)((CharOop *)(*(TypeArrayOop *)result)[pos])->value;
+			ss << (wchar_t)((IntOop *)(*(TypeArrayOop *)result)[pos])->value;
 		}
 	ss << "\"]";
 	// get hash value
@@ -107,7 +107,7 @@ Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	assert(charsequence->get_klass() != nullptr);
 	// fill in `char[]`
 	for (int pos = 0; pos < str.size(); pos ++) {
-		(*charsequence)[pos] = new CharOop((unsigned short)str[pos]);
+		(*charsequence)[pos] = new IntOop((unsigned short)str[pos]);
 	}
 	// alloc a StringOop.
 	InstanceOop *stringoop = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"))->new_instance();

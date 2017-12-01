@@ -189,11 +189,11 @@ public:
 //	short value;		// data
 //	ShortOop(short value) : BasicTypeOop(Type::SHORT), value(value) {}
 //};
-
-struct CharOop : public BasicTypeOop {
-	unsigned short value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......	// finally modified back to short...
-	CharOop(unsigned short value) : BasicTypeOop(Type::CHAR), value(value) {}
-};
+//
+//struct CharOop : public BasicTypeOop {
+//	unsigned short value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......	// finally modified back to short...
+//	CharOop(unsigned short value) : BasicTypeOop(Type::CHAR), value(value) {}
+//};
 
 struct IntOop : public BasicTypeOop {
 	int value;		// data

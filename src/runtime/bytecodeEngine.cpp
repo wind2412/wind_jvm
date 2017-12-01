@@ -174,7 +174,7 @@ wstring BytecodeEngine::get_real_value(Oop *oop)
 				ss << ((IntOop *)oop)->value;
 				break;
 			case Type::CHAR:
-				ss << (wchar_t)((CharOop *)oop)->value;
+				ss << (wchar_t)((IntOop *)oop)->value;
 				break;
 			case Type::FLOAT:
 				ss << ((FloatOop *)oop)->value;
@@ -203,10 +203,9 @@ Oop* copy_BasicOop_value(Oop *oop)		// aux
 			case Type::BOOLEAN:
 			case Type::BYTE:
 			case Type::SHORT:
+			case Type::CHAR:
 			case Type::INT:
 				return new IntOop(((IntOop *)basic)->value);
-			case Type::CHAR:
-				return new CharOop(((CharOop *)basic)->value);
 			case Type::DOUBLE:
 				return new DoubleOop(((DoubleOop *)basic)->value);
 			case Type::FLOAT:
@@ -559,8 +558,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0x15:{		// iload
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 iload_0~3.
-				op_stack.push(localVariableTable[index]);
 				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::INT);
+				op_stack.push(new IntOop(((IntOop *)localVariableTable[index])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[" << index << "] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -570,7 +569,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
 				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::LONG);
-				op_stack.push(localVariableTable[index]);
+				op_stack.push(new LongOop(((LongOop *)localVariableTable[index])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[" << index << "] long: "<< ((LongOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -581,7 +580,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int index = pc[1];
 				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
 				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::FLOAT);
-				op_stack.push(localVariableTable[index]);
+				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[index])->value));
 #ifdef DEBUG		// 去掉这一段，bus error bug 匪夷所思地消失了... 然而程序根本没走到这啊？？？？！！到底是什么情况？？？？看来应该是编译器优化的原因吗......
 	std::wcout << "(DEBUG) push localVariableTable[" << index << "] float: "<< ((FloatOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -604,7 +603,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1a:{		// iload_0
 				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::INT);
-				op_stack.push(localVariableTable[0]);
+				op_stack.push(new IntOop(((IntOop *)localVariableTable[0])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[0] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -612,7 +611,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1b:{		// iload_1
 				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::INT);
-				op_stack.push(localVariableTable[1]);
+				op_stack.push(new IntOop(((IntOop *)localVariableTable[1])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[1] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -620,7 +619,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1c:{		// iload_2
 				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::INT);
-				op_stack.push(localVariableTable[2]);
+				op_stack.push(new IntOop(((IntOop *)localVariableTable[2])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[2] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -628,7 +627,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1d:{		// iload_3
 				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::INT);
-				op_stack.push(localVariableTable[3]);
+				op_stack.push(new IntOop(((IntOop *)localVariableTable[3])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[3] int: "<< ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
@@ -636,7 +635,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1e:{		// lload_0
 				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::LONG);
-				op_stack.push(localVariableTable[0]);
+				op_stack.push(new LongOop(((LongOop *)localVariableTable[0])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[0] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
@@ -644,7 +643,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x1f:{		// lload_1
 				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::LONG);
-				op_stack.push(localVariableTable[1]);
+				op_stack.push(new LongOop(((LongOop *)localVariableTable[1])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[1] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
@@ -652,7 +651,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x20:{		// lload_2
 				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::LONG);
-				op_stack.push(localVariableTable[2]);
+				op_stack.push(new LongOop(((LongOop *)localVariableTable[2])->value));
 #ifdef DEBUG						// 是的，还有这里也是！去掉之后就没事。但是会触发另一个非常诡异的 segmentation fault. linux 平台没有此现象......
 	std::wcout << "(DEBUG) push localVariableTable[2] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
@@ -660,7 +659,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x21:{		// lload_3
 				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::LONG);
-				op_stack.push(localVariableTable[3]);
+				op_stack.push(new LongOop(((LongOop *)localVariableTable[3])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[3] long: "<< ((LongOop *)op_stack.top())->value << "l on stack." << std::endl;
 #endif
@@ -668,7 +667,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x22:{		// fload_0
 				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::FLOAT);
-				op_stack.push(localVariableTable[0]);
+				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[0])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[0] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
@@ -676,7 +675,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x23:{		// fload_1
 				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::FLOAT);
-				op_stack.push(localVariableTable[1]);
+				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[1])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[1] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
@@ -684,7 +683,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x24:{		// fload_2
 				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::FLOAT);
-				op_stack.push(localVariableTable[2]);
+				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[2])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[2] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
@@ -692,7 +691,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x25:{		// fload_3
 				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::FLOAT);
-				op_stack.push(localVariableTable[3]);
+				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[3])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[3] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
 #endif
@@ -773,7 +772,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				op_stack.push(new IntOop((int)((CharOop *)(*charsequence)[index])->value));
+				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((IntOop *)op_stack.top())->value << "'" << std::endl;
 #endif
@@ -785,7 +784,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(index > 3);
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				IntOop *ref = (IntOop *)op_stack.top();
-				localVariableTable[index] = ref;	op_stack.pop();
+				localVariableTable[index] = new IntOop(ref->value);	op_stack.pop();
 #ifdef DEBUG
 		std::wcout << "(DEBUG) pop int [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
 #endif
@@ -809,7 +808,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x3b:{		// istore_0
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
-				localVariableTable[0] = op_stack.top();	op_stack.pop();
+				localVariableTable[0] = new IntOop(((IntOop *)op_stack.top())->value);	op_stack.pop();
 #ifdef DEBUG
 	std::wcout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[0])->value << " to localVariableTable[0] and rewrite." << std::endl;
 #endif
@@ -817,7 +816,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x3c:{		// istore_1
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
-				localVariableTable[1] = op_stack.top();	op_stack.pop();
+				localVariableTable[1] = new IntOop(((IntOop *)op_stack.top())->value);	op_stack.pop();
 #ifdef DEBUG
 	std::wcout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[1])->value << " to localVariableTable[1] and rewrite." << std::endl;
 #endif
@@ -825,7 +824,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x3d:{		// istore_2
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
-				localVariableTable[2] = op_stack.top();	op_stack.pop();
+				localVariableTable[2] = new IntOop(((IntOop *)op_stack.top())->value);	op_stack.pop();
 #ifdef DEBUG
 	std::wcout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[2])->value << " to localVariableTable[2] and rewrite." << std::endl;
 #endif
@@ -833,7 +832,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 			case 0x3e:{		// istore_3
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
-				localVariableTable[3] = op_stack.top();	op_stack.pop();
+				localVariableTable[3] = new IntOop(((IntOop *)op_stack.top())->value);	op_stack.pop();
 #ifdef DEBUG
 	std::wcout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
 #endif
@@ -929,11 +928,24 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
-
+			case 0x54:{		// bastore
+				IntOop *byte = (IntOop *)op_stack.top();	op_stack.pop();
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[B");		// assert byte[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				(*charsequence)[index] = new IntOop((int)((char)(byte->value)));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get byte ['" << (int)((char)byte->value) << "'] from the stack to byte[]'s position of [" << index << "]" << std::endl;
+#endif
+				break;
+			}
 			case 0x55:{		// castore
-				CharOop *ch = (CharOop *)op_stack.top();	op_stack.pop();
+				IntOop *ch = (IntOop *)op_stack.top();	op_stack.pop();
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (op_stack.top() == nullptr) {
 					// TODO: should throw NullpointerException
@@ -942,7 +954,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				(*charsequence)[index] = ch;
+				(*charsequence)[index] = new IntOop((unsigned short)ch->value);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get wchar_t ['" << ch->value << "'] from the stack to char[]'s position of [" << index << "]" << std::endl;
 #endif
@@ -1290,10 +1302,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0x92:{		// i2c
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();		// TODO: 变成 byte 型的数据。希望我用的 wchar_t 不会有问题... 最好改一改.....
-				char new_val = (char)val;
-				op_stack.push(new IntOop((int)new_val));
+				op_stack.push(new IntOop((unsigned short)val));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) convert int: [" << val << "f] to char: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+	std::wcout << "(DEBUG) convert int: [" << val << "f] to char: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]." << std::endl;
 #endif
 				break;
 			}
@@ -1459,7 +1470,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
-				return op_stack.top();	// boolean, short, char, int
+				return new IntOop(((IntOop *)op_stack.top())->value);	// boolean, short, char, int
 			}
 			case 0xad:{		// lreturn
 				// TODO: monitor...
@@ -1469,7 +1480,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "(DEBUG) return an long value from stack: "<< ((LongOop*)op_stack.top())->value << std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
-				return op_stack.top();	// long
+				return new LongOop(((LongOop *)op_stack.top())->value);	// long
 			}
 
 
@@ -1480,7 +1491,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "(DEBUG) return an float value from stack: "<< ((FloatOop*)op_stack.top())->value << "f" << std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
-				return op_stack.top();	// float
+				return new FloatOop(((FloatOop *)op_stack.top())->value);	// float
 			}
 			case 0xaf:{		// dreturn
 				thread.pc = backup_pc;
@@ -1489,8 +1500,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "(DEBUG) return an double value from stack: "<< ((DoubleOop*)op_stack.top())->value << "ld"<< std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
-				return op_stack.top();	// double
-				break;
+				return new DoubleOop(((DoubleOop *)op_stack.top())->value);	// double
 			}
 
 
