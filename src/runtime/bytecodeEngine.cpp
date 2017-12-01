@@ -762,7 +762,21 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
+			case 0x33:{		// baload
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && (op_stack.top()->get_klass()->get_name() == L"[B" || op_stack.top()->get_klass()->get_name() == L"[Z"));		// assert byte[]/boolean[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get byte/boolean[" << index << "] which is the byte/boolean: '" << ((IntOop *)op_stack.top())->value << "'" << std::endl;
+#endif
+				break;
+			}
 			case 0x34:{		// caload
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (op_stack.top() == nullptr) {
@@ -772,7 +786,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
+				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));			// TODO: ...... 我取消了 CharOop，因此造成了没法扩展......一定要回来重看...
 #ifdef DEBUG
 	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((IntOop *)op_stack.top())->value << "'" << std::endl;
 #endif
@@ -835,6 +849,38 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				localVariableTable[3] = new IntOop(((IntOop *)op_stack.top())->value);	op_stack.pop();
 #ifdef DEBUG
 	std::wcout << "(DEBUG) pop stack top int: "<< ((IntOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x3f:{		// lstore_0
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				localVariableTable[0] = new LongOop(((LongOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top long: "<< ((LongOop *)localVariableTable[0])->value << " to localVariableTable[0] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x40:{		// lstore_1
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				localVariableTable[1] = new LongOop(((LongOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top long: "<< ((LongOop *)localVariableTable[1])->value << " to localVariableTable[1] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x41:{		// lstore_2
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				localVariableTable[2] = new LongOop(((LongOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top long: "<< ((LongOop *)localVariableTable[2])->value << " to localVariableTable[2] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x42:{		// lstore_3
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				localVariableTable[3] = new LongOop(((LongOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top long: "<< ((LongOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
 #endif
 				break;
 			}
@@ -940,7 +986,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				(*charsequence)[index] = new IntOop((int)((char)(byte->value)));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get byte ['" << (int)((char)byte->value) << "'] from the stack to byte[]'s position of [" << index << "]" << std::endl;
+	std::wcout << "(DEBUG) get byte/boolean ['" << (int)((char)byte->value) << "'] from the stack to byte/boolean[]'s position of [" << index << "]" << std::endl;
 #endif
 				break;
 			}
@@ -1468,7 +1514,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an int value from stack: "<< ((IntOop*)op_stack.top())->value << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return new IntOop(((IntOop *)op_stack.top())->value);	// boolean, short, char, int
 			}
@@ -1478,7 +1524,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an long value from stack: "<< ((LongOop*)op_stack.top())->value << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return new LongOop(((LongOop *)op_stack.top())->value);	// long
 			}
@@ -1489,7 +1535,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an float value from stack: "<< ((FloatOop*)op_stack.top())->value << "f" << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return new FloatOop(((FloatOop *)op_stack.top())->value);	// float
 			}
@@ -1498,7 +1544,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
 #ifdef DEBUG
 	std::wcout << "(DEBUG) return an double value from stack: "<< ((DoubleOop*)op_stack.top())->value << "ld"<< std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return new DoubleOop(((DoubleOop *)op_stack.top())->value);	// double
 			}
@@ -1513,7 +1559,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << oop << std::endl;
 	else
 		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 //				assert(method->return_type() == oop->get_klass()->get_name());
 				return oop;	// boolean, short, char, int
@@ -1523,7 +1569,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				thread.pc = backup_pc;
 #ifdef DEBUG
 	std::wcout << "(DEBUG) only return." << std::endl;
-	std::wcout << "[Now, get out of StackFrame #" << thread.vm_stack.size() - 1 << "]..." << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 				return nullptr;
 			}

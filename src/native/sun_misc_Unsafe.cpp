@@ -20,6 +20,7 @@ static unordered_map<wstring, void*> methods = {
     {L"objectFieldOffset:(" FLD ")J",			(void *)&JVM_ObjectFieldOffset},
     {L"getIntVolatile:(" OBJ "J)I",				(void *)&JVM_GetIntVolatile},
     {L"compareAndSwapInt:(" OBJ "JII)Z",			(void *)&JVM_CompareAndSwapInt},
+    {L"allocateMemory:(J)J",						(void *)&JVM_AllocateMemory},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -135,6 +136,23 @@ void JVM_CompareAndSwapInt(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)target)->value, expected) == expected));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+}
+
+void JVM_AllocateMemory(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long size = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	if (size < 0) {
+		assert(false);
+	} else if (size == 0) {
+		_stack.push_back(new LongOop((uintptr_t)nullptr));
+	} else {
+		void *addr = ::malloc(size);														// TODO: GC !!!!! 这个是堆外分配！！
+		_stack.push_back(new LongOop((uintptr_t)addr));		// 地址放入。不过会转成 long。
+	}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) malloc size of [" << size << "] at address: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 

@@ -796,6 +796,5 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	this->name = ss.str();
 	// 2. set java_mirror
 	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
-
 }
 
