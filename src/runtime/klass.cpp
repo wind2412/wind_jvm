@@ -102,22 +102,11 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_num, metaField)));
 			total_static_fields_num ++;	// offset +++
 		} else {		// non-static field
-		// test debug
-		{
-			std::weak_ptr<Field_info> w(metaField);
-			std::wcout << metaField->get_name() << "[a]..." << w.use_count() << std::endl;
-		}
 			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_non_static_fields_num, metaField)));
 			this->is_this_klass_field.insert(make_pair(total_non_static_fields_num, true));		// 是自己的 field
 			total_non_static_fields_num ++;
 		}
 		ss.str(L"");
-
-		// test debug
-		{
-			std::weak_ptr<Field_info> w(metaField);
-			std::wcout << metaField->get_name() << "[b]..." << w.use_count() << std::endl;
-		}
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.
@@ -374,7 +363,7 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descr
 		}
 		if (iter == instance_klass->static_fields_layout.end()) {
 			// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
-			for (auto iter : this->interfaces) {
+			for (auto iter : instance_klass->interfaces) {
 				// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
 				target = iter.second->get_field(BIG_signature);
 				if (target.second != nullptr)	return target;
