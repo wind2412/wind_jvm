@@ -100,6 +100,7 @@ protected:
 	Klass operator= (const Klass &);
 public:
 	Klass() {}
+	~Klass() {std::wcout << "??????? destruct Klass ???" << std::endl;}		// delete
 };
 
 class Field_info;
@@ -134,9 +135,9 @@ private:
 													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	// should add message to recode whether this field is parent klass's field, for java/lang/Class.getDeclaredFields0()...
 	unordered_map<int, bool> is_this_klass_field;		// don't use vector<bool>...		// use fields_layout.second.first as index.
-	// layouts.
-	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
-	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
+	// layouts.		// bug of fields_layout: 由于父类可能有和子类一样名字+描述符的变量，因此会冲突......
+	std::unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
+	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<classname+':'+name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_num = 0;
 	int total_static_fields_num = 0;
 //	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
@@ -162,7 +163,7 @@ private:
 
 	Parameter_annotations_t *rva = nullptr;		// TODO: 最终因为 java/lang/reflection/Field 的原因，必须要按照 openjdk 的方式来重新 parse Annotations。即，Array<u1> 的格式......难受得很......唉QAQ
 
-	u2 num_RuntimeVisibleTypeAnnotations;
+	u2 num_RuntimeVisibleTypeAnnotations = 0;
 	TypeAnnotation *rvta = nullptr;
 
 private:

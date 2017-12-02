@@ -144,6 +144,7 @@ wstring Field_info::parse_signature() {
 }
 
 Field_info::~Field_info () {
+	std::wcout << "??????? destruct field ???" << std::endl;		// delete
 	for (int i = 0; i < attributes_count; i ++) {
 		delete attributes[i];
 	}

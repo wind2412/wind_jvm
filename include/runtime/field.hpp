@@ -66,7 +66,7 @@ private:
 	// 其实我设置 RuntimeVisibleAnnotation 内部是一个 ParameterAnnotation.
 	Parameter_annotations_t *rva = nullptr;
 
-	u2 num_RuntimeVisibleTypeAnnotations;
+	u2 num_RuntimeVisibleTypeAnnotations = 0;
 	TypeAnnotation *rvta = nullptr;
 
 	ConstantValue_attribute *constant_value = nullptr;	// only one

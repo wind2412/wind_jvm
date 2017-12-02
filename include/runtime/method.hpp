@@ -60,7 +60,7 @@ private:
 	bool parsed = false;
 	unordered_map<wstring, shared_ptr<Klass>> exceptions_tb;
 
-	u2 signature_index;
+	u2 signature_index = 0;
 	Element_value *ad = nullptr;
 //	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
 
@@ -125,6 +125,7 @@ public:
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
 
 	~Method() {
+		std::wcout << "??????? destruct method ???" << std::endl;		// delete
 		for (int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];
 		}

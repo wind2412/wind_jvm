@@ -263,17 +263,15 @@ void vm_thread::init_and_do_main()
 		this->add_frame_and_execute(_initialize_system_class, {});
 		system_klass->set_state(Klass::KlassState::Initialized);		// set state.
 
-		assert(false);
-
 		// 3.7 Complete!
 		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
 		Security_DEBUG_klass->set_state(Klass::KlassState::Initialized);
 
 	}
 
-	// for test
-	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
 	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
+
+	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
 
 	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
 	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".

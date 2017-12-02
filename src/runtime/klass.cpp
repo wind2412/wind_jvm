@@ -99,11 +99,22 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_num, metaField)));
 			total_static_fields_num ++;	// offset +++
 		} else {		// non-static field
+		// test debug
+		{
+			std::weak_ptr<Field_info> w(metaField);
+			std::wcout << metaField->get_name() << "[a]..." << w.use_count() << std::endl;
+		}
 			this->fields_layout.insert(make_pair(ss.str(), make_pair(total_non_static_fields_num, metaField)));
 			this->is_this_klass_field.insert(make_pair(total_non_static_fields_num, true));		// 是自己的 field
 			total_non_static_fields_num ++;
 		}
 		ss.str(L"");
+
+		// test debug
+		{
+			std::weak_ptr<Field_info> w(metaField);
+			std::wcout << metaField->get_name() << "[b]..." << w.use_count() << std::endl;
+		}
 	}
 
 	// alloc to save value of STATIC fields. non-statics are in oop.

@@ -50,7 +50,8 @@ void constructor(Tp *ptr, Args &&...args)		// placement new.
 template <typename Tp>
 void destructor(Tp *ptr)
 {
-	ptr->~Tp();
+	if (ptr)
+		ptr->~Tp();
 }
 
 
