@@ -17,15 +17,11 @@ static unordered_map<wstring, void*> methods = {
 };
 
 void JVM_FD_InitIDs(list<Oop *> & _stack){		// static
-	wind_jvm & vm = *(wind_jvm *)_stack.back();	_stack.pop_back();
-	MirrorOop *klass_mirror = (MirrorOop *)_stack.back();	_stack.pop_back();
-	shared_ptr<InstanceKlass> fd_klass = std::static_pointer_cast<InstanceKlass>(klass_mirror->get_mirrored_who());
 
 	// 此方法旨在设置 FileDescriptor::field 的偏移大小......
 	// 我并不知道这有什么意义......
 	// 所以我 do nothing...
 
-//	assert(false);
 }
 
 

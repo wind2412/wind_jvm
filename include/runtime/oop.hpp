@@ -124,7 +124,7 @@ public:
 
 class ArrayOop : public Oop {
 protected:
-	int length;
+	int length;				// length 即 capacity！！是一个东西！vector 这种，由于 capacity 是 malloc 的内存，length 是 placement new 出来的对象，才有分别！这里一上来对象就全了，没有就是 null，所以没有区别！！
 	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
 public:
 	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**

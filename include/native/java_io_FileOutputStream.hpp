@@ -14,6 +14,7 @@
 using std::list;
 
 void JVM_FOS_InitIDs(list<Oop *> & _stack);
+void JVM_WriteBytes(list<Oop *> & _stack);
 
 
 

@@ -11,21 +11,47 @@
 #include <cassert>
 #include "wind_jvm.hpp"
 #include "native/native.hpp"
+#include <unistd.h>
+
+#define MAX_BUF_SIZE		4096
 
 static unordered_map<wstring, void*> methods = {
     {L"initIDs:()V",				(void *)&JVM_FOS_InitIDs},
+    {L"writeBytes:([BIIZ)V",		(void *)&JVM_WriteBytes},
 };
 
 void JVM_FOS_InitIDs(list<Oop *> & _stack){		// static
-	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
-	MirrorOop *klass_mirror = (MirrorOop *)_stack.back();	_stack.pop_back();
-	shared_ptr<InstanceKlass> fd_klass = std::static_pointer_cast<InstanceKlass>(klass_mirror->get_mirrored_who());
 
 	// 此方法旨在设置 FileDescriptor::field 的偏移大小......
 	// 我并不知道这有什么意义......
 	// 所以我 do nothing...
 
-//	assert(false);
+}
+
+void JVM_WriteBytes(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	TypeArrayOop *bytes = (TypeArrayOop *)_stack.front(); _stack.pop_front();
+	int offset = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	int len = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	bool append = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();		// in linux/unix, append is of no use. because `append` is `open()`'s property in *nix. It's only useful for windows.
+
+	Oop *oop;
+	// get the unix fd.
+	_this->get_field_value(FILEOUTPUTSTREAM L":fd:Ljava/io/FileDescriptor;", &oop);
+	((InstanceOop *)oop)->get_field_value(FILEDESCRIPTOR L":fd:I", &oop);
+	int fd = ((IntOop *)oop)->value;
+
+	assert(bytes->get_length() > offset && bytes->get_length() > (offset + len));		// ArrayIndexOutofBoundException
+
+	char *buf = new char[len];
+
+	for (int i = offset, j = 0; i < offset + len; i ++, j ++) {
+		buf[j] = (char)((IntOop *)(*bytes)[i])->value;
+	}
+
+	if (write(fd, buf, len) == -1) {
+		assert(false);
+	}
 }
 
 

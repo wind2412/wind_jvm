@@ -1361,9 +1361,18 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+			case 0x91:{		// i2b
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop((char)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert int: [" << val << "f] to byte: [" << std::dec << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x92:{		// i2c
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
-				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();		// TODO: 变成 byte 型的数据。希望我用的 wchar_t 不会有问题... 最好改一改.....
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop((unsigned short)val));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) convert int: [" << val << "f] to char: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]." << std::endl;
