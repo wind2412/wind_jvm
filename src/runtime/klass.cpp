@@ -627,9 +627,6 @@ InstanceKlass::~InstanceKlass() {
 		delete attributes[i];
 	}
 	delete[] attributes;
-	for (int i = 0; i < total_static_fields_num; i ++) {
-		delete static_fields[i];
-	}
 };
 
 vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()

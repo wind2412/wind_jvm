@@ -40,9 +40,10 @@ void vm_thread::launch()
 	pthread_create(&tid, nullptr, scapegoat, &p);
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
+
 		pthread_join(tid, nullptr);
 
-		std::wcout << "run `" << this->method->get_name() << "()` over!!!" << std::endl;		// delete
+		std::wcout << "run over!!!" << std::endl;		// delete
 	}
 }
 
@@ -293,7 +294,6 @@ void vm_thread::init_and_do_main()
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
-	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
 }
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)

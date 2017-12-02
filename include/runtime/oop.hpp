@@ -86,12 +86,6 @@ private:
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);
-public:
-	~InstanceOop() {
-		for (int i = 0; i < field_length; i ++) {
-			delete fields[i];
-		}
-	}
 };
 
 class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.

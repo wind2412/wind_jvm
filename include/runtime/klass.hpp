@@ -100,7 +100,6 @@ protected:
 	Klass operator= (const Klass &);
 public:
 	Klass() {}
-	~Klass() {std::wcout << "??????? destruct Klass ???" << std::endl;}		// delete
 };
 
 class Field_info;

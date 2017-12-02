@@ -125,7 +125,6 @@ public:
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
 
 	~Method() {
-		std::wcout << "??????? destruct method ???" << std::endl;		// delete
 		for (int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];
 		}
