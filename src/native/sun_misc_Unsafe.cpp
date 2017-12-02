@@ -42,16 +42,16 @@ void JVM_AddressSize(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
 // see: http://hllvm.group.iteye.com/group/topic/37940
-void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用这些函数...因为我根本不知道正确的实现是什么.....
+void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();	// java/lang/reflect/Field obj.
 
 	// 需要 new 一个对象... 实测...				// TODO: 还要支持 static 的！这时不用 new 对象了。
 	Oop *oop;
-	assert(field->get_field_value(L"name:Ljava/lang/String;", &oop));
+	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
-	assert(field->get_field_value(L"type:Ljava/lang/Class;", &oop));
+	assert(field->get_field_value(FIELD L":type:Ljava/lang/Class;", &oop));
 	MirrorOop *mirror = (MirrorOop *)oop;
 
 	wstring descriptor = name + L":";
@@ -74,16 +74,18 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){		// 我只希望不要调用�
 	}
 
 	// get the class which has the member variable.
-	assert(field->get_field_value(L"clazz:Ljava/lang/Class;", &oop));
+	assert(field->get_field_value(FIELD L":clazz:Ljava/lang/Class;", &oop));
 	MirrorOop *outer_klass_mirror = (MirrorOop *)oop;
 	assert(outer_klass_mirror->get_mirrored_who()->get_type() == ClassType::InstanceClass);	// outer must be InstanceType.
 	shared_ptr<InstanceKlass> outer_klass = std::static_pointer_cast<InstanceKlass>(outer_klass_mirror->get_mirrored_who());
 
+	wstring BIG_signature = outer_klass->get_name() + L":" + descriptor;
+
 	// try to new a obj
-	int offset = outer_klass->new_instance()->get_all_field_offset(descriptor);			// TODO: GC!!
+	int offset = outer_klass->new_instance()->get_all_field_offset(BIG_signature);			// TODO: GC!!
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) the field which names [ " << descriptor << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
+	std::wcout << "(DEBUG) the field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(offset));		// 这时候万一有了 GC，我的内存布局就全都变了...

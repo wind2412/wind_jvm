@@ -135,9 +135,9 @@ private:
 													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	// should add message to recode whether this field is parent klass's field, for java/lang/Class.getDeclaredFields0()...
 	unordered_map<int, bool> is_this_klass_field;		// don't use vector<bool>...		// use fields_layout.second.first as index.
-	// layouts.		// bug of fields_layout: 由于父类可能有和子类一样名字+描述符的变量，因此会冲突......
-	std::unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop].
-	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<classname+':'+name+':'+descriptor, <static_fields' offset, Field_info>>
+	// layouts.		// bug of fields_layout: 由于父类可能有和子类一样名字+描述符的变量，因此会冲突...... 不得不加上了 klass 的命名空间来解决这个问题......悲伤。变成了历史遗留问题......
+	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop]. <classname+':'+name+':'+descriptor, <fields' offset, Field_info>>
+	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_num = 0;
 	int total_static_fields_num = 0;
 //	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
@@ -183,7 +183,7 @@ public:
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
-	pair<int, shared_ptr<Field_info>> get_field(const wstring & signature);	// [name + ':' + descriptor]
+	pair<int, shared_ptr<Field_info>> get_field(const wstring & BIG_signature);	// [classname + ':' + name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]

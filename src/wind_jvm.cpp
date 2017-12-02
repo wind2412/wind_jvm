@@ -155,8 +155,8 @@ void vm_thread::init_and_do_main()
 		InstanceOop *init_thread = thread_klass->new_instance();
 		BytecodeEngine::initial_clinit(thread_klass, *this);		// first <clinit>!
 		// inject!!
-		init_thread->set_field_value(L"eetop:J", new LongOop((uint64_t)pthread_self()));		// TODO: 这样没有移植性！！要改啊！！！虽然很方便......其实在 linux 下，也是 8 bytes......
-		init_thread->set_field_value(L"priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
+		init_thread->set_field_value(THREAD L":eetop:J", new LongOop((uint64_t)pthread_self()));		// TODO: 这样没有移植性！！要改啊！！！虽然很方便......其实在 linux 下，也是 8 bytes......
+		init_thread->set_field_value(THREAD L":priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
 		// add this Thread obj to ThreadTable!!!	// ......在这里放入的 init_thread 并没有初始化完全。因为它还没有执行构造函数。不过，那也必须放到表中了。因为在 <init> 执行的时候，内部有其他的类要调用 currentThread...... 所以不放入表中不行啊......
 		ThreadTable::add_a_thread(pthread_self(), init_thread);
 
@@ -180,7 +180,7 @@ void vm_thread::init_and_do_main()
 		{
 			// inject it into `init_thread`!! 否则，届时在 java/lang/SecurityManager <clinit> 时，会自动 getCurrentThread --> get 到 main_threadgroup --> get 到 system_threadgroup. 所以必须先行注入。
 			// hack...
-			init_thread->set_field_value(L"group:Ljava/lang/ThreadGroup;", main_threadgroup);
+			init_thread->set_field_value(THREAD L":group:Ljava/lang/ThreadGroup;", main_threadgroup);
 		}
 		assert(this->vm_stack.size() == 0);
 

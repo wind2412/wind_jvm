@@ -41,6 +41,12 @@ using std::function;
 #define VOD L"Ljava/lang/Void;"
 #define BA  "[B"
 
+#define STRING				L"java/lang/String"
+#define FIELD				L"java/lang/reflect/Field"
+#define CONSTRUCTOR			L"java/lang/reflect/Constructor"
+#define CLASS				L"java/lang/Class"
+#define THREAD				L"java/lang/Thread"
+
 void init_native();
 
 // 说明：所有的 native 方法我全部设置成为签名是 void (*)(list<Oop *> & _stack) 的形式了。避免了签名不同调用困难的问题。这样就很好啦～参数和返回值全都会被压入 _stack 中～～

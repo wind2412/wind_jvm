@@ -402,13 +402,13 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 			field->if_didnt_parse_then_parse();
 
 			// fill in!		// see: openjdk: share/vm/runtime/reflection.cpp
-			field_oop->set_field_value(L"clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
-			field_oop->set_field_value(L"slot:I", new IntOop(iter.second.first));			// TODO: 不知道这里设置的对不对??
-			field_oop->set_field_value(L"name:Ljava/lang/String;", java_lang_string::intern(field->get_name()));		// bug report... 原先写得是 iter.first，结果那是 name+type... 这里只要 name......
+			field_oop->set_field_value(FIELD L":clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
+			field_oop->set_field_value(FIELD L":slot:I", new IntOop(iter.second.first));			// TODO: 不知道这里设置的对不对??
+			field_oop->set_field_value(FIELD L":name:Ljava/lang/String;", java_lang_string::intern(field->get_name()));		// bug report... 原先写得是 iter.first，结果那是 name+type... 这里只要 name......
 
 			// judge whether it is a basic type?
 			if (field->get_type_klass() != nullptr) {		// It is an obj/objArray/TypeArray.
-				field_oop->set_field_value(L"type:Ljava/lang/Class;", field->get_type_klass()->get_mirror());
+				field_oop->set_field_value(FIELD L":type:Ljava/lang/Class;", field->get_type_klass()->get_mirror());
 			} else {										// It is a BasicType.
 				wstring descriptor = field->get_descriptor();
 				if (descriptor.size() == 1) {		// BasicType, like `I`, `J`, `S`...
@@ -423,7 +423,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 						case L'D':{
 							MirrorOop *basic_mirror = java_lang_class::get_basic_type_mirror(descriptor);
 							assert(basic_mirror != nullptr);
-							field_oop->set_field_value(L"type:Ljava/lang/Class;", basic_mirror);
+							field_oop->set_field_value(FIELD L":type:Ljava/lang/Class;", basic_mirror);
 							break;
 						}
 						default:
@@ -434,12 +434,12 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 			}
 			// 注意：field 属性也有 Annotation，因此 ACC_ANNOTATION 也会被设置上！但是，参加 class_parser.hpp 开头，field 在 jvm 规范中是不允许设置 ACC_ANNOTATION 的！
 			// 这里在 openjdk 中也有提到。
-			field_oop->set_field_value(L"modifiers:I", new IntOop(field->get_flag() & (~ACC_ANNOTATION)));
-			field_oop->set_field_value(L"override:Z", new IntOop(false));
+			field_oop->set_field_value(FIELD L":modifiers:I", new IntOop(field->get_flag() & (~ACC_ANNOTATION)));
+			field_oop->set_field_value(L"java/lang/reflect/AccessibleObject:override:Z", new IntOop(false));
 			// set Generic Signature.
 			wstring template_signature = field->parse_signature();
 			if (template_signature != L"")
-				field_oop->set_field_value(L"signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
+				field_oop->set_field_value(FIELD L":signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
 			// set Annotation...
 			// 我完全没有搞清楚为什么 openjdk 那里要额外设置 TypeAnnotations ??? 这一项按照源码，分明是 java/lang/reflect/Field 通过 native 去读取的啊...
 			// 很多东西都设置好了，除了 TypeAnnotations，因为它是自己取的啊，通过 Field::private native byte[] getTypeAnnotationBytes0(); 方法...
@@ -451,7 +451,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 				for (int i = 0; i < stub->stub.size(); i ++) {
 					(*byte_arr)[i] = new IntOop(stub->stub[i]);
 				}
-				field_oop->set_field_value(L"annotations:[B", byte_arr);
+				field_oop->set_field_value(FIELD L":annotations:[B", byte_arr);
 			}
 
 			v.push_back(field_oop);
@@ -467,7 +467,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	std::wcout << "===-------------- getClassDeclaredFields Pool (" << klass->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < v.size(); i ++) {
 		Oop *result;
-		assert(v[i]->get_field_value(L"name:Ljava/lang/String;", &result));
+		assert(v[i]->get_field_value(FIELD L":name:Ljava/lang/String;", &result));
 		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << ", address: [" << result << ']' << std::endl;
 	}
 	std::wcout << "===--------------------------------------------------------===" << std::endl;
@@ -503,8 +503,8 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 		shared_ptr<Method> method = iter.second;
 		auto ctor_oop = klass->new_instance();
 
-		ctor_oop->set_field_value(L"clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
-		ctor_oop->set_field_value(L"slot:I", new IntOop(iter.first));
+		ctor_oop->set_field_value(CONSTRUCTOR L":clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
+		ctor_oop->set_field_value(CONSTRUCTOR L":slot:I", new IntOop(iter.first));
 
 		// parse arg list.
 		vector<MirrorOop *> args = method->parse_argument_list();
@@ -514,7 +514,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 		for (int i = 0; i < args.size(); i ++) {
 			(*class_array_obj)[i] = args[i];
 		}
-		ctor_oop->set_field_value(L"parameterTypes:[Ljava/lang/Class;", class_array_obj);
+		ctor_oop->set_field_value(CONSTRUCTOR L":parameterTypes:[Ljava/lang/Class;", class_array_obj);
 
 
 		// parse exceptions list.
@@ -524,13 +524,13 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 		for (int i = 0; i < excepts.size(); i ++) {
 			(*except_array_obj)[i] = excepts[i];
 		}
-		ctor_oop->set_field_value(L"exceptionTypes:[Ljava/lang/Class;", except_array_obj);
+		ctor_oop->set_field_value(CONSTRUCTOR L":exceptionTypes:[Ljava/lang/Class;", except_array_obj);
 
-		ctor_oop->set_field_value(L"modifiers:I", new IntOop(method->get_flag() & (~ACC_ANNOTATION)));
-		ctor_oop->set_field_value(L"override:Z", new IntOop(false));
+		ctor_oop->set_field_value(CONSTRUCTOR L":modifiers:I", new IntOop(method->get_flag() & (~ACC_ANNOTATION)));
+		ctor_oop->set_field_value(L"java/lang/reflect/AccessibleObject:override:Z", new IntOop(false));
 		wstring template_signature = method->parse_signature();
 		if (template_signature != L"")
-			ctor_oop->set_field_value(L"signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
+			ctor_oop->set_field_value(CONSTRUCTOR L":signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
 
 		// set RuntimeVisiableAnnotations
 		CodeStub *stub = method->get_rva();		// RuntimeVisibleAnnotations' bytecode
@@ -539,7 +539,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 			for (int i = 0; i < stub->stub.size(); i ++) {
 				(*byte_arr)[i] = new IntOop(stub->stub[i]);
 			}
-			ctor_oop->set_field_value(L"annotations:[B", byte_arr);
+			ctor_oop->set_field_value(CONSTRUCTOR L":annotations:[B", byte_arr);
 		}
 		// set RuntimeVisiableParameterAnnotations
 		stub = method->get_rvpa();		// RuntimeVisibleParameterAnnotations' bytecode
@@ -548,7 +548,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 			for (int i = 0; i < stub->stub.size(); i ++) {
 				(*byte_arr)[i] = new IntOop(stub->stub[i]);
 			}
-			ctor_oop->set_field_value(L"parameterAnnotations:[B", byte_arr);
+			ctor_oop->set_field_value(CONSTRUCTOR L":parameterAnnotations:[B", byte_arr);
 		}
 
 		v.push_back(ctor_oop);

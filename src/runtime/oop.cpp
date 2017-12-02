@@ -30,26 +30,62 @@ InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.f
 //	memcpy(this->fields, rhs.fields, sizeof(Oop *) * this->field_length);		// shallow copy
 }
 
-bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)
+bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。由于 namespace 不同，因此会用多级父类的名字在 field_layout 中进行查找。
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	wstring signature = field->get_name() + L":" + field->get_descriptor();
-	return get_field_value(signature, result);
+	wstring descriptor = field->get_name() + L":" + field->get_descriptor();
+
+	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
+	while (instance_klass != nullptr) {
+		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
+		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+		if (iter == instance_klass->fields_layout.end()) {
+			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
+			continue;
+		}
+		int offset = iter->second.first;
+		iter->second.second->if_didnt_parse_then_parse();		// important !!
+		*result = this->fields[offset];
+		return true;
+	}
+
+	std::wcerr << "didn't find field [" << descriptor << "] in InstanceKlass " << this->klass->get_name() << " and its parents!" << std::endl;
+	assert(false);
+
+//	return get_field_value(signature, result);
 }
 
-void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)
+void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	wstring signature = field->get_name() + L":" + field->get_descriptor();
-	set_field_value(signature, value);
+	wstring descriptor = field->get_name() + L":" + field->get_descriptor();
+
+	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
+	while (instance_klass != nullptr) {
+		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
+		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+		if (iter == instance_klass->fields_layout.end()) {
+			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
+			continue;
+		}
+		int offset = iter->second.first;
+		iter->second.second->if_didnt_parse_then_parse();		// important!!
+		this->fields[offset] = value;
+		return;
+	}
+
+	std::wcerr << "didn't find field [" << descriptor << "] in InstanceKlass " << this->klass->get_name() << " and its parents!" << std::endl;
+	assert(false);
+
+//	set_field_value(signature, value);
 }
 
-bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				// use for forging String Oop at parsing constant_pool.
+bool InstanceOop::get_field_value(const wstring & BIG_signature, Oop **result) 				// use for forging String Oop at parsing constant_pool.
 {		// [bug发现] 在 ByteCodeEngine 中，getField 里边，由于我的设计，因此即便是读取 int 也会返回一个 IntOop 的 对象。因此这肯定是错误的... 改为在这里直接取引用，直接解除类型并且取出真值。
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+	auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 	if (iter == instance_klass->fields_layout.end()) {
-		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		std::wcerr << "didn't find field [" << BIG_signature << "] in InstanceKlass " << instance_klass->name << std::endl;
 		assert(false);
 	}
 	int offset = iter->second.first;
@@ -70,12 +106,12 @@ bool InstanceOop::get_field_value(const wstring & signature, Oop **result) 				/
 	return true;
 }
 
-void InstanceOop::set_field_value(const wstring & signature, Oop *value)
+void InstanceOop::set_field_value(const wstring & BIG_signature, Oop *value)
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	auto iter = instance_klass->fields_layout.find(signature);
+	auto iter = instance_klass->fields_layout.find(BIG_signature);
 	if (iter == instance_klass->fields_layout.end()) {
-		std::wcerr << "didn't find field [" << signature << "] in InstanceKlass " << instance_klass->name << std::endl;
+		std::wcerr << "didn't find field [" << BIG_signature << "] in InstanceKlass " << instance_klass->name << std::endl;
 		assert(false);
 	}
 	int offset = iter->second.first;
@@ -96,14 +132,14 @@ void InstanceOop::set_field_value(const wstring & signature, Oop *value)
 
 }
 
-int InstanceOop::get_all_field_offset(const wstring & signature)
+int InstanceOop::get_all_field_offset(const wstring & BIG_signature)
 {
 	// first, search in non-static field.
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	auto iter = instance_klass->fields_layout.find(signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
+	auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 	if (iter == instance_klass->fields_layout.end()) {
 		// then, search in static field.
-		return get_static_field_offset(signature);
+		return get_static_field_offset(BIG_signature.substr(BIG_signature.find_first_of(L":") + 1));
 	}
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
@@ -126,7 +162,7 @@ int InstanceOop::get_all_field_offset(const wstring & signature)
 	// 这里存放的不是绝对距离，我会把语义完全改变，成为 “和此 oop 存放的 field 的起始地址的相对距离”，而不是 “和此 oop 的 this 指针的绝对距离”！！
 	// 这样，GC 也可以用多种算法了！！看来也可以支持复制算法了！开森～
 #ifdef DEBUG
-	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
+	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << BIG_signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
 #endif
 //	return (char *)&this->fields[offset] - (char *)this;
 	return offset;	// vector 是连续内存。

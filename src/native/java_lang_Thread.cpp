@@ -36,7 +36,7 @@ void JVM_StartThread(list<Oop *> & _stack){		// static
 	return;					// TODO: I close here!!!
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
-	assert(_this->get_field_value(L"eetop:J", &result));
+	assert(_this->get_field_value(THREAD L":eetop:J", &result));
 	LongOop *tid = (LongOop *)result;
 	assert(tid->value == 0);			// must be 0. if not 0, it must be started already.
 
@@ -66,7 +66,7 @@ void JVM_IsThreadAlive(list<Oop *> & _stack){
 	std::wcout << "the java.lang.Thread obj's address: [" << _this << "]." << std::endl;
 #endif
 	Oop *result;
-	assert(_this->get_field_value(L"eetop:J", &result));
+	assert(_this->get_field_value(THREAD L":eetop:J", &result));
 	LongOop *tid = (LongOop *)result;
 //	assert(tid->value != 0);	// simple check
 	/**

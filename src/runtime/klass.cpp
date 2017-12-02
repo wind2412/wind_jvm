@@ -94,8 +94,11 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf->fields_count; i ++) {
 		shared_ptr<Field_info> metaField = make_shared<Field_info>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->fields[i], cf->constant_pool);
+		if (!metaField->is_static()) {
+			ss << metaField->get_klass()->get_name() << L":";		// for fixing bug: must have the namespace in field_layout... !!!
+		}
 		ss << metaField->get_name() << L":" << metaField->get_descriptor();
-		if((cf->fields[i].access_flags & 0x08) != 0) {	// static field
+		if(metaField->is_static()) {	// static field
 			this->static_fields_layout.insert(make_pair(ss.str(), make_pair(total_static_fields_num, metaField)));
 			total_static_fields_num ++;	// offset +++
 		} else {		// non-static field
@@ -354,33 +357,42 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 
 }
 
-pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & signature)		// 字段解析时的查找
+pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descriptor)		// 字段解析时的查找
 {
 	pair<int, shared_ptr<Field_info>> target = std::make_pair(-1, nullptr);
-	// search in this->fields_layout
-	auto iter = this->fields_layout.find(signature);
-	if (iter == this->fields_layout.end()) {
-		// search in this->static_fields_layout
-		iter = this->static_fields_layout.find(signature);
-	} else {
-		return (*iter).second;
-	}
-	if (iter == this->static_fields_layout.end()) {
-		// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
-		for (auto iter : this->interfaces) {
-			// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
-			target = iter.second->get_field(signature);
-			if (target.second != nullptr)	return target;
+	shared_ptr<InstanceKlass> instance_klass(shared_ptr<InstanceKlass>(this, [](auto *){}));
+	while (instance_klass != nullptr) {
+		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
+		std::wcout << BIG_signature << std::endl;		// delete
+		// search in this->fields_layout
+		auto iter = this->fields_layout.find(BIG_signature);
+		if (iter == this->fields_layout.end()) {
+			// search in this->static_fields_layout
+			iter = instance_klass->static_fields_layout.find(descriptor);
+		} else {
+			return (*iter).second;
 		}
-		// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
-		// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
-		if (this->parent != nullptr)	// this class is not java.lang.Object. java.lang.Object has no parent.
-			target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
-		return target;		// nullptr or Real result.
-	} else {
-		return (*iter).second;
+		if (iter == instance_klass->static_fields_layout.end()) {
+			// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
+			for (auto iter : this->interfaces) {
+				// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
+				target = iter.second->get_field(BIG_signature);
+				if (target.second != nullptr)	return target;
+			}
+			// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
+			// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
+//			if (this->parent != nullptr)	// this class is not java.lang.Object. java.lang.Object has no parent.
+//				target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(BIG_signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
+//			return target;		// nullptr or Real result.
+//			else {
+			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());		// find by parent's BIG_signature
+			continue;
+//			}
+		} else {
+			return (*iter).second;
+		}
 	}
-
+	return target;
 }
 
 bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, Oop **result)
@@ -502,7 +514,7 @@ void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr
 		// ** 如果是 static 的 get_field，那么需要根据 signature 去 parent 去找。不过这里只是初始化，parent 的 static 域会被自己初始化，不用此子类管。 **
 		int offset = iter.second.first;
 		if (fields[offset] == nullptr) {			// 这里为 0，届时有可能是 ref 的 null，也有可能是 没有经过初始化 的 basic type oop.
-			wstring type = iter.first.substr(iter.first.find_first_of(L":") + 1);		// e.g. value:[C --> [C,   value:J --> J
+			wstring type = iter.first.substr(iter.first.find_last_of(L":") + 1);		// e.g. value:[C --> [C,   value:J --> J
 			if (type.size() == 1) {
 				// is a basic type !!!
 				switch (type[0]) {
@@ -669,7 +681,7 @@ MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *
 	if (loader != nullptr) {
 		// need to initialize the `ClassLoader.class` by using ClassLoader's constructor!!
 		// TODO !!!!!!!! 这里千万别忘了写了！！！需要由 AppClassLoader 类来加载这个 Klass ！！！
-//		mirror->set_field_value(L"classLoader:Ljava/lang/ClassLoader;", loader);
+//		mirror->set_field_value(CLS L":classLoader:Ljava/lang/ClassLoader;", loader);
 		std::cerr << "**Please** load sun/misc/Launcher$AppClassLoader.class first !! " << std::endl;
 		assert(false);
 	}
