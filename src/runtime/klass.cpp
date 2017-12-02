@@ -671,8 +671,9 @@ MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *
 		// need to initialize the `ClassLoader.class` by using ClassLoader's constructor!!
 		// TODO !!!!!!!! 这里千万别忘了写了！！！需要由 AppClassLoader 类来加载这个 Klass ！！！
 //		mirror->set_field_value(CLS L":classLoader:Ljava/lang/ClassLoader;", loader);
+//		mirror->set_field_value(CLS L":classLoader:Ljava/lang/ClassLoader;", nullptr);	// TODO: 先用 nullptr 代替了。
 		std::cerr << "**Please** load sun/misc/Launcher$AppClassLoader.class first !! " << std::endl;
-		assert(false);
+//		assert(false);
 	}
 
 	return mirror;

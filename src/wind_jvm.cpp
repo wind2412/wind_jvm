@@ -271,7 +271,6 @@ void vm_thread::init_and_do_main()
 
 	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 
-	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
 
 	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
 	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
@@ -294,6 +293,7 @@ void vm_thread::init_and_do_main()
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
+	assert(false);		// 这里开始才是高能......都不知道能不能成功...... 而且 exec 还有没被加载......
 }
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
