@@ -23,3 +23,4 @@ int get_cpu_nums() {
 	assert(cpu_nums != 0);
 	return cpu_nums;
 }
+

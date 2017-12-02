@@ -37,7 +37,7 @@ void JVM_MonitorNotify(list<Oop *> & _stack){
 }
 void JVM_MonitorNotifyAll(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	_this->notify_all();
 }
 void JVM_Clone(list<Oop *> & _stack){
 	Oop *_this = _stack.front();	_stack.pop_front();

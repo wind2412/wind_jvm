@@ -809,6 +809,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x37:{		// lstore
+				int index = pc[1];
+				assert(index > 3);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				LongOop *ref = (LongOop *)op_stack.top();
+				localVariableTable[index] = new LongOop(ref->value);	op_stack.pop();
+#ifdef DEBUG
+		std::wcout << "(DEBUG) pop long [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x3a:{		// astore
@@ -1360,7 +1371,23 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
-
+			case 0x94:{		// lcmp
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				if (val2 > val1) {
+					op_stack.push(new IntOop(-1));
+				} else if (val2 < val1) {
+					op_stack.push(new IntOop(1));
+				} else {
+					op_stack.push(new IntOop(0));
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) compare longs: [" << val1 << " and " << val2 << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 			case 0x95:		// fcmp_l
 			case 0x96:{		// fcmp_g
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
@@ -1603,8 +1630,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				thread.pc = backup_pc;
 				Oop *oop = op_stack.top();	op_stack.pop();
 #ifdef DEBUG
-	if (oop != 0)
-		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  "address: "<< std::hex << oop << std::endl;
+	if (oop != 0) {
+		std::wcout << "(DEBUG) return an ref from stack: <class>:" << oop->get_klass()->get_name() <<  ", address: "<< std::hex << oop << std::endl;
+		if (oop->get_klass()->get_name() == L"java/lang/String")	std::wcout << "(DEBUG) return: [" << java_lang_string::print_stringOop((InstanceOop *)oop) << "]" << std::endl;
+	}
 	else
 		std::wcout << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
 	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
@@ -1850,6 +1879,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					op_stack.pop();
 					size --;
 				}
+				// 这里用作魔改。比如，禁用 System.loadLibrary 方法。
+				if (new_method->get_klass()->get_name() == L"java/lang/System" && new_method->get_name() == L"loadLibrary") break;
+
 				// synchronized:
 				Oop *this_obj;
 				if (new_method->is_synchronized()) {

@@ -22,6 +22,8 @@
 #include "native/java_lang_String.hpp"
 #include "native/sun_reflect_NativeConstructorAccessorImpl.hpp"
 #include "native/java_util_concurrent_atomic_AtomicLong.hpp"
+#include "native/java_io_UnixFileSystem.hpp"
+#include "native/sun_misc_signal.hpp"
 
 static unordered_map<wstring, function<void*(const wstring &)>> native_map;		// such as: {L"java/lang/Object", search [native method]'s method lambda for java/lang/Object}
 
@@ -43,6 +45,8 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"java/lang/String"] = java_lang_string_search_method;
 	native_map[L"sun/reflect/NativeConstructorAccessorImpl"] = sun_reflect_nativeConstructorAccessorImpl_search_method;
 	native_map[L"java/util/concurrent/atomic/AtomicLong"] = java_util_concurrent_atomic_atomicLong_search_method;
+	native_map[L"java/io/UnixFileSystem"] = java_io_unixFileSystem_search_method;
+	native_map[L"sun/misc/Signal"] = sun_misc_signal_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().
