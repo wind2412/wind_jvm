@@ -255,9 +255,6 @@ void vm_thread::init_and_do_main()
 			this->add_frame_and_execute(target_method, list);
 		}
 
-		std::wcout << "this is overrrrrr!!" << std::endl;		// delete
-		std::wcout << "init_thread oop: " << init_thread << std::endl;	// delete
-
 		// 3.3 Complete! invoke the method...
 		// java/lang/System::initializeSystemClass(): "Initialize the system class.  Called after thread initialization." So it must be created after the thread.
 		shared_ptr<Method> _initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
@@ -270,29 +267,39 @@ void vm_thread::init_and_do_main()
 
 	}
 
-	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
+	auto launcher_helper_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
+	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
+	shared_ptr<Method> load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
+	// new a String.
+	InstanceOop *main_class = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
 
-
-	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
-	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
-	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
-	assert(main_method != nullptr);
-	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
-
-	// first execute <clinit> if has
-	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);
-	// second execute [public static void main].
-
-	// new a String[].
-	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
-	auto iter = system_classmap.find(L"java/lang/String.class");
-	assert(iter != system_classmap.end());
-	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
-	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
-		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
-	}
-	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_class}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
+
+
+
+//	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
+//
+//	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
+//	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
+//	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
+//	assert(main_method != nullptr);
+//	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
+//
+//	// first execute <clinit> if has
+//	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);
+//	// second execute [public static void main].
+//
+//	// new a String[].
+//	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
+//	auto iter = system_classmap.find(L"java/lang/String.class");
+//	assert(iter != system_classmap.end());
+//	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
+//	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
+//		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
+//	}
+//	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+//	this->execute();
 
 }
 

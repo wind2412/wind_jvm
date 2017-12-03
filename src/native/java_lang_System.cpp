@@ -16,6 +16,7 @@
 #include "native/java_lang_String.hpp"
 #include "wind_jvm.hpp"
 #include "classloader.hpp"
+#include <sys/time.h>
 
 using std::vector;
 
@@ -36,7 +37,14 @@ void JVM_CurrentTimeMillis(list<Oop *> & _stack)		// static
 	assert(false);
 }
 void JVM_NanoTime(list<Oop *> & _stack){				// static
-	assert(false);
+	timeval time;
+	if (gettimeofday(&time, nullptr) == -1) {
+		assert(false);
+	}
+	_stack.push_back(new LongOop(time.tv_sec * 1000 * 1000 * 1000 + time.tv_usec * 1000));		// second * 10^9 + micro_second * 10^3 = nano_second.
+#ifdef DEBUG
+	std::wcout << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
+#endif
 }
 void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 	Oop *obj1 = (Oop *)_stack.front();	_stack.pop_front();
@@ -67,7 +75,7 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		ObjArrayOop *objarr1 = (ObjArrayOop *)obj1;
 		ObjArrayOop *objarr2 = (ObjArrayOop *)obj2;
 		assert(objarr1->get_dimension() == objarr2->get_dimension());
-		assert(src_pos + length < objarr1->get_length() && dst_pos + length < objarr2->get_length());	// TODO: ArrayIndexOutofBound
+		assert(src_pos + length <= objarr1->get_length() && dst_pos + length <= objarr2->get_length());	// TODO: ArrayIndexOutofBound
 		// 1. src has same element of dst, 2. or is sub_type of dst, 3. all the copy part are null.
 		auto src_klass = std::static_pointer_cast<ObjArrayKlass>(objarr1->get_klass())->get_element_klass();
 		auto dst_klass = std::static_pointer_cast<ObjArrayKlass>(objarr2->get_klass())->get_element_klass();
@@ -138,23 +146,24 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.management.compiler"), java_lang_string::intern(L"nop")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.io.unicode.encoding"), java_lang_string::intern(L"UnicodeBig")});
 //	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.reflect.noCaches"), java_lang_string::intern(L"true")});	// 直接魔改了（逃
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.ext.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/ext:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.endorsed.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/endorsed")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/resources.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/rt.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/sunrsasign.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jsse.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jce.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/charsets.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jfr.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/classes")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:.")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vendor.url.bug"), java_lang_string::intern(L"http://bugreport.sun.com/bugreport/")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.name"), java_lang_string::intern(L"Mac OS X")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1/bin")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.home"), java_lang_string::intern(L"/Users/zhengxiaolin")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.timezone"), java_lang_string::intern(L"Asia/Shanghai")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.version"), java_lang_string::intern(L"10.12.6")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.io.tmpdir"), java_lang_string::intern(L"/var/folders/wc/0c_zn09x12s_y90ccmvjb6900000gn/T/")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.dir"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.name"), java_lang_string::intern(L"zhengxiaolin")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.java.command"), java_lang_string::intern(L"test1.Test8")});
-//	vm.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.cpu.endian"), java_lang_string::intern(L"little")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.ext.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/ext:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.endorsed.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/endorsed")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/resources.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/rt.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/sunrsasign.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jsse.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jce.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/charsets.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jfr.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/classes")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:.")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vendor.url.bug"), java_lang_string::intern(L"http://bugreport.sun.com/bugreport/")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.name"), java_lang_string::intern(L"Mac OS X")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1/bin")});
+	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/github/wind_jvm")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.home"), java_lang_string::intern(L"/Users/zhengxiaolin")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.timezone"), java_lang_string::intern(L"Asia/Shanghai")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.version"), java_lang_string::intern(L"10.12.6")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.io.tmpdir"), java_lang_string::intern(L"/var/folders/wc/0c_zn09x12s_y90ccmvjb6900000gn/T/")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.dir"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.name"), java_lang_string::intern(L"zhengxiaolin")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.java.command"), java_lang_string::intern(L"test1.Test8")});
+//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.cpu.endian"), java_lang_string::intern(L"little")});
 
 	_stack.push_back(prop);
 }

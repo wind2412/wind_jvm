@@ -66,11 +66,11 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
 		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
-			std::wcout << "the "<< i << " argument is java/lang/String: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "]" << std::endl;
+			std::wcout << "the "<< i-1 << " argument is java/lang/String: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "]" << std::endl;
 		}
 		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
 			wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
-			std::wcout << "the "<< i << " argument is java/lang/Class: [" << type << "]" << std::endl;
+			std::wcout << "the "<< i-1 << " argument is java/lang/Class: [" << type << "]" << std::endl;
 		}
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {

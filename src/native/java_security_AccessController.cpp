@@ -15,6 +15,7 @@
 static unordered_map<wstring, void*> methods = {
     {L"doPrivileged:(" PA ")" OBJ,				(void *)&JVM_DoPrivileged},
     {L"doPrivileged:(" PEA ")" OBJ,				(void *)&JVM_DoPrivileged},
+    {L"doPrivileged:(" PEA ACC ")" OBJ,			(void *)&JVM_DoPrivileged},
     {L"getStackAccessControlContext:()" ACC,		(void *)&JVM_GetStackAccessControlContext},
 };
 
