@@ -749,6 +749,22 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x2f:{		// laload
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[J");		// assert long[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				op_stack.push(new LongOop(((IntOop *)((*charsequence)[index]))->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get long[" << index << "] which is the long: [" << ((LongOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
+
 
 
 			case 0x32:{		// aaload
@@ -778,7 +794,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get byte/boolean[" << index << "] which is the byte/boolean: '" << ((IntOop *)op_stack.top())->value << "'" << std::endl;
+	std::wcout << "(DEBUG) get byte/boolean[" << index << "] which is the byte/boolean: [" << ((IntOop *)op_stack.top())->value << "]" << std::endl;
 #endif
 				break;
 			}
@@ -793,7 +809,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));			// TODO: ...... 我取消了 CharOop，因此造成了没法扩展......一定要回来重看...
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: '" << (wchar_t)((IntOop *)op_stack.top())->value << "'" << std::endl;
+	std::wcout << "(DEBUG) get char[" << index << "] which is the wchar_t: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]" << std::endl;
 #endif
 				break;
 			}
@@ -964,6 +980,23 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
+
+			case 0x50:{		// lastore
+				LongOop *value = (LongOop *)op_stack.top();	op_stack.pop();
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[J");		// assert char[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				(*charsequence)[index] = new LongOop(value->value);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get long ['" << value->value << "'] from the stack to long[]'s position of [" << index << "]" << std::endl;
+#endif
+				break;
+			}
 
 			case 0x53:{		// aastore
 				Oop *value = op_stack.top();	op_stack.pop();
@@ -1277,8 +1310,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
+			case 0x81:{		// lor
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val2 | val1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val2 << " | " << val1 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 			case 0x82:{		// ixor
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();

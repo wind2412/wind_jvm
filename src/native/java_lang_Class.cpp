@@ -325,7 +325,20 @@ void JVM_SetClassSigners(list<Oop *> & _stack){
 }
 void JVM_IsArrayClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	auto klass = _this->get_mirrored_who();
+	if (klass == nullptr) {		// it is primitive type. klass->get_type will crash.
+		_stack.push_back(new IntOop(false));
+	} else if (klass->get_type() == ClassType::ObjArrayClass || klass->get_type() == ClassType::TypeArrayClass) {
+		_stack.push_back(new IntOop(true));
+	} else {
+		_stack.push_back(new IntOop(false));
+	}
+#ifdef DEBUG
+	if (klass != nullptr)
+		std::wcout << "(DEBUG) klass: [" << klass->get_name() << "] is a array klass? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+	else
+		std::wcout << "(DEBUG) klass: [" << _this->get_extra() << "] is not a array klass." << std::endl;
+#endif
 }
 void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -344,7 +357,45 @@ void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 }
 void JVM_GetComponentType(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	auto klass = _this->get_mirrored_who();
+	assert(klass != nullptr);
+	assert(klass->get_type() == ClassType::ObjArrayClass || klass->get_type() == ClassType::TypeArrayClass);
+
+	if (klass->get_type() == ClassType::ObjArrayClass) {
+		_stack.push_back(std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass()->get_mirror());
+	} else {
+		Type type = std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type();
+		switch (type) {
+			case Type::BYTE:
+			case Type::BOOLEAN:
+			case Type::SHORT:
+			case Type::INT:
+				_stack.push_back(java_lang_class::get_basic_type_mirror(L"I"));
+				break;
+			case Type::FLOAT:
+				_stack.push_back(java_lang_class::get_basic_type_mirror(L"F"));
+				break;
+			case Type::LONG:
+				_stack.push_back(java_lang_class::get_basic_type_mirror(L"J"));
+				break;
+			case Type::DOUBLE:
+				_stack.push_back(java_lang_class::get_basic_type_mirror(L"D"));
+				break;
+			default:{
+				std::cerr << "can't get here!" << std::endl;
+				assert(false);
+			}
+		}
+	}
+
+#ifdef DEBUG
+	MirrorOop *mirror = (MirrorOop *)_stack.back();
+	if (mirror->get_mirrored_who() == nullptr) {
+		std::wcout << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_extra() << "]." << std::endl;
+	} else {
+		std::wcout << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_mirrored_who()->get_name() << "]." << std::endl;
+	}
+#endif
 }
 void JVM_GetClassModifiers(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

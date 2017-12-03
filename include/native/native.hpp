@@ -25,6 +25,7 @@ using std::function;
 #define OBJ L"Ljava/lang/Object;"
 #define STE L"Ljava/lang/StackTraceElement;"
 #define STR L"Ljava/lang/String;"
+#define FLE L"Ljava/io/File;"
 #define IPS L"Ljava/io/InputStream;"
 #define PRS L"Ljava/io/PrintStream;"
 #define PRO L"Ljava/util/Properties;"
@@ -48,7 +49,7 @@ using std::function;
 #define THREAD				L"java/lang/Thread"
 #define FILEOUTPUTSTREAM		L"java/io/FileOutputStream"
 #define FILEDESCRIPTOR		L"java/io/FileDescriptor"
-
+#define FILE					L"java/io/File"
 
 void init_native();
 

@@ -14,6 +14,8 @@
 using std::list;
 
 void JVM_UFS_InitIDs(list<Oop *> & _stack);
+void JVM_Canonicalize0(list<Oop *> & _stack);
+void JVM_GetBooleanAttributes0(list<Oop *> & _stack);
 
 
 
