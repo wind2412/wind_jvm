@@ -1146,7 +1146,58 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 
 			case 0x63:{		// dadd
-				assert(false);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val1 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+
+#ifdef DEBUG
+	auto print_double = [](double val) {
+		if (val == DOUBLE_NAN)						std::wcout << "NAN";
+		else if (val == DOUBLE_INFINITY)				std::wcout << "DOUBLE_INFINITY";
+		else if (val == DOUBLE_NEGATIVE_INFINITY)		std::wcout << "DOUBLE_NEGATIVE_INFINITY";
+		else std::wcout << val << "ld";
+	};
+	std::wcout << "(DEBUG) dadd of val2: [";
+	print_double(val2);
+	std::wcout << "] and val1: [";
+	print_double(val1);
+	std::wcout << "], result is: [";
+#endif
+				if (val2 == DOUBLE_NAN || val1 == DOUBLE_NAN) {
+					op_stack.push(new DoubleOop(NAN));
+				} else if ((val2 == DOUBLE_INFINITY && val1 == DOUBLE_NEGATIVE_INFINITY) || (val1 == DOUBLE_INFINITY && val2 == DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(NAN));
+				} else if (val2 == DOUBLE_INFINITY && val1 == DOUBLE_INFINITY) {
+					op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+				} else if (val2 == DOUBLE_NEGATIVE_INFINITY && val1 == DOUBLE_NEGATIVE_INFINITY) {
+					op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+				} else if (val2 == DOUBLE_INFINITY && (val1 != DOUBLE_INFINITY && val1 != DOUBLE_NAN && val1 != DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+				} else if (val2 == DOUBLE_NEGATIVE_INFINITY && (val1 != DOUBLE_INFINITY && val1 != DOUBLE_NAN && val1 != DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+				} else if (val1 == DOUBLE_INFINITY && (val2 != DOUBLE_INFINITY && val2 != DOUBLE_NAN && val2 != DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+				} else if (val1 == DOUBLE_NEGATIVE_INFINITY && (val2 != DOUBLE_INFINITY && val2 != DOUBLE_NAN && val2 != DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+				} else {	// TODO: ???? 相同符号的零值？？？ 不同符号的零值？？？？
+					double result = val2 + val1;
+					op_stack.push(new DoubleOop(result));
+
+//					if (val2 > 0 && val1 > 0 && result < 0) {				// judge overflow:		// TODO: wrong algorithm......除了用汇编直接读取，如何判断是否溢出 ????
+//						op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+//					} else if (val2 < 0 && val1 < 0 && result > 0) {		// judge underflow:
+//						op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+//					} else {												// else: no flow.
+//						op_stack.push(new DoubleOop(result));
+//					}
+				}
+
+#ifdef DEBUG
+	print_double(((DoubleOop *)op_stack.top())->value);
+	std::wcout << "]." << std::endl;
+#endif
+
 				break;
 			}
 			case 0x64:{		// isub
@@ -1207,7 +1258,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
 					}
 				} else {
-					op_stack.push(new FloatOop(val2 * val1));
+					float result = val2 * val1;
+					op_stack.push(new FloatOop(result));
 				}
 #ifdef DEBUG
 	print_float(((FloatOop *)op_stack.top())	->value);
@@ -1445,7 +1497,15 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
-
+			case 0x88:{		// l2i
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop((int)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert long: [" << val << "] to int: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x89:{		// l2f
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 				long val = ((LongOop*)op_stack.top())->value; op_stack.pop();
@@ -1496,6 +1556,34 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
+
+			case 0x8f:{		// d2l
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+
+				if (val == DOUBLE_NAN) {
+					op_stack.push(new LongOop(0));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert double: [DOUBLE_NAN] to long: [0]." << std::endl;
+#endif
+				} else if (val == DOUBLE_INFINITY) {
+					op_stack.push(new LongOop(LONG_MAX));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert double: [DOUBLE_INFINITY] to long: [LONG_MAX]." << std::endl;
+#endif
+				} else if (val == DOUBLE_NEGATIVE_INFINITY) {
+					op_stack.push(new LongOop(LONG_MIN));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert double: [DOUBLE_NEGATIVE_INFINITY] to long: [LONG_MIN]." << std::endl;
+#endif
+				} else {
+					op_stack.push(new LongOop((long)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert double: [" << val << "ld] to long: [" << ((LongOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				}
+				break;
+			}
 
 			case 0x91:{		// i2b
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
