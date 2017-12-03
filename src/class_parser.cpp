@@ -86,7 +86,7 @@ std::ifstream & operator >> (std::ifstream & f, CONSTANT_Float_info & i) {
 	return f;
 }
 float CONSTANT_Float_info::get_value() {
-	if (bytes == FLOAT_INFINITY)				return FLOAT_INFINITY;
+	if (bytes == FLOAT_INFINITY)					return FLOAT_INFINITY;
 	else if (bytes == FLOAT_NEGATIVE_INFINITY)	return FLOAT_NEGATIVE_INFINITY;
 	else if ((bytes >= 0x7f800001 && bytes <= 0x7fffffff) || (bytes >= 0xff800001 && bytes <= 0xffffffff))	return FLOAT_NAN;
 	else {

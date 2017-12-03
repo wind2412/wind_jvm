@@ -220,6 +220,8 @@ Oop* copy_BasicOop_value(Oop *oop)		// aux
 			default:
 				assert(false);
 		}
+	} else {
+		assert(false);
 	}
 }
 
@@ -483,8 +485,20 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
+			case 0x0e:{		// dconst_1
+				op_stack.push(new DoubleOop((double)1));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push double 1.0ld on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x0f:{		// dconst_2
+				op_stack.push(new DoubleOop((double)2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push double 2.0ld on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x10: {		// bipush
 				op_stack.push(new IntOop(pc[1]));
 #ifdef DEBUG
@@ -1131,6 +1145,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+			case 0x63:{		// dadd
+				assert(false);
+				break;
+			}
 			case 0x64:{		// isub
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
@@ -1167,7 +1185,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 #ifdef DEBUG
 	auto print_float = [](float val) {
-		if (val == FLOAT_NAN)	std::wcout << "FLOAT_NAN";
+		if (val == FLOAT_NAN)	std::wcout << "NAN";
 		else if (val == FLOAT_INFINITY)	std::wcout << "FLOAT_INFINITY";
 		else if (val == FLOAT_NEGATIVE_INFINITY)	std::wcout << "FLOAT_NEGATIVE_INFINITY";
 		else std::wcout << val << "f";
@@ -1179,7 +1197,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	std::wcout << "], result is: [";
 #endif
 				if (val2 == FLOAT_NAN || val1 == FLOAT_NAN) {		// NAN * (any other)
-					op_stack.push(new FloatOop(FLOAT_NAN));
+					op_stack.push(new FloatOop(FLOAT_NAN));		// [x] 不兼容.....[x] 注意 cmath 中的 INFINITY, -INFINITY 以及 NAN 全是针对 fp 浮点数来说的！！
 				} else if (((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && val1 == 0.0f) || ((val1 == FLOAT_INFINITY || val1 == FLOAT_NEGATIVE_INFINITY) && val2 == 0.0f)) {
 					op_stack.push(new FloatOop(FLOAT_NAN));			// INFINITY * 0
 				} else if ((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && (val1 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY)) {
@@ -1190,6 +1208,61 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					}
 				} else {
 					op_stack.push(new FloatOop(val2 * val1));
+				}
+#ifdef DEBUG
+	print_float(((FloatOop *)op_stack.top())	->value);
+	std::wcout << "]." << std::endl;
+#endif
+				break;
+			}
+
+
+
+			case 0x6e:{		// fdiv
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val1 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+
+#ifdef DEBUG
+	auto print_float = [](float val) {
+		if (val == FLOAT_NAN)	std::wcout << "FLOAT_NAN";
+		else if (val == FLOAT_INFINITY)	std::wcout << "FLOAT_INFINITY";
+		else if (val == FLOAT_NEGATIVE_INFINITY)	std::wcout << "FLOAT_NEGATIVE_INFINITY";
+		else std::wcout << val << "f";
+	};
+	std::wcout << "(DEBUG) fdiv of val2: [";
+	print_float(val2);
+	std::wcout << "] and val1: [";
+	print_float(val1);
+	std::wcout << "], result is: [";
+#endif
+				if (val2 == FLOAT_NAN || val1 == FLOAT_NAN) {		// NAN / (any other)
+					op_stack.push(new FloatOop(FLOAT_NAN));
+				} else if ((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && (val1 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(FLOAT_NAN));			// INFINITY / INFINITY
+				} else if ((val2 == FLOAT_INFINITY || val2 == FLOAT_NEGATIVE_INFINITY) && (val1 != FLOAT_NAN && val1 != FLOAT_INFINITY && val1 != FLOAT_NEGATIVE_INFINITY)) {
+					if ((val2 < 0 && val1 < 0) || (val2 > 0 && val1 > 0)) {
+						op_stack.push(new FloatOop(FLOAT_INFINITY));			// INFINITY / non-INFINITY
+					} else {
+						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));			// INFINITY / non-INFINITY
+					}
+				} else if ((val2 != FLOAT_NAN && val2 != FLOAT_INFINITY && val2 != FLOAT_NEGATIVE_INFINITY) && (val1 == FLOAT_INFINITY || val1 == FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(0.0f));					// non-INFINITY / INFINITY		// TODO: 这里不太明白。规范上说 零值 也有符号，虽然不是没听过，还是难以理解...
+				} else if (val1 == 0.0 && val2 == 0.0) {
+					op_stack.push(new FloatOop(FLOAT_NAN));
+				} else if (val2 == 0.0 && (val1 != FLOAT_NAN && val1 != FLOAT_INFINITY && val1 != FLOAT_NEGATIVE_INFINITY && val1 != 0.0)) {
+					if (val1 > 0)
+						op_stack.push(new FloatOop(FLOAT_INFINITY));
+					else
+						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+				} else if ((val2 != FLOAT_NAN && val2 != FLOAT_INFINITY && val2 != FLOAT_NEGATIVE_INFINITY && val2 != 0.0) && val1 == 0.0) {
+					if (val2 > 0)
+						op_stack.push(new FloatOop(FLOAT_INFINITY));
+					else
+						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+				} else {
+					op_stack.push(new FloatOop(val2 / val1));
 				}
 #ifdef DEBUG
 	print_float(((FloatOop *)op_stack.top())	->value);
@@ -1373,6 +1446,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+			case 0x89:{		// l2f
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new FloatOop((float)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert long: [" << val << "] to float: [" << ((FloatOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
+
+
 			case 0x8b:{		// f2i		// TODO: 和 fmul, getField, setField 一样，没有做 Spec $2.8.3 FP Strict!!
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val = ((FloatOop*)op_stack.top())->value; op_stack.pop();
@@ -1399,6 +1483,16 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				}
 
+				break;
+			}
+
+			case 0x8d:{		// f2d
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new DoubleOop((double)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert float: [" << val << "f] to double: [" << ((DoubleOop *)op_stack.top())->value << "]." << std::endl;
+#endif
 				break;
 			}
 

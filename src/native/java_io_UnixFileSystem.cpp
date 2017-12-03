@@ -42,7 +42,7 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 	InstanceOop *file = (InstanceOop *)_stack.front();	_stack.pop_front();
 
 	Oop *result;
-	file->get_field_value(FILE L":path:Ljava/lang/String;", &result);
+	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
 	const char *path = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str();
 
 	// get file msg

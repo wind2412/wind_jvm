@@ -49,7 +49,7 @@ using std::function;
 #define THREAD				L"java/lang/Thread"
 #define FILEOUTPUTSTREAM		L"java/io/FileOutputStream"
 #define FILEDESCRIPTOR		L"java/io/FileDescriptor"
-#define FILE					L"java/io/File"
+#define JFILE				L"java/io/File"
 
 void init_native();
 
