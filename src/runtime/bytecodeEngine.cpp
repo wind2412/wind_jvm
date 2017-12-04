@@ -2369,6 +2369,11 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					}
 //					else							// bug...
 //						op_stack.push(ref);		// re-push.		// "op_stack will not change if op_stack's top is null."
+					else {
+#ifdef DEBUG
+	std::wcout << "(DEBUG) ref is null. So checkcast do nothing." << std::endl;
+#endif
+					}
 					break;
 				}
 				// 2. if ref is not null, judge its type

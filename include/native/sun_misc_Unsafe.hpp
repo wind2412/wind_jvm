@@ -26,6 +26,7 @@ void JVM_AllocateMemory(list<Oop *> & _stack);
 void JVM_PutLong(list<Oop *> & _stack);
 void JVM_GetByte(list<Oop *> & _stack);
 void JVM_FreeMemory(list<Oop *> & _stack);
+void JVM_GetObjectVolatile(list<Oop *> & _stack);
 
 
 void *sun_misc_unsafe_search_method(const wstring & str);

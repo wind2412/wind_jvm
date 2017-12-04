@@ -43,6 +43,8 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 
 	Oop *result;
 	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
+	std::wcout.imbue(std::locale(""));			// IMPORTANT!!!!! 如果不指定...... 用 下边 wcout 输出，是正确的......但是 path 真正的值其实只有一个 "x"......
+	std::wcout << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
 	const char *path = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str();
 
 	// get file msg

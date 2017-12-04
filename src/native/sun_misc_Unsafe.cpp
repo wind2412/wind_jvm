@@ -24,6 +24,7 @@ static unordered_map<wstring, void*> methods = {
     {L"putLong:(JJ)V",							(void *)&JVM_PutLong},
     {L"getByte:(J)B",							(void *)&JVM_GetByte},
     {L"freeMemory:(J)V",							(void *)&JVM_FreeMemory},
+    {L"getObjectVolatile:(" OBJ "J)" OBJ ,		(void *)&JVM_GetObjectVolatile},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -195,7 +196,69 @@ void JVM_FreeMemory(list<Oop *> & _stack){
 #ifdef DEBUG
 	std::wcout << "(DEBUG) free Memory of address: [" << std::hex << addr << "]." << std::endl;
 #endif
+}
 
+void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier!!!
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	Oop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	// 在这里我的实现 hack 了一发～～～ 由于我的 oop 对象模型中，InstanceOop 的 field 全是挂在堆分配的内存中的。所以 Unsafe 得到的 offset 是 field [之内] 的 offset，也就是 field 内部的一个 oop 相对于 field 这个 vector 本身的地址。
+	// 而并不是 openjdk 实现中的相对于 this 的 offset。由于设计不同，只有这样才能让我日后的 GC 能够选择更多的算法。但是针对 ArrayOop，这样不行。因为 ArrayOop 的 Unsafe 已经写死了 ——
+	// 是通过 ABASE + i << ASHIFT (java/util/concurrent/ConcurrentHashMap) 来实现的 真·偏移。所以，看到这一点之后，我把 ArrayBaseOffset 默认返回了 0.
+	// 这样，每次传进来的此方法的 offset，就一定只是 i << ASHIFT。即 i * sizeof(intptr_t)。然后就可以逆向算出来 i 的大小～
+	// 而且，在下边为了 InstanceOop 和 ArrayOop 区别对待，需要判断 obj 的类型～
+
+	void *addr;
+
+	if (obj->get_ooptype() == OopType::_TypeArrayOop || obj->get_ooptype() == OopType::_ObjArrayOop) {
+		// 通过 vector 相对偏移来取值。直接 volatile + barrier 取值就可以。
+//		for (int i = 0; i < ((ArrayOop *)obj)->get_length(); i ++) {
+//			std::wcout << (*(ArrayOop *)obj)[i] << " ";
+//		}
+//		std::wcout << std::endl;
+
+		int i_element = offset / sizeof(intptr_t);
+		addr = (void *)((*(ArrayOop *)obj)[i_element]);
+//		if ((Oop *)addr != nullptr)
+//		std::wcout << "array addr: " << obj << ", offset: " << i_element << ", inner obj type: " << ((Oop *)addr)->get_ooptype() << std::endl;	// delete
+		if ((Oop *)addr != nullptr)
+			assert(((Oop *)addr)->get_ooptype() == OopType::_BasicTypeOop || ((Oop *)addr)->get_ooptype() == OopType::_InstanceOop || ((Oop *)addr)->get_ooptype() == OopType::_TypeArrayOop || ((Oop *)addr)->get_ooptype() == OopType::_ObjArrayOop);
+	} else if (obj->get_ooptype() == OopType::_InstanceOop) {
+		// 也是通过 vector 相对偏移来取值～
+		assert(false);		// 先关闭这个功能...等到用的时候再开启。
+		Oop *target;
+		if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
+			offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
+			target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+		} else {		// it's in non-static field.
+			target = ((InstanceOop *)obj)->get_fields_addr()[offset];
+		}
+		// 非常危险...
+		assert(target->get_ooptype() == OopType::_InstanceOop);
+		addr = (void *)target;
+	} else {
+		assert(false);
+	}
+
+	// the code's thought is from openjdk:
+	volatile Oop * v = *(volatile Oop **)&addr;		// TODO: 这里还有不理解的地方......等待高人解惑......
+
+	// barrier. I use boost::atomic//ops_gcc_x86.hpp's method.	// TODO: 也有理解不上的地方。acquire 语义究竟是被用于什么地方？为什么用于 LoadLoad 和 LoadStore (x86下)？ 还有待学习啊......
+	__asm__ volatile (			// TODO: 这里同样。mfence 是屏障指令；lock;nop; 也是(虽然手册规范不让这么写，不过后边的语义就是nop)。不过为什么 openjdk AccessOrder 实现中 AMD64 要 addq？
+#ifdef __x86_64__
+			"mfence;"
+#else
+			"lock; addl $0, (%%esp);"
+#endif
+			:::"memory"
+	);
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get an Oop from address: [" << std::hex << addr << "]." << std::endl;
+#endif
+
+	_stack.push_back(const_cast<Oop *&>(v));		// get rid of cv constrait symbol.
 }
 
 

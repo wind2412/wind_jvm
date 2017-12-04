@@ -193,8 +193,8 @@ MirrorOop::MirrorOop(shared_ptr<Klass> mirrored_who)			// 注意：在使用 lld
 					  mirrored_who(mirrored_who){}
 
 /*===----------------  TypeArrayOop  -------------------===*/
-ArrayOop::ArrayOop(const ArrayOop & rhs) : Oop(rhs), length(rhs.length), buf(new Oop*[this->length])	// TODO: not gc control......
+ArrayOop::ArrayOop(const ArrayOop & rhs) : Oop(rhs), buf(rhs.buf)	// TODO: not gc control......
 {
-	memcpy(this->buf, rhs.buf, sizeof(Oop *) * this->length);		// shallow copy
+//	memcpy(this->buf, rhs.buf, sizeof(Oop *) * this->length);		// shallow copy
 }
 

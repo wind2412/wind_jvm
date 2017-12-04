@@ -16,6 +16,8 @@
 #include <cstring>
 #include <memory>
 
+// TODO: 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
+
 class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
 
 };
@@ -118,30 +120,31 @@ public:
 
 class ArrayOop : public Oop {
 protected:
-	int length;				// length 即 capacity！！是一个东西！vector 这种，由于 capacity 是 malloc 的内存，length 是 placement new 出来的对象，才有分别！这里一上来对象就全了，没有就是 null，所以没有区别！！
-	Oop **buf = nullptr;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
+							// length 即 capacity！！是一个东西！vector 这种，由于 capacity 是 malloc 的内存，length 是 placement new 出来的对象，才有分别！这里一上来对象就全了，没有就是 null，所以没有区别！！
+	vector<Oop *> buf;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
+							// 这里， java/util/concurrent/ConcurrentHashMap 源码最后几行中，发现内部计算 Unsafe 的数组元素偏移量，是完全通过 ABASE + i << ASHIFT 的。而 i << ASHIFT 就是平台指针的大小，也就是 scale。所以必须固定大小储存。
 public:
-	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype), length(length), buf((Oop **)MemAlloc::allocate(sizeof(Oop *) * length)) {}	// **only malloc (sizeof(ptr) * length) !!!!**
+	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype) {
+		buf.resize(length);
+	}
 	ArrayOop(const ArrayOop & rhs);
-	int get_length() { return length; }
+	int get_length() { return buf.size(); }
 	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
 	Oop* & operator[] (int index) {
-		assert(index >= 0 && index < length);	// TODO: please replace with ArrayIndexOutofBound...
+		assert(index >= 0 && index < buf.size());	// TODO: please replace with ArrayIndexOutofBound...
 		return buf[index];
 	}
 	const Oop* operator[] (int index) const {
 		return this->operator[](index);
 	}
 	int get_buf_offset() {		// use for sun/misc/Unsafe...
-		return ((char *)&buf - (char *)this);
+//		return ((char *)&buf - (char *)this);
+		return 0;				// 因为我把 field 挂在了堆中，因此这里返回 0，在 Unsafe.getObjectVolatile() 中解码更加方便～
 	}
 	~ArrayOop() {
-		if (buf != nullptr) {
-			for (int i = 0; i < length; i ++) {
-				MemAlloc::deallocate(buf[i]);
-			}
-			MemAlloc::deallocate(buf);
-		}
+//		for (int i = 0; i < buf.size(); i ++) {
+//			MemAlloc::deallocate(buf[i]);			// TODO: 这里的对于 gc 的写法，要好好考虑！！
+//		}
 	}
 };
 
