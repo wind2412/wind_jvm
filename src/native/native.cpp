@@ -27,6 +27,7 @@
 #include "native/sun_misc_URLClassPath.hpp"
 #include "native/java_lang_ClassLoader.hpp"
 #include "native/java_lang_Runtime.hpp"
+#include "native/java_lang_Throwable.hpp"
 
 static unordered_map<wstring, function<void*(const wstring &)>> native_map;		// such as: {L"java/lang/Object", search [native method]'s method lambda for java/lang/Object}
 
@@ -53,6 +54,7 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"sun/misc/URLClassPath"] = sun_misc_urlClassPath_search_method;
 	native_map[L"java/lang/ClassLoader"] = java_lang_classLoader_search_method;
 	native_map[L"java/lang/Runtime"] = java_lang_runtime_search_method;
+	native_map[L"java/lang/Throwable"] = java_lang_throwable_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().

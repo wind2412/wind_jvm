@@ -151,12 +151,13 @@ private:
 	shared_ptr<rt_constant_pool> rt_pool;
 
 	// Attributes
-	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21		// source_file ignored.
+	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21
 	u2 attributes_count;
 	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
 
 	InnerClasses_attribute *inner_classes = nullptr;
 	EnclosingMethod_attribute *enclosing_method = nullptr;
+	wstring sourceFile;
 	u2 signature_index = 0;
 	BootstrapMethods_attribute *bm = nullptr;
 
@@ -177,6 +178,7 @@ public:
 	shared_ptr<Method> get_static_void_main();
 	void initialize_final_static_field();
 	wstring parse_signature();
+	wstring get_source_file_name();
 public:
 	vector<Oop *> & get_static_fields_addr() { return static_fields; }
 private:

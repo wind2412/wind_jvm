@@ -13,9 +13,6 @@
 
 using std::list;
 
-// 注意：此文件只是为了因为流程必须走过这里而设置。其实内存布局和 jdk 都完全不同，我猜这里我应该用不上。只是随便设置一下。
-// 希望日后不会有用到 Unsafe 模块的东西......
-
 void JVM_ArrayBaseOffset(list<Oop *> & _stack);
 void JVM_ArrayIndexScale(list<Oop *> & _stack);
 void JVM_AddressSize(list<Oop *> & _stack);

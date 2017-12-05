@@ -13,10 +13,10 @@
 #include <sys/time.h>
 
 // this class object, will be embedded into [Oop's header].
-// TODO: 每个 unix 函数调用都有返回值！我都没有判断（逃
+// TODO: 每个 unix 函数调用都有返回值......我都没有判断（逃
 class Monitor : public boost::noncopyable {
 private:
-	pthread_mutex_t _mutex;
+	pthread_mutex_t _mutex;				// TODO: mutex 需要设置两个来供 cond 使用吗...?
 	pthread_mutexattr_t _attr;
 	pthread_cond_t _cond;
 public:
@@ -52,6 +52,10 @@ public:
 	}
 	void leave() {
 		pthread_mutex_unlock(&_mutex);
+	}
+	void force_unlock_when_athrow() {
+		pthread_mutex_trylock(&_mutex);		// TODO: QAQ 大神们不要嘲讽 QAQ 多线程我连入门级别都没到 QAQ 且求指导好的写法 QAQ
+		pthread_mutex_unlock(&_mutex);		// TODO: 因为 Spec 规范了 unlock 的次数不能小于 lock，而且判断不出到底 lock 还是没有...毕竟我的 cond 也是用同一个 mutex 锁... 不知道对不对 ?? 所以想出了这个方法...轻喷......
 	}
 	~Monitor() {
 		pthread_mutex_destroy(&_mutex);

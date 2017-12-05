@@ -24,6 +24,7 @@ using std::function;
 #define THD L"Ljava/lang/Thread;"
 #define OBJ L"Ljava/lang/Object;"
 #define STE L"Ljava/lang/StackTraceElement;"
+#define TRB L"Ljava/lang/Throwable;"
 #define STR L"Ljava/lang/String;"
 #define FLE L"Ljava/io/File;"
 #define IPS L"Ljava/io/InputStream;"
@@ -50,6 +51,8 @@ using std::function;
 #define FILEOUTPUTSTREAM		L"java/io/FileOutputStream"
 #define FILEDESCRIPTOR		L"java/io/FileDescriptor"
 #define JFILE				L"java/io/File"
+#define THROWABLE			L"java/lang/Throwable"
+#define STACKTRACEELEMENT	L"java/lang/StackTraceElement"
 
 void init_native();
 

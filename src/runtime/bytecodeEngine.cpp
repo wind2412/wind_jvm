@@ -59,7 +59,9 @@ using std::make_pair;
 
 /*===----------- StackFrame --------------===*/
 StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
-	if (is_native)	return;
+	if (is_native) {
+		return;
+	}
 	localVariableTable.resize(method->get_code()->max_locals);
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
 	for (Oop * value : args) {
@@ -2015,6 +2017,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				if (new_method->is_static()) {
 					std::wcout << " [static]";
 				}
+				if (new_method->is_synchronized()) {
+					std::wcout << " [synchronized]";
+				}
 				std::wcout << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
 #endif
 				shared_ptr<Method> target_method;
@@ -2034,6 +2039,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				// synchronize
 				if (target_method->is_synchronized()) {
 					ref->enter_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) synchronize obj: [" << ref << "]." << std::endl;
+#endif
 				}
 				if (target_method->is_native()) {
 					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
@@ -2051,8 +2059,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						arg_list.push_back((Oop *)&thread);
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
+						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, true));
 						pc = 0;
-						thread.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);
 						// 然后弹出并恢复 pc......
@@ -2082,7 +2090,23 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				// unsynchronize
 				if (target_method->is_synchronized()) {
 					ref->leave_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) unsynchronize obj: [" << ref << "]." << std::endl;
+#endif
 				}
+
+				// **IMPORTANT** judge whether returns an Exception!!!
+				if (!new_method->is_void()) {
+					Oop *top = op_stack.top();
+					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
+						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
+						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+						if (klass->check_interfaces(throwable_klass)) {
+							goto exception_handler;
+						}
+					}
+				}
+
 				break;
 			}
 			case 0xb7:		// invokeSpecial
@@ -2106,6 +2130,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 				if (new_method->is_static()) {
 					std::wcout << " [static]";
+				}
+				if (new_method->is_synchronized()) {
+					std::wcout << " [synchronized]";
 				}
 				std::wcout << " " << new_klass->get_name() << "::" << signature << std::endl;
 #endif
@@ -2135,10 +2162,16 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				if (new_method->is_synchronized()) {
 					if (new_method->is_static()) {	// if static, lock the `mirror` of this klass.	// for 0xb8: invokeStatic
 						new_method->get_klass()->get_mirror()->enter_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) synchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
+#endif
 					} else {							// if not-static, lock this obj.					// for 0xb7: invokeSpecial
 						// get the `obj` from op_stack!
 						this_obj = arg_list.front();
 						this_obj->enter_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) synchronize obj: [" << this_obj << "]." << std::endl;
+#endif
 					}
 				}
 				if (new_method->is_native()) {
@@ -2169,8 +2202,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
-						pc = 0;
-						thread.vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, arg_list, true));
+						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, true));
+						pc = nullptr;
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);
 						// 然后弹出并恢复 pc......
@@ -2204,10 +2237,29 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				if (new_method->is_synchronized()) {
 					if (new_method->is_static()) {
 						new_method->get_klass()->get_mirror()->leave_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) unsynchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
+#endif
 					} else {
 						this_obj->leave_monitor();
+#ifdef DEBUG
+					std::wcout << "(DEBUG) unsynchronize obj: [" << this_obj << "]." << std::endl;
+#endif
 					}
 				}
+
+				// **IMPORTANT** judge whether returns an Exception!!!
+				if (!new_method->is_void()) {
+					Oop *top = op_stack.top();
+					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
+						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
+						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+						if (klass->check_interfaces(throwable_klass)) {
+							goto exception_handler;
+						}
+					}
+				}
+
 				break;
 			}
 
@@ -2352,14 +2404,26 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0xbf:{		// athrow
-				int rtpool_index = ((pc[1] << 8) | pc[2]);
-				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
-				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+	exception_handler:
+				InstanceOop *exception_obj = (InstanceOop *)op_stack.top();	op_stack.pop();
+				auto excp_klass = std::static_pointer_cast<InstanceKlass>(exception_obj->get_klass());
 
-				BootStrapClassLoader::get_bootstrap().print();	// 这个时候 Exception 类必须被加载！因为 op_stack 栈顶的引用是 Exception 的。(is_a() 函数)
-
-				assert(false);
-
+				// backtrace ONLY this stack.
+				int jump_pc = cur_frame.method->where_is_catch(pc - code_begin, excp_klass);
+				if (jump_pc != 0) {	// this frame has the handler, what ever the `catch_handler` or `finally handler`.
+					pc = code_begin + jump_pc - occupied;		// jump to this handler pc!
+					// then clean up all the op_stack, and push `exception_obj` on it !!!
+					stack<Oop *>().swap(op_stack);
+					// add it on!
+					op_stack.push(exception_obj);
+					break;	// go to the handler~
+				} else {				// this frame cannot handle the exception!
+					// make `cur_frame` lose effectiveness!
+					// I think only should take this method: return an `Exception` oop, and judge at the last StackFrame's `invokeVirtual`.etc.
+					// then If the last frame find an `Exception` oop has been pushed, then it will directly `GOTO` the `athrow` instruct.
+					thread.pc = backup_pc;
+					return exception_obj;
+				}
 
 				break;
 			}

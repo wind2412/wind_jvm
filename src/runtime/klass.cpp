@@ -260,6 +260,11 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 				signature_index = ((Signature_attribute *)this->attributes[i])->signature_index;
 				break;
 			}
+			case 8: {	// SourceFile: 用于 printStackTrace。
+				assert(cf->constant_pool[((SourceFile_attribute *)this->attributes[i])->sourcefile_index-1]->tag == CONSTANT_Utf8);
+				sourceFile = ((CONSTANT_Utf8_info *)cf->constant_pool[((SourceFile_attribute *)this->attributes[i])->sourcefile_index-1])->convert_to_Unicode();
+				break;
+			}
 			case 14:{		// RuntimeVisibleAnnotation
 				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
 				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
@@ -280,7 +285,6 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 				break;
 			}
 			case 6:
-			case 8:
 			case 9:
 			case 13:
 			case 15:
@@ -583,6 +587,12 @@ wstring InstanceKlass::parse_signature()
 	wstring signature = boost::any_cast<wstring>(_pair.second);
 	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
 	return signature;
+}
+
+wstring InstanceKlass::get_source_file_name()
+{
+	assert(this->sourceFile != L"");
+	return this->sourceFile;
 }
 
 bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)

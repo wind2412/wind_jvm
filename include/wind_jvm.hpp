@@ -51,6 +51,8 @@ public:
 	Oop *add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list);
 	MirrorOop *get_caller_class_CallerSensitive();
 	void init_and_do_main();
+	ArrayOop *get_stack_trace();
+	int get_stack_size() { return vm_stack.size(); }
 };
 
 class wind_jvm {

@@ -59,6 +59,7 @@ public:
 	void notify() { m.notify(); }
 	void notify_all() { m.notify_all(); }
 	void leave_monitor() { m.leave(); }
+	void force_unlock_when_athrow() { m.force_unlock_when_athrow(); }
 public:
 	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!

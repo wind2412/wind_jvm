@@ -48,7 +48,7 @@ private:
 
 	// Code attribute
 	Code_attribute *code = nullptr;			// TODO: !!! 小心！！ Code 属性中还有一份异常表！！
-//	LineNumberTable_attribute *lnt = nullptr;					// 用于调试器。
+	LineNumberTable_attribute *lnt = nullptr;					// 用于调试器。   // 而且用于 printStackTrace。因此留下了。
 //	LocalVariableTable_attribute *lvt = nullptr;				// 用于调试器。
 //	LocalVariableTypeTable_attribute *lvtt = nullptr;			// 用于调试器。
 //	StackMapTable_attribute *smt = nullptr;					// 此属性用于虚拟机的类型检查阶段。
@@ -78,6 +78,7 @@ public:
 public:
 	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();
 	vector<MirrorOop *> parse_argument_list();
+	int get_java_source_lineno(int pc_no);
 public:
 	bool has_annotation_name_in_method(const wstring & name) {
 		if (rvpa != nullptr && rvpa->has_annotation_name(name)) return true;
@@ -123,12 +124,14 @@ public:
 	void print() { std::wcout << name << ":" << descriptor; }
 	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
+	int where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp);
 
 	~Method() {
 		for (int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];
 		}
 		delete[] attributes;
+		delete lnt;		// delete LineNumberTable.
 	}
 };
 

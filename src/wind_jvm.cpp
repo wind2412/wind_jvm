@@ -98,9 +98,11 @@ void vm_thread::execute()
 Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
 	// for defense:
 	int frame_num = this->vm_stack.size();
-	this->vm_stack.push_back(StackFrame(new_method, nullptr, nullptr, list));
+	uint8_t *backup_pc = this->pc;
+	this->vm_stack.push_back(StackFrame(new_method, this->pc, nullptr, list));		// 设置下一帧的 return_pc 是现在的 pc 值，可以用于 printStackTrace。
 	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back(), this->thread_no);
 	this->vm_stack.pop_back();
+	this->pc = backup_pc;
 	assert(frame_num == this->vm_stack.size());
 	return result;
 }
@@ -301,6 +303,58 @@ void vm_thread::init_and_do_main()
 //	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 //	this->execute();
 
+}
+
+ArrayOop * vm_thread::get_stack_trace()
+{
+	auto stack_elem_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/StackTraceElement;"));
+	auto stack_elem_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/StackTraceElement"));
+	auto stack_elem_init = stack_elem_klass->get_this_class_method(L"<init>:(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
+	assert(stack_elem_init != nullptr);
+
+	auto arr = (ArrayOop *)stack_elem_arr_klass->new_instance(this->vm_stack.size());
+
+	std::wstringstream ss;
+
+	uint8_t *last_frame_pc = this->pc;		// 先设置成 pc。下边会修改。
+	int i = 0;
+	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it) {
+		shared_ptr<Method> m = it->method;
+		auto klass_name = java_lang_string::intern(m->get_klass()->get_name());
+		auto method_name = java_lang_string::intern(m->get_name());
+		auto file_name = java_lang_string::intern(m->get_klass()->get_source_file_name());
+		int line_num;
+		if (last_frame_pc == 0)
+			line_num = 0;
+		else {
+			std::wcout << "(DEBUG) lineno: " << last_frame_pc - m->get_code()->code << std::endl;
+			line_num = m->get_java_source_lineno(last_frame_pc - m->get_code()->code);
+		}
+
+		// set next frame's pc
+		last_frame_pc = it->return_pc;
+
+		// inject
+		(*arr)[i] = stack_elem_klass->new_instance();
+		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":declaringClass:" STR, klass_name);
+		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":methodName:" STR,     method_name);
+		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":fileName:" STR,       file_name);
+		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
+
+#ifdef DEBUG
+	ss << "[backtrace " << this->vm_stack.size() - i << "] <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+#endif
+
+		i ++;
+	}
+
+#ifdef DEBUG
+	std::wcout << "===------------------- printStackTrace() ------------------===" << std::endl;
+	std::wcout << ss.str();
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
+#endif
+
+	return arr;
 }
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
