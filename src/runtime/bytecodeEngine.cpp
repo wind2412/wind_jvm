@@ -2228,7 +2228,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				auto oop = real_klass->new_instance();
 				op_stack.push(oop);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) new an object (only alloc memory): <class>: " << klass->get_name() << std::endl;
+	std::wcout << "(DEBUG) new an object (only alloc memory): <class>: [" << klass->get_name() <<"], at address: [" << oop << "]." << std::endl;
 #endif
 				break;
 			}

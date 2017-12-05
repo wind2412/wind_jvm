@@ -34,10 +34,10 @@ bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		/
 {
 	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
 	wstring descriptor = field->get_name() + L":" + field->get_descriptor();
-
 	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
+		std::wcout << "get_field_value: " << BIG_signature << std::endl;		// delete
 		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 		if (iter == instance_klass->fields_layout.end()) {
 			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
@@ -63,6 +63,7 @@ void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 
 	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
+		std::wcout << "set_field_value: " << BIG_signature << std::endl;		// delete
 		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 		if (iter == instance_klass->fields_layout.end()) {
 			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
