@@ -763,6 +763,21 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x2e:{		// iaload
+				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
+				if (op_stack.top() == nullptr) {
+					// TODO: should throw NullpointerException
+					assert(false);
+				}
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[I");		// assert int[] array
+				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
+				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) get int[" << index << "] which is the int: [" << ((IntOop *)op_stack.top())->value << "]" << std::endl;
+#endif
+				break;
+			}
 			case 0x2f:{		// laload
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (op_stack.top() == nullptr) {
@@ -1590,7 +1605,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop((char)val));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) convert int: [" << val << "f] to byte: [" << std::dec << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+	std::wcout << "(DEBUG) convert int: [" << val << "] to byte: [" << std::dec << ((IntOop *)op_stack.top())->value << "]." << std::endl;
 #endif
 				break;
 			}
@@ -1599,7 +1614,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop((unsigned short)val));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) convert int: [" << val << "f] to char: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]." << std::endl;
+	std::wcout << "(DEBUG) convert int: [" << val << "] to char: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]." << std::endl;
 #endif
 				break;
 			}

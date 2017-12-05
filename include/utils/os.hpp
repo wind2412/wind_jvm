@@ -21,5 +21,15 @@ inline int cmpxchg(int exchange_value, volatile int *dest, int compare_value)
 	return exchange_value;		// 把原先 dest 里边的 (和 compare_value 相等，目前已经被换到 exchange_value 中去) 值 return。
 }
 
+inline long cmpxchg(long exchange_value, volatile long *dest, long compare_value)
+{
+	int mp = get_cpu_nums() > 1 ? get_cpu_nums() : 0;
+	__asm__ volatile("cmp $0, %4; je 1f; lock; 1: cmpxchgq %1,(%3)"
+	                   : "=a"(exchange_value)
+	                   : "r"(exchange_value), "a"(compare_value), "r"(dest), "r"(mp)
+	                   : "cc", "memory");
+	return exchange_value;		// 把原先 dest 里边的 (和 compare_value 相等，目前已经被换到 exchange_value 中去) 值 return。
+}
+
 
 #endif /* INCLUDE_UTILS_OS_HPP_ */

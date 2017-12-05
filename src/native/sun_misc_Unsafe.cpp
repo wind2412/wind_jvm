@@ -14,17 +14,19 @@
 #include "utils/os.hpp"
 
 static unordered_map<wstring, void*> methods = {
-    {L"arrayBaseOffset:(" CLS ")I",				(void *)&JVM_ArrayBaseOffset},
-    {L"arrayIndexScale:(" CLS ")I",				(void *)&JVM_ArrayIndexScale},
-    {L"addressSize:()I",							(void *)&JVM_AddressSize},
-    {L"objectFieldOffset:(" FLD ")J",			(void *)&JVM_ObjectFieldOffset},
-    {L"getIntVolatile:(" OBJ "J)I",				(void *)&JVM_GetIntVolatile},
-    {L"compareAndSwapInt:(" OBJ "JII)Z",			(void *)&JVM_CompareAndSwapInt},
-    {L"allocateMemory:(J)J",						(void *)&JVM_AllocateMemory},
-    {L"putLong:(JJ)V",							(void *)&JVM_PutLong},
-    {L"getByte:(J)B",							(void *)&JVM_GetByte},
-    {L"freeMemory:(J)V",							(void *)&JVM_FreeMemory},
-    {L"getObjectVolatile:(" OBJ "J)" OBJ ,		(void *)&JVM_GetObjectVolatile},
+    {L"arrayBaseOffset:(" CLS ")I",							(void *)&JVM_ArrayBaseOffset},
+    {L"arrayIndexScale:(" CLS ")I",							(void *)&JVM_ArrayIndexScale},
+    {L"addressSize:()I",										(void *)&JVM_AddressSize},
+    {L"objectFieldOffset:(" FLD ")J",						(void *)&JVM_ObjectFieldOffset},
+    {L"getIntVolatile:(" OBJ "J)I",							(void *)&JVM_GetIntVolatile},
+    {L"compareAndSwapInt:(" OBJ "JII)Z",						(void *)&JVM_CompareAndSwapInt},
+    {L"allocateMemory:(J)J",									(void *)&JVM_AllocateMemory},
+    {L"putLong:(JJ)V",										(void *)&JVM_PutLong},
+    {L"getByte:(J)B",										(void *)&JVM_GetByte},
+    {L"freeMemory:(J)V",										(void *)&JVM_FreeMemory},
+    {L"getObjectVolatile:(" OBJ "J)" OBJ ,					(void *)&JVM_GetObjectVolatile},
+    {L"compareAndSwapObject:(" OBJ "J" OBJ OBJ ")Z",			(void *)&JVM_CompareAndSwapObject},
+    {L"compareAndSwapLong:(" OBJ "JJJ)Z",						(void *)&JVM_CompareAndSwapLong},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -122,13 +124,8 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 
 }
 
-void JVM_CompareAndSwapInt(list<Oop *> & _stack){
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
-	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
-	int expected = ((IntOop *)_stack.front())->value;	_stack.pop_front();
-	int x = ((IntOop *)_stack.front())->value;	_stack.pop_front();
-
+Oop *get_inner_oop_from_instance_oop_of_static_or_non_static_fields(InstanceOop *obj, long offset)
+{
 	Oop *target;
 	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
 		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
@@ -136,6 +133,18 @@ void JVM_CompareAndSwapInt(list<Oop *> & _stack){
 	} else {		// it's in non-static field.
 		target = obj->get_fields_addr()[offset];
 	}
+	return target;
+}
+
+void JVM_CompareAndSwapInt(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	int expected = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	int x = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+	Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
+
 	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
 
 	// CAS, from x86 assembly, and openjdk.
@@ -198,10 +207,9 @@ void JVM_FreeMemory(list<Oop *> & _stack){
 #endif
 }
 
-void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier!!!
-	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	Oop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
-	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)		// obj 可能是一个 InstanceOop，也有可能是一个 ArrayOop。
+{
+	void *addr;
 
 	// 在这里我的实现 hack 了一发～～～ 由于我的 oop 对象模型中，InstanceOop 的 field 全是挂在堆分配的内存中的。所以 Unsafe 得到的 offset 是 field [之内] 的 offset，也就是 field 内部的一个 oop 相对于 field 这个 vector 本身的地址。
 	// 而并不是 openjdk 实现中的相对于 this 的 offset。由于设计不同，只有这样才能让我日后的 GC 能够选择更多的算法。但是针对 ArrayOop，这样不行。因为 ArrayOop 的 Unsafe 已经写死了 ——
@@ -209,37 +217,32 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier
 	// 这样，每次传进来的此方法的 offset，就一定只是 i << ASHIFT。即 i * sizeof(intptr_t)。然后就可以逆向算出来 i 的大小～
 	// 而且，在下边为了 InstanceOop 和 ArrayOop 区别对待，需要判断 obj 的类型～
 
-	void *addr;
-
 	if (obj->get_ooptype() == OopType::_TypeArrayOop || obj->get_ooptype() == OopType::_ObjArrayOop) {
 		// 通过 vector 相对偏移来取值。直接 volatile + barrier 取值就可以。
-//		for (int i = 0; i < ((ArrayOop *)obj)->get_length(); i ++) {
-//			std::wcout << (*(ArrayOop *)obj)[i] << " ";
-//		}
-//		std::wcout << std::endl;
-
 		int i_element = offset / sizeof(intptr_t);
 		addr = (void *)((*(ArrayOop *)obj)[i_element]);
-//		if ((Oop *)addr != nullptr)
-//		std::wcout << "array addr: " << obj << ", offset: " << i_element << ", inner obj type: " << ((Oop *)addr)->get_ooptype() << std::endl;	// delete
 		if ((Oop *)addr != nullptr)
 			assert(((Oop *)addr)->get_ooptype() == OopType::_BasicTypeOop || ((Oop *)addr)->get_ooptype() == OopType::_InstanceOop || ((Oop *)addr)->get_ooptype() == OopType::_TypeArrayOop || ((Oop *)addr)->get_ooptype() == OopType::_ObjArrayOop);
 	} else if (obj->get_ooptype() == OopType::_InstanceOop) {
 		// 也是通过 vector 相对偏移来取值～
 		assert(false);		// 先关闭这个功能...等到用的时候再开启。
-		Oop *target;
-		if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
-			offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
-			target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
-		} else {		// it's in non-static field.
-			target = ((InstanceOop *)obj)->get_fields_addr()[offset];
-		}
+		Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields((InstanceOop *)obj, offset);
 		// 非常危险...
-		assert(target->get_ooptype() == OopType::_InstanceOop);
+		assert(target->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
 		addr = (void *)target;
 	} else {
 		assert(false);
 	}
+
+	return addr;
+}
+
+void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier!!!
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	Oop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	void *addr = get_inner_obj_from_obj_and_offset(obj, offset);
 
 	// the code's thought is from openjdk:
 	volatile Oop * v = *(volatile Oop **)&addr;		// TODO: 这里还有不理解的地方......等待高人解惑......
@@ -261,6 +264,41 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier
 	_stack.push_back(const_cast<Oop *&>(v));		// get rid of cv constrait symbol.
 }
 
+void JVM_CompareAndSwapObject(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	InstanceOop *expected = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *x = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	void *addr = get_inner_obj_from_obj_and_offset(obj, offset);
+
+
+	// CAS, from x86 assembly, and openjdk.
+	_stack.push_back(new IntOop(cmpxchg((long)x, (volatile long *)&addr, (long)expected) == (long)expected));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+}
+
+void JVM_CompareAndSwapLong(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	long expected = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	long x = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+
+	Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
+
+	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::LONG);
+
+	// CAS, from x86 assembly, and openjdk.
+	_stack.push_back(new IntOop(cmpxchg(x, &((LongOop *)target)->value, expected) == expected));
+
+#ifdef DEBUG
+	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+#endif
+}
 
 
 // 返回 fnPtr.

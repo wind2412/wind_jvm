@@ -365,7 +365,8 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descr
 			// search in super_interfaces : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
 			for (auto iter : instance_klass->interfaces) {
 				// TODO: 这些都没有考虑过 Interface 或者 parent 是 数组的情况.....感觉应当进行考虑...  虽然 Interface 我设置的默认是 InstanceKlass，不过 parent 可是 Klass...
-				target = iter.second->get_field(BIG_signature);
+//				target = iter.second->get_field(BIG_signature);		// fix the bug !!
+				target = iter.second->get_field(descriptor);
 				if (target.second != nullptr)	return target;
 			}
 			// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
