@@ -1228,6 +1228,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x65:{		// lsub
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val1 - val2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) sub long value from stack: "<< val1 << " - " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
 
 
 
@@ -2007,6 +2018,20 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					op_stack.pop();
 					size --;
 				}
+
+				// 这里用作魔改。比如，禁用 Perf 类。
+				if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
+					if (new_method->is_void()) {
+						break;
+					} else if (new_method->is_return_primitive()){
+						op_stack.push(new IntOop(0));
+						break;
+					} else {
+						op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
+						break;
+					}
+				}
+
 				// 2. get ref.
 				assert(ref != nullptr);			// `this` must not be nullptr!!!!
 #ifdef DEBUG
@@ -2036,6 +2061,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
 				}
 				assert(target_method != nullptr);
+
+
 				// synchronize
 				if (target_method->is_synchronized()) {
 					ref->enter_monitor();
@@ -2096,14 +2123,22 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 
 				// **IMPORTANT** judge whether returns an Exception!!!
-				if (!new_method->is_void()) {
+				if (cur_frame.has_exception && !new_method->is_void()) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
 						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
-						if (klass->check_interfaces(throwable_klass)) {
+						if (klass->check_parent(throwable_klass)) {
+							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
+#ifdef DEBUG
+	std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
+#endif
 							goto exception_handler;
+						} else {
+							assert(false);
 						}
+					} else {
+						assert(false);
 					}
 				}
 
@@ -2154,8 +2189,21 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					op_stack.pop();
 					size --;
 				}
+
 				// 这里用作魔改。比如，禁用 System.loadLibrary 方法。
 				if (new_method->get_klass()->get_name() == L"java/lang/System" && new_method->get_name() == L"loadLibrary") break;
+				// 这里用作魔改。比如，禁用 Perf 类。
+				if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
+					if (new_method->is_void()) {
+						break;
+					} else if (new_method->is_return_primitive()){
+						op_stack.push(new IntOop(0));
+						break;
+					} else {
+						op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
+						break;
+					}
+				}
 
 				// synchronized:
 				Oop *this_obj;
@@ -2249,14 +2297,22 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 
 				// **IMPORTANT** judge whether returns an Exception!!!
-				if (!new_method->is_void()) {
+				if (cur_frame.has_exception && !new_method->is_void()) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
 						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
-						if (klass->check_interfaces(throwable_klass)) {
+						if (klass->check_parent(throwable_klass)) {
+							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
+#ifdef DEBUG
+	std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
+#endif
 							goto exception_handler;
+						} else {
+							assert(false);
 						}
+					} else {
+						assert(false);
 					}
 				}
 
@@ -2416,12 +2472,30 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					stack<Oop *>().swap(op_stack);
 					// add it on!
 					op_stack.push(exception_obj);
+#ifdef DEBUG
+	std::wcout << "(DEBUG) [athrow] this frame has the catcher, and the pc is [" << jump_pc << "]!" << std::endl;
+#endif
 					break;	// go to the handler~
 				} else {				// this frame cannot handle the exception!
 					// make `cur_frame` lose effectiveness!
 					// I think only should take this method: return an `Exception` oop, and judge at the last StackFrame's `invokeVirtual`.etc.
 					// then If the last frame find an `Exception` oop has been pushed, then it will directly `GOTO` the `athrow` instruct.
 					thread.pc = backup_pc;
+					assert(&cur_frame == &thread.vm_stack.back());
+					if (thread.vm_stack.size() == 1) {	// if cur_frame is the last...
+#ifdef DEBUG
+	std::wcout << "(DEBUG) [athrow] TERMINALED because of exception!!!" << std::endl;
+#endif
+						exit(-1);
+					} else {
+						auto iter = thread.vm_stack.rbegin();
+						++iter;							// get cur_frame's prev...
+						iter->has_exception = true;
+#ifdef DEBUG
+	std::wcout << "(DEBUG) [athrow] this frame doesn't has the catcher, or it's native method. so we should go to the last frame!" << std::endl;
+	std::wcout << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
+#endif
+					}
 					return exception_obj;
 				}
 

@@ -40,6 +40,7 @@ using std::function;
 #define PA  L"Ljava/security/PrivilegedAction;"
 #define PEA L"Ljava/security/PrivilegedExceptionAction;"
 #define ACC L"Ljava/security/AccessControlContext;"
+#define BB  L"Ljava/nio/ByteBuffer;"
 #define VOD L"Ljava/lang/Void;"
 #define BA  "[B"
 

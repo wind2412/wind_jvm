@@ -69,6 +69,7 @@ public:
 	bool is_public() { return (this->access_flags & ACC_PUBLIC) == ACC_PUBLIC; }
 	bool is_private() { return (this->access_flags & ACC_PRIVATE) == ACC_PRIVATE; }
 	bool is_void() { return descriptor[descriptor.size()-1] == L'V'; }
+	bool is_return_primitive() { return descriptor[descriptor.size()-1] != L';'; }
 	bool is_main() { return is_static() && is_public() && is_void(); }
 	bool is_native() { return (this->access_flags & ACC_NATIVE) == ACC_NATIVE; }
 	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }

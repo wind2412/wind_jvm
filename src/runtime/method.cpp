@@ -229,23 +229,45 @@ vector<MirrorOop *> Method::parse_argument_list()
 
 int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 {
+#ifdef DEBUG
+	std::wcout << "===-------------- [Begin Finding Catch/Finally Block...] -----------------===" << std::endl;
+#endif
+
 	// 可以改进：这里其实可以考虑设置一个计数器什么的。因为之前被 catch 的肯定不会被第二次 catch。catch 这东西，对于同一个对象而言，是一次性的。
 	auto rt_pool = this->get_klass()->get_rtpool();
 	for (int i = 0; i < this->code->exception_table_length; i ++) {
 		auto excp_tbl = this->code->exception_table[i];
+#ifdef DEBUG
+	std::wcout << "(DEBUG) cur_pc is: [" << cur_pc << "], and it compare with: [" << excp_tbl.start_pc << "~" << excp_tbl.end_pc << "], " << std::endl;
+#endif
 		if (cur_pc >= excp_tbl.start_pc && cur_pc < excp_tbl.end_pc) {	// in the exception range.
 			if (excp_tbl.catch_type == 0) {		// finally block. must be right.
+#ifdef DEBUG
+	std::wcout << "which's holder is `any` --> finally block.[V]" << std::endl;
+	std::wcout << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
+#endif
 				return excp_tbl.handler_pc;
 			} else {		// catch block. should judge current exception type is the `catch_type` or not?
 				auto _pair = (*rt_pool)[excp_tbl.catch_type - 1];
 				assert(_pair.first == CONSTANT_Class);
 				auto catch_klass = std::static_pointer_cast<InstanceKlass>(boost::any_cast<shared_ptr<Klass>>(_pair.second));
 				if (cur_excp->check_interfaces(catch_klass) || cur_excp->check_parent(catch_klass)) {
+#ifdef DEBUG
+	std::wcout << "which's holder is `"<< excp_tbl.handler_pc << "` --> catch block.[V]" << std::endl;
+	std::wcout << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
+#endif
 					return excp_tbl.handler_pc;
 				}
 			}
 		}
+#ifdef DEBUG
+	std::wcout << "not matched.[x]" << std::endl;
+#endif
 	}
 	// failed. NO catch handler.
+#ifdef DEBUG
+	std::wcout << "(DEBUG) didn't find a handler in this frame..." << std::endl;
+	std::wcout << "===---------------- [End Finding Catch/Finally Block...[x]] -----------------===" << std::endl;
+#endif
 	return 0;
 }

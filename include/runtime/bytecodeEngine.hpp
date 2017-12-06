@@ -40,6 +40,7 @@ public:
 	shared_ptr<Method> method;			// the method will be executed in this StackFrame.
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
+	bool has_exception = false;
 public:
 	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, bool is_native = false);
 	bool is_valid() { return valid_frame; }

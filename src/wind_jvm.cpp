@@ -269,6 +269,11 @@ void vm_thread::init_and_do_main()
 
 	}
 
+	auto Perf_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Perf"));
+	Perf_klass->set_state(Klass::KlassState::Initializing);				// 禁用 Perf.
+	auto PerfCounter_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/PerfCounter"));
+	PerfCounter_klass->set_state(Klass::KlassState::Initializing);		// 禁用 PerfCounter.
+
 	auto launcher_helper_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
 	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
 	shared_ptr<Method> load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
@@ -342,7 +347,7 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
 #ifdef DEBUG
-	ss << "[backtrace " << this->vm_stack.size() - i << "] <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 #endif
 
 		i ++;
