@@ -43,9 +43,20 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 
 	Oop *result;
 	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
-	std::wcout.imbue(std::locale(""));			// IMPORTANT!!!!! 如果不指定...... 用 下边 wcout 输出，是正确的......但是 path 真正的值其实只有一个 "x"......
+//	std::wcout.imbue(std::locale(""));			// IMPORTANT!!!!! 如果不指定...... 用 下边 wcout 输出，是正确的......但是 path 真正的值其实只有一个 "x"......
 	std::wcout << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
-	const char *path = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str();
+
+	// 注：通过 wstring_to_utf8 转成的 string 是没有问题的。有问题的是对这个 string 直接求 c_str() 得到 char*。
+	// 这个提取 c_str() 的过程，是可能会出现各种诡异的状况的。
+	// 非常好的解决方法，就是直接复制一份 string 出来，就没问题了。
+	std::string backup_str = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result));
+
+//	const char *path = .c_str();
+//	const char *path = narrow(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str();
+
+//	std::wcout << "(((" << backup_str.c_str() << ")))" << std::endl;	// 竟然复制一份 转换成的 string 就好了？？？
+
+	const char *path = backup_str.c_str();
 
 	// get file msg
 	struct stat64 stat;

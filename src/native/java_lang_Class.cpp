@@ -369,6 +369,7 @@ void JVM_GetComponentType(list<Oop *> & _stack){
 			case Type::BYTE:
 			case Type::BOOLEAN:
 			case Type::SHORT:
+			case Type::CHAR:
 			case Type::INT:
 				_stack.push_back(java_lang_class::get_basic_type_mirror(L"I"));
 				break;
