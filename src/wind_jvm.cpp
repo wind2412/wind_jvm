@@ -329,10 +329,12 @@ ArrayOop * vm_thread::get_stack_trace()
 		auto method_name = java_lang_string::intern(m->get_name());
 		auto file_name = java_lang_string::intern(m->get_klass()->get_source_file_name());
 		int line_num;
+		int last_pc_debug = 0;
 		if (last_frame_pc == 0)
 			line_num = 0;
 		else {
 			std::wcout << "(DEBUG) lineno: " << last_frame_pc - m->get_code()->code << std::endl;
+			last_pc_debug = last_frame_pc - m->get_code()->code;
 			line_num = m->get_java_source_lineno(last_frame_pc - m->get_code()->code);
 		}
 
@@ -347,7 +349,7 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
 #ifdef DEBUG
-	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 #endif
 
 		i ++;

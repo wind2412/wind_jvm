@@ -7,7 +7,6 @@
 
 #include "native/native.hpp"
 
-#include "native/sun_misc_Perf.hpp"
 #include "native/java_lang_Object.hpp"
 #include "native/java_lang_Thread.hpp"
 #include "native/java_lang_System.hpp"
@@ -57,7 +56,6 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"java/lang/ClassLoader"] = java_lang_classLoader_search_method;
 	native_map[L"java/lang/Runtime"] = java_lang_runtime_search_method;
 	native_map[L"java/lang/Throwable"] = java_lang_throwable_search_method;
-	native_map[L"sun/misc/Perf"] = sun_misc_perf_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().

@@ -251,7 +251,7 @@ int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 				auto _pair = (*rt_pool)[excp_tbl.catch_type - 1];
 				assert(_pair.first == CONSTANT_Class);
 				auto catch_klass = std::static_pointer_cast<InstanceKlass>(boost::any_cast<shared_ptr<Klass>>(_pair.second));
-				if (cur_excp->check_interfaces(catch_klass) || cur_excp->check_parent(catch_klass)) {
+				if (cur_excp == catch_klass || cur_excp->check_interfaces(catch_klass) || cur_excp->check_parent(catch_klass)) {	// bug report: 卡了两天的 bug ！！卧槽......没有 catch 住 ClassNotFoundException，真正的原因在于没有判断此类是不是 catch_klass... 只判断 check_parent 和 check_interface 了...... 托这 bug 的福...... 把各种 ClassLoader 的源码翻了个遍...... 很有收获......
 #ifdef DEBUG
 	std::wcout << "which's holder is `"<< excp_tbl.handler_pc << "` --> catch block.[V]" << std::endl;
 	std::wcout << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;

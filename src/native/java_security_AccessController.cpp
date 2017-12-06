@@ -11,6 +11,7 @@
 #include <cassert>
 #include "wind_jvm.hpp"
 #include "native/native.hpp"
+#include "classloader.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"doPrivileged:(" PA ")" OBJ,				(void *)&JVM_DoPrivileged},
@@ -67,8 +68,28 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" OBJ);
 	}
 	assert(method != nullptr);
+
 	Oop* result = thread.add_frame_and_execute (method, { pa }); // load the `this` obj
-	_stack.push_back (result);
+
+	// **IMPORTANT** judge whether returns an Exception!!!		// TODO: bug：如果在 run() 中 throw 的话......像是 openjdk: URLClassLoader::findClass() 一样......
+																// 应当捕获所有 Exception，并且变成 PrivilegeException 抛出！！
+	bool substitute = false;
+	if (result != nullptr && result->get_ooptype() != OopType::_BasicTypeOop && result->get_klass()->get_type() == ClassType::InstanceClass) {	// same as `(Bytecode)invokeVirtual` 's exception judge.
+		auto klass = std::static_pointer_cast<InstanceKlass>(result->get_klass());
+		auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+		if (klass == throwable_klass || klass->check_parent(throwable_klass)) {
+#ifdef DEBUG
+std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
+#endif
+			substitute = true;
+		}
+	}
+
+	if (substitute) {
+		_stack.push_back (pa);			// 使用 PriviledgeException 代替返回的 Exception 返回！！
+	} else {
+		_stack.push_back (result);
+	}
 }
 
 // I don't get a snapshot... return nullptr.

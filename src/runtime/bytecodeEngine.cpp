@@ -2128,7 +2128,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
 						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
-						if (klass->check_parent(throwable_klass)) {
+						if (klass == throwable_klass || klass->check_parent(throwable_klass)) {		// 千万别忘了判断此 klass 是不是 throwable !!!!!
 							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
 #ifdef DEBUG
 	std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
@@ -2302,7 +2302,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
 						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
-						if (klass->check_parent(throwable_klass)) {
+						if (klass == throwable_klass || klass->check_parent(throwable_klass)) {		// 千万别忘了判断此 klass 是不是 throwable !!!!!
 							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
 #ifdef DEBUG
 	std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
