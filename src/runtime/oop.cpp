@@ -7,12 +7,13 @@
 
 #include "runtime/oop.hpp"
 #include "classloader.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 /*===----------------  InstanceOop  -----------------===*/
 InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.
 	this->field_length = klass->non_static_field_num();
-	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
+//	std::wcout << klass->get_name() << "'s field_size allocate " << this->field_length << " bytes..." << std::endl;	// delete
 	if (this->field_length != 0) {
 //		fields = new Oop*[this->field_length];			// TODO: not gc control......
 //		memset(fields, 0, this->field_length * sizeof(Oop *));		// 啊啊啊啊全部清空别忘了！！
@@ -37,7 +38,6 @@ bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		/
 	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
-		std::wcout << "get_field_value: " << BIG_signature << std::endl;		// delete
 		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 		if (iter == instance_klass->fields_layout.end()) {
 			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
@@ -63,7 +63,6 @@ void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 
 	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
-		std::wcout << "set_field_value: " << BIG_signature << std::endl;		// delete
 		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
 		if (iter == instance_klass->fields_layout.end()) {
 			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
@@ -163,7 +162,7 @@ int InstanceOop::get_all_field_offset(const wstring & BIG_signature)
 	// 这里存放的不是绝对距离，我会把语义完全改变，成为 “和此 oop 存放的 field 的起始地址的相对距离”，而不是 “和此 oop 的 this 指针的绝对距离”！！
 	// 这样，GC 也可以用多种算法了！！看来也可以支持复制算法了！开森～
 #ifdef DEBUG
-	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << BIG_signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
+	sync_wcout{} << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], " << BIG_signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
 #endif
 //	return (char *)&this->fields[offset] - (char *)this;
 	return offset;	// vector 是连续内存。
@@ -183,7 +182,7 @@ int InstanceOop::get_static_field_offset(const wstring & signature)
 	// TODO: volatile?
 
 #ifdef DEBUG
-	std::wcout << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], (static)" << signature << ":[" << &this->fields[offset] << "(encoding: " << offset + instance_klass->non_static_field_num() << ")]" << std::endl;
+	sync_wcout{} << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], (static)" << signature << ":[" << &this->fields[offset] << "(encoding: " << offset + instance_klass->non_static_field_num() << ")]" << std::endl;
 #endif
 	return offset + instance_klass->non_static_field_num();		// 这里需要注意。由于 static 和 non-static 我是分别存放的，而 unsafe 中指定的 offset 是唯一的。这就造成我不知道去 static 里边找还是 non-static 里边找。“两个都找，找到就ok” 的策略一定会引入软件漏洞。因此，采用编码，让 non-static 和 static 的编号永远不会重合。根据 non-static-field-size 来判断去哪里找。
 }

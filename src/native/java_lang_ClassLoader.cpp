@@ -14,6 +14,7 @@
 #include "native/java_lang_String.hpp"
 #include "system_directory.hpp"
 #include "classloader.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"findLoadedClass0:(" STR ")" CLS,				(void *)&JVM_FindLoadedClass},
@@ -44,9 +45,9 @@ void JVM_FindLoadedClass(list<Oop *> & _stack){
 
 #ifdef DEBUG
 	if (_stack.back() == nullptr) {
-		std::wcout << "(DEBUG) didn't find [" << klass_name << "] in system_map. return null." << std::endl;
+		sync_wcout{} << "(DEBUG) didn't find [" << klass_name << "] in system_map. return null." << std::endl;
 	} else {
-		std::wcout << "(DEBUG) finded [" << klass_name << "] in system_map. return its mirror." << std::endl;
+		sync_wcout{} << "(DEBUG) finded [" << klass_name << "] in system_map. return its mirror." << std::endl;
 	}
 #endif
 
@@ -70,9 +71,9 @@ void JVM_FindBootStrapClass(list<Oop *> & _stack){
 
 #ifdef DEBUG
 	if (_stack.back() == nullptr) {
-		std::wcout << "(DEBUG) didn't find [" << klass_name << "] in system_map. return null." << std::endl;
+		sync_wcout{} << "(DEBUG) didn't find [" << klass_name << "] in system_map. return null." << std::endl;
 	} else {
-		std::wcout << "(DEBUG) finded [" << klass_name << "] in system_map. return its mirror." << std::endl;
+		sync_wcout{} << "(DEBUG) finded [" << klass_name << "] in system_map. return its mirror." << std::endl;
 	}
 #endif
 }
@@ -105,7 +106,7 @@ void JVM_DefineClass1(list<Oop *> & _stack){
 	delete[] buf;
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) DefineClass1(): [" << klass_name << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) DefineClass1(): [" << klass_name << "]." << std::endl;
 #endif
 }
 

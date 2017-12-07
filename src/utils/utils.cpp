@@ -45,7 +45,7 @@ int parse_field_descriptor(const std::wstring & descriptor)
 			case L'J':	// long
 				return 8;
 			default:
-				std::cerr << "can't get here in <utils.cpp>::parse_field_descriptor!" << std::endl;
+				std::wcerr << "can't get here in <utils.cpp>::parse_field_descriptor!" << std::endl;
 				assert(false);
 				return -1;
 		}

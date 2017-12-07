@@ -49,7 +49,7 @@ void JVM_Canonicalize0(list<Oop *> & _stack){
 	_stack.push_back(java_lang_string::intern(canonical_path));
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) canonical path of [" << java_lang_string::stringOop_to_wstring(str) << "] is [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) canonical path of [" << java_lang_string::stringOop_to_wstring(str) << "] is [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
 #endif
 }
 
@@ -60,7 +60,9 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 	Oop *result;
 	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
 //	std::wcout.imbue(std::locale(""));			// IMPORTANT!!!!! 如果不指定...... 用 下边 wcout 输出，是正确的......但是 path 真正的值其实只有一个 "x"......
-	std::wcout << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
+#ifdef DEBUG
+	sync_wcout{} << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
+#endif
 
 	// 注：通过 wstring_to_utf8 转成的 string 是没有问题的。有问题的是对这个 string 直接求 c_str() 得到 char*。
 	// 这个提取 c_str() 的过程，是可能会出现各种诡异的状况的。
@@ -91,7 +93,7 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(mode));
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) file: [" << path << "]'s attribute: [" << std::hex << mode << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) file: [" << path << "]'s attribute: [" << std::hex << mode << "]." << std::endl;
 #endif
 }
 

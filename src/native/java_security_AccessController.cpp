@@ -79,7 +79,7 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 		auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
 		if (klass == throwable_klass || klass->check_parent(throwable_klass)) {
 #ifdef DEBUG
-std::wcout << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
+	sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
 #endif
 			substitute = true;
 		}

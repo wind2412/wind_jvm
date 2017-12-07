@@ -34,7 +34,7 @@ void JVM_FloatToRawIntBits(list<Oop *> & _stack){		// static
 	u.f = (float)v;		// 见 openjdk: share/native/java/lang/Float.c::Java_java_lang_Float_floatToRawIntBits()
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) [use bits] to convert float: [" << u.f << "] to int: [" << u.i << "] and return the int value." << std::endl;
+	sync_wcout{} << "(DEBUG) [use bits] to convert float: [" << u.f << "] to int: [" << u.i << "] and return the int value." << std::endl;
 #endif
 
 	_stack.push_back(new IntOop(u.i));

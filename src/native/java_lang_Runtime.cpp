@@ -22,7 +22,7 @@ void JVM_AvailableProcessors(list<Oop*>& _stack)
 {
 	_stack.push_back(new IntOop(get_cpu_nums()));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) now this machine has [" << ((IntOop *)_stack.back())->value << "] cpus." << std::endl;
+	sync_wcout{} << "(DEBUG) now this machine has [" << ((IntOop *)_stack.back())->value << "] cpus." << std::endl;
 #endif
 }
 

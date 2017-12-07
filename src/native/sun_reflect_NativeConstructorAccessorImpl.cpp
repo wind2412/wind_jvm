@@ -48,7 +48,7 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 	// save.
 	_stack.push_back(init);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) use Constructor:[<init>:" << target_method->get_descriptor() << "] to initialize a new obj of type [" << target_klass->get_name() << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) use Constructor:[<init>:" << target_method->get_descriptor() << "] to initialize a new obj of type [" << target_klass->get_name() << "]." << std::endl;
 #endif
 }
 

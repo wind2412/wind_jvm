@@ -113,7 +113,7 @@ void JVM_FindSignal(list<Oop *> & _stack){		// static
 	assert(iter != siglabels.end());
 	_stack.push_back(new IntOop(iter->second));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) find [" << java_lang_string::stringOop_to_wstring(str) << "] and get sig number: [" << iter->second << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) find [" << java_lang_string::stringOop_to_wstring(str) << "] and get sig number: [" << iter->second << "]." << std::endl;
 #endif
 }
 
@@ -176,7 +176,7 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 	}
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) set signo: [" << signo << "]'s handler to a new handler: [(void (*)(int)" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) set signo: [" << signo << "]'s handler to a new handler: [(void (*)(int)" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 
 }

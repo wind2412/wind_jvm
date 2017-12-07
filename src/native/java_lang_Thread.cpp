@@ -11,6 +11,7 @@
 #include "native/native.hpp"
 #include "runtime/thread.hpp"
 #include "wind_jvm.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 /*===-------------- from hotspot -------------------*/
 static unordered_map<wstring, void*> methods = {
@@ -33,12 +34,17 @@ static unordered_map<wstring, void*> methods = {
 };
 
 void JVM_StartThread(list<Oop *> & _stack){		// static
-	return;					// TODO: I close here!!!
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
 	assert(_this->get_field_value(THREAD L":eetop:J", &result));
 	LongOop *tid = (LongOop *)result;
 	assert(tid->value == 0);			// must be 0. if not 0, it must be started already.
+
+	// 魔改。
+	// 如果 klass 是 ReferenceHandler 的话，我就不启动这个线程了。由于 DEBUG 模式下，有这个线程无限跑输出太多了......内存分分钟就没了......
+	if (_this->get_klass()->get_name() == L"java/lang/ref/Reference$ReferenceHandler") {
+		return;
+	}
 
 	// first, find the `run()` method in `this`.
 	shared_ptr<Method> run = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
@@ -63,7 +69,7 @@ void JVM_StopThread(list<Oop *> & _stack){
 void JVM_IsThreadAlive(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 #ifdef DEBUG
-	std::wcout << "the java.lang.Thread obj's address: [" << _this << "]." << std::endl;
+	sync_wcout{} << "the java.lang.Thread obj's address: [" << _this << "]." << std::endl;
 #endif
 	Oop *result;
 	assert(_this->get_field_value(THREAD L":eetop:J", &result));
@@ -83,7 +89,7 @@ void JVM_IsThreadAlive(list<Oop *> & _stack){
 	 */
 	if (tid->value == 0) {
 #ifdef DEBUG
-	std::wcout << "This Thread is an empty obj, only alloc memory but not settled pthread_t. It didn't call the `start0` method! " << std::endl;
+	sync_wcout{} << "This Thread is an empty obj, only alloc memory but not settled pthread_t. It didn't call the `start0` method! " << std::endl;
 #endif
 		_stack.push_back(new IntOop(0));
 		return;
@@ -93,12 +99,12 @@ void JVM_IsThreadAlive(list<Oop *> & _stack){
 	if (ret == 0) {
 		_stack.push_back(new IntOop(1));
 #ifdef DEBUG
-	std::wcout << "Thread pthread_t: [" << tid->value << "] is alive! " << std::endl;
+	sync_wcout{} << "Thread pthread_t: [" << tid->value << "] is alive! " << std::endl;
 #endif
 	} else if (ret == ESRCH) {
 		_stack.push_back(new IntOop(0));
 #ifdef DEBUG
-	std::wcout << "Thread pthread_t: [" << tid->value << "] is dead... " << std::endl;
+	sync_wcout{} << "Thread pthread_t: [" << tid->value << "] is dead... " << std::endl;
 #endif
 	} else {
 		// EINVAL

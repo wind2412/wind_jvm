@@ -1,8 +1,9 @@
 #include <memory>
 #include <boost/algorithm/string/predicate.hpp>
 #include "classloader.hpp"
-#include "vm_exceptions.hpp"
 #include "runtime/klass.hpp"
+#include "utils/utils.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 using std::ifstream;
 using std::shared_ptr;
@@ -27,10 +28,14 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 				std::wcerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
-			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
+#ifdef DEBUG
+			sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
+#endif
 			shared_ptr<ClassFile> cf(new ClassFile);
 			f >> *cf;
-			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
+#ifdef DEBUG
+			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
+#endif
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, nullptr);
 			system_classmap.insert(make_pair(target, newklass));
@@ -54,7 +59,6 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 				// a. load the spliced class
 				wstring temp = classname.substr(layer + 1);		// "Ljava.lang.Object;" --> "java.lang.Object;"
 				wstring _true = temp.substr(0, temp.size()-1);	// "java.lang.Object;" --> "java.lang.Object"
-				std::wcout << layer << " " << _true << std::endl;
 				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
@@ -119,12 +123,12 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 
 void BootStrapClassLoader::print()
 {
-	std::wcout << "===------------ ( BootStrapClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
-	std::wcout << "total Classes num: " << system_classmap.size() << std::endl;
+	sync_wcout{} << "===------------ ( BootStrapClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
+	sync_wcout{} << "total Classes num: " << system_classmap.size() << std::endl;
 	for (auto iter : system_classmap) {
-		std::wcout << "  " << iter.first << std::endl;
+		sync_wcout{} << "  " << iter.first << std::endl;
 	}
-	std::wcout <<  "===----------------------------------------------------------------------------===" << std::endl;
+	sync_wcout{} <<  "===----------------------------------------------------------------------------===" << std::endl;
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
@@ -132,7 +136,9 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 {
 //	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
-	std::wcout << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
+#endif
 	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
 	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom.zxl.Haha'.
@@ -149,16 +155,22 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 					std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
 					return nullptr;
 				}
-				std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+#endif
 				f >> *cf;
 			} else {		// use ByteBuffer:
 				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
-				std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+#endif
 				s >> *cf;
 			}
 //			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
 //			(*stream) >> *cf;		// bug report !!! 注意：*stream 是不可以的！！*直接解引用，无法触发多态！！必须用 `.` 或者 `->` 才可以！！
-			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
+#ifdef DEBUG
+			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
+#endif
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this, loader_mirror);	// set the Java ClassLoader's mirror!!!
 			classmap.insert(make_pair(target, newklass));
@@ -183,7 +195,6 @@ MyClassLoader::get_loader().print();
 				// a. load the spliced class
 				wstring temp = classname.substr(layer+1);		// java.lang.Object;
 				wstring _true = temp.substr(0, temp.size()-1);
-				std::wcout << layer << " " << _true << std::endl;
 				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
@@ -246,12 +257,12 @@ MyClassLoader::get_loader().print();
 
 void MyClassLoader::print()
 {
-	std::wcout << "===--------------- ( MyClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
-	std::wcout << "total Classes num: " << this->classmap.size() << std::endl;
+	sync_wcout{} << "===--------------- ( MyClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
+	sync_wcout{} << "total Classes num: " << this->classmap.size() << std::endl;
 	for (auto iter : this->classmap) {
-		std::wcout << "  " << iter.first << std::endl;
+		sync_wcout{} << "  " << iter.first << std::endl;
 	}
-	std::wcout <<  "===------------------------------------------------------------------------===" << std::endl;
+	sync_wcout{} <<  "===------------------------------------------------------------------------===" << std::endl;
 }
 
 shared_ptr<Klass> MyClassLoader::find_in_classmap(const wstring & classname)

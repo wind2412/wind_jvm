@@ -26,7 +26,9 @@ void JVM_GetLength(list<Oop *> & _stack){
 
 	Oop *result;
 	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
-	std::wcout << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
+#ifdef DEBUG
+	sync_wcout{} << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
+#endif
 	std::string backup_str = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result));
 
 	const char *path = backup_str.c_str();
@@ -38,7 +40,7 @@ void JVM_GetLength(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) file: [" << path << "]'s length: [" << stat.st_size << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) file: [" << path << "]'s length: [" << stat.st_size << "]." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(stat.st_size));

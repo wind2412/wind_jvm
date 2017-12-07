@@ -54,7 +54,7 @@ void JVM_Clone(list<Oop *> & _stack){
 		InstanceOop *clone = new InstanceOop(*((InstanceOop *)_this));
 		_stack.push_back(clone);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) cloned from obj [" << _this << "] (InstanceOop) to new cloned obj [" << clone << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) cloned from obj [" << _this << "] (InstanceOop) to new cloned obj [" << clone << "]." << std::endl;
 #endif
 
 	} else if (_this->get_klass()->get_type() == ClassType::TypeArrayClass || _this->get_klass()->get_type() == ClassType::ObjArrayClass) {
@@ -66,7 +66,7 @@ void JVM_Clone(list<Oop *> & _stack){
 		_stack.push_back(clone);
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) cloned from obj [" << _this << "] (ArrayOop) to new cloned obj [" << clone << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) cloned from obj [" << _this << "] (ArrayOop) to new cloned obj [" << clone << "]." << std::endl;
 #endif
 	} else {
 		assert(false);

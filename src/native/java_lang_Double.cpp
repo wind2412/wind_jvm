@@ -28,7 +28,7 @@ void JVM_DoubleToRawLongBits(list<Oop *> & _stack){		// static
 	u.d = v;
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) [use bits] to convert double: [" << u.d << "] to long: [" << u.l << "] and return the long value." << std::endl;
+	sync_wcout{} << "(DEBUG) [use bits] to convert double: [" << u.d << "] to long: [" << u.l << "] and return the long value." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(u.l));
@@ -43,7 +43,7 @@ void JVM_LongBitsToDouble(list<Oop *> & _stack){		// static
 	u.l = v;
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) [use bits] to convert long: [" << u.l << "] to double: [" << u.d << "] and return the double value." << std::endl;
+	sync_wcout{} << "(DEBUG) [use bits] to convert long: [" << u.l << "] to double: [" << u.d << "] and return the double value." << std::endl;
 #endif
 
 	_stack.push_back(new DoubleOop(u.d));

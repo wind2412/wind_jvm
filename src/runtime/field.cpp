@@ -9,6 +9,7 @@
 #include "classloader.hpp"
 #include "utils/utils.hpp"
 #include "runtime/constantpool.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 Field_info::Field_info(shared_ptr<InstanceKlass> klass, field_info & fi, cp_info **constant_pool) : klass(klass) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
 	this->access_flags = fi.access_flags;

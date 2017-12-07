@@ -40,7 +40,9 @@ void JVM_Open0(list<Oop *> & _stack){
 	std::string backup_str = wstring_to_utf8(java_lang_string::stringOop_to_wstring(str));
 	const char *filename = backup_str.c_str();
 
-	std::wcout << "open filename: [" << filename << "]." << std::endl;
+#ifdef DEBUG
+	sync_wcout{} << "open filename: [" << filename << "]." << std::endl;
+#endif
 
 	// use O_RDONLY to open the file!!! (of FileInputStream, 1. readOnly, 2. only read File, not dir!)
 
@@ -72,7 +74,7 @@ void JVM_Open0(list<Oop *> & _stack){
 	((InstanceOop *)result)->get_field_value(FILEDESCRIPTOR L":fd:I", &real_fd);
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) open a file [" << filename << "], and inject real fd: [" << fd << "] to substitude the old garbage value fd: [" << ((IntOop *)real_fd)->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) open a file [" << filename << "], and inject real fd: [" << fd << "] to substitude the old garbage value fd: [" << ((IntOop *)real_fd)->value << "]." << std::endl;
 #endif
 
 	((IntOop *)real_fd)->value = fd;		// inject the real fd into it!
@@ -104,7 +106,7 @@ void JVM_ReadBytes(list<Oop *> & _stack){
 	if (ret == 0) {		// EOF
 		_stack.push_back(new IntOop(-1));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) meet EOF of fd: [" << fd << "]!" << std::endl;
+	sync_wcout{} << "(DEBUG) meet EOF of fd: [" << fd << "]!" << std::endl;
 #endif
 	} else {				// Not EOF
 		for (int i = offset, j = 0; i < offset + ret; i ++, j ++) {		// I think it should be `offset + ret`, not `offset + len`.
@@ -112,7 +114,7 @@ void JVM_ReadBytes(list<Oop *> & _stack){
 		}
 		_stack.push_back(new IntOop(ret));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) read fd: [" << fd << "] for [" << ret << "] bytes." << std::endl;
+	sync_wcout{} << "(DEBUG) read fd: [" << fd << "] for [" << ret << "] bytes." << std::endl;
 #endif
 	}
 
@@ -137,7 +139,7 @@ void JVM_Close0(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) close a file fd: [" << fd << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) close a file fd: [" << fd << "]." << std::endl;
 #endif
 
 }

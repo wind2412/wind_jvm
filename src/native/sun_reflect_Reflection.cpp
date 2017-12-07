@@ -30,12 +30,12 @@ void JVM_GetClassAccessFlags(list<Oop *> & _stack){		// static
 	if (klass == nullptr) {		// primitive type
 		_stack.push_back(new IntOop(	ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC ));
 #ifdef DEBUG
-	std::wcout << "type is [" << target->get_extra() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "type is [" << target->get_extra() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 	} else {
 		_stack.push_back(new IntOop(klass->get_access_flags()));
 #ifdef DEBUG
-	std::wcout << "klass is [" << klass->get_name() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "klass is [" << klass->get_name() << "], and access_flag is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 	}
 }

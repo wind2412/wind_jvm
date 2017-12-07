@@ -14,11 +14,10 @@
 #include "classloader.hpp"
 #include "runtime/thread.hpp"
 #include <regex>
+#include "utils/synchronize_wcout.hpp"
 
 Lock thread_num_lock;
 int all_thread_num;
-
-Lock wcout_lock;
 
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
@@ -43,7 +42,9 @@ void vm_thread::launch()
 
 		pthread_join(tid, nullptr);
 
-		std::wcout << "run over!!!" << std::endl;		// delete
+#ifdef DEBUG
+		sync_wcout{} << "run over!!!" << std::endl;		// delete
+#endif
 	}
 }
 
@@ -304,6 +305,9 @@ void vm_thread::init_and_do_main()
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
+	// kill all other running thread...
+	ThreadTable::kill_all_except_main_thread(pthread_self());
+
 //	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 //
 //	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
@@ -340,7 +344,6 @@ ArrayOop * vm_thread::get_stack_trace()
 		if (last_frame_pc == 0)
 			line_num = 0;
 		else {
-			std::wcout << "(DEBUG) lineno: " << last_frame_pc - m->get_code()->code << std::endl;
 			last_pc_debug = last_frame_pc - m->get_code()->code;
 			line_num = m->get_java_source_lineno(last_frame_pc - m->get_code()->code);
 		}
@@ -356,16 +359,16 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
 #ifdef DEBUG
-	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+	sync_wcout{} << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 #endif
 
 		i ++;
 	}
 
 #ifdef DEBUG
-	std::wcout << "===------------------- printStackTrace() ------------------===" << std::endl;
-	std::wcout << ss.str();
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===------------------- printStackTrace() ------------------===" << std::endl;
+	sync_wcout{} << ss.str();
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 
 	return arr;

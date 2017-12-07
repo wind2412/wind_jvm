@@ -5,6 +5,7 @@
 #include "runtime/bytecodeEngine.hpp"
 #include "native/java_lang_Class.hpp"
 #include "classloader.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool) : klass(klass) {
 	assert(constant_pool[mi.name_index-1]->tag == CONSTANT_Utf8);
@@ -231,11 +232,11 @@ vector<MirrorOop *> Method::parse_argument_list()
 		}
 	}
 #ifdef DEBUG
-	std::wcout << "===---------------- arg list (Runtime of " << descriptor << ") -----------------===" << std::endl;
+	sync_wcout{} << "===---------------- arg list (Runtime of " << descriptor << ") -----------------===" << std::endl;
 	for (int i = 0; i < v.size(); i ++) {
-		std::wcout << v[i]->get_klass()->get_name() << std::endl;
+		sync_wcout{} << v[i]->get_klass()->get_name() << std::endl;
 	}
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 	return v;
 }
@@ -303,7 +304,7 @@ MirrorOop *Method::parse_return_type()
 int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 {
 #ifdef DEBUG
-	std::wcout << "===-------------- [Begin Finding Catch/Finally Block...] -----------------===" << std::endl;
+	sync_wcout{} << "===-------------- [Begin Finding Catch/Finally Block...] -----------------===" << std::endl;
 #endif
 
 	// 可以改进：这里其实可以考虑设置一个计数器什么的。因为之前被 catch 的肯定不会被第二次 catch。catch 这东西，对于同一个对象而言，是一次性的。
@@ -311,13 +312,13 @@ int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 	for (int i = 0; i < this->code->exception_table_length; i ++) {
 		auto excp_tbl = this->code->exception_table[i];
 #ifdef DEBUG
-	std::wcout << "(DEBUG) cur_pc is: [" << cur_pc << "], and it compare with: [" << excp_tbl.start_pc << "~" << excp_tbl.end_pc << "], " << std::endl;
+	sync_wcout{} << "(DEBUG) cur_pc is: [" << cur_pc << "], and it compare with: [" << excp_tbl.start_pc << "~" << excp_tbl.end_pc << "], " << std::endl;
 #endif
 		if (cur_pc >= excp_tbl.start_pc && cur_pc < excp_tbl.end_pc) {	// in the exception range.
 			if (excp_tbl.catch_type == 0) {		// finally block. must be right.
 #ifdef DEBUG
-	std::wcout << "which's holder is `any` --> finally block.[V]" << std::endl;
-	std::wcout << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
+	sync_wcout{} << "which's holder is `any` --> finally block.[V]" << std::endl;
+	sync_wcout{} << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
 #endif
 				return excp_tbl.handler_pc;
 			} else {		// catch block. should judge current exception type is the `catch_type` or not?
@@ -326,21 +327,21 @@ int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 				auto catch_klass = std::static_pointer_cast<InstanceKlass>(boost::any_cast<shared_ptr<Klass>>(_pair.second));
 				if (cur_excp == catch_klass || cur_excp->check_interfaces(catch_klass) || cur_excp->check_parent(catch_klass)) {	// bug report: 卡了两天的 bug ！！卧槽......没有 catch 住 ClassNotFoundException，真正的原因在于没有判断此类是不是 catch_klass... 只判断 check_parent 和 check_interface 了...... 托这 bug 的福...... 把各种 ClassLoader 的源码翻了个遍...... 很有收获......
 #ifdef DEBUG
-	std::wcout << "which's holder is `"<< excp_tbl.handler_pc << "` --> catch block.[V]" << std::endl;
-	std::wcout << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
+	sync_wcout{} << "which's holder is `"<< excp_tbl.handler_pc << "` --> catch block.[V]" << std::endl;
+	sync_wcout{} << "===---------------- [End Finding Catch/Finally Block [V]] -----------------===" << std::endl;
 #endif
 					return excp_tbl.handler_pc;
 				}
 			}
 		}
 #ifdef DEBUG
-	std::wcout << "not matched.[x]" << std::endl;
+	sync_wcout{} << "not matched.[x]" << std::endl;
 #endif
 	}
 	// failed. NO catch handler.
 #ifdef DEBUG
-	std::wcout << "(DEBUG) didn't find a handler in this frame..." << std::endl;
-	std::wcout << "===---------------- [End Finding Catch/Finally Block...[x]] -----------------===" << std::endl;
+	sync_wcout{} << "(DEBUG) didn't find a handler in this frame..." << std::endl;
+	sync_wcout{} << "===---------------- [End Finding Catch/Finally Block...[x]] -----------------===" << std::endl;
 #endif
 	return 0;
 }

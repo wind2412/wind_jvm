@@ -13,6 +13,7 @@
 #include "native/native.hpp"
 #include "wind_jvm.hpp"
 #include <regex>
+#include "utils/synchronize_wcout.hpp"
 
 /*===--------------------- java_lang_class ----------------------===*/
 java_lang_class::mirror_state & java_lang_class::state() {
@@ -64,8 +65,6 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 	while(!delay_mirrors.empty()) {
 		wstring name = delay_mirrors.front();
 		delay_mirrors.pop();
-
-			std::wcout << " fix up..." << name << std::endl;	// delete
 
 		shared_ptr<Klass> klass = system_classmap.find(L"java/lang/Class.class")->second;
 		if (name.size() == 1)	// ... switch only accept an integer... can't accept a wstring.
@@ -143,13 +142,13 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Mi
 			}
 			klass->set_mirror(mirror);	// set java_mirror
 #ifdef DEBUG
-	std::wcout << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
+	sync_wcout{} << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
 #endif
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {
 			MirrorOop *mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
 			klass->set_mirror(mirror);	// set java_mirror
 #ifdef DEBUG
-	std::wcout << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
+	sync_wcout{} << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
 #endif
 		} else {
 			assert(false);
@@ -201,7 +200,7 @@ void JVM_GetClassName(list<Oop *> & _stack){
 		_stack.push_back(str);
 	}
 #ifdef DEBUG
-	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
 #endif
 }
 void JVM_ForClassName(list<Oop *> & _stack){		// static
@@ -215,7 +214,9 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 		std::wcerr << "Now don't support java/lang/Class::forName()'s argument `loader` is Application loader!! only support BootStrapLoader!!" << std::endl;
 		assert(false);
 	} else {
-		std::wcout << klass_name << std::endl;
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) forClassName: [" << klass_name << "]." << std::endl;
+#endif
 		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(std::regex_replace(klass_name, std::wregex(L"\\."), L"/"));
 		assert(klass != nullptr);		// wrong. Because user want to load a non-exist class.
 		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
@@ -234,19 +235,19 @@ void JVM_GetSuperClass(list<Oop *> & _stack){
 	if (_this->get_mirrored_who() == nullptr) {	// primitive types
 		_stack.push_back(nullptr);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) primitive type [" << _this->get_extra() << "] doesn't have a super klass. return null." << std::endl;
+	sync_wcout{} << "(DEBUG) primitive type [" << _this->get_extra() << "] doesn't have a super klass. return null." << std::endl;
 #endif
 	} else {
 		if (_this->get_mirrored_who()->get_parent() == nullptr) {
 			assert(_this->get_mirrored_who()->get_name() == L"java/lang/Object");
 			_stack.push_back(nullptr);
 #ifdef DEBUG
-	std::wcout << "(DEBUG) java/lang/Object doesn't have a super klass. return null." << std::endl;
+	sync_wcout{} << "(DEBUG) java/lang/Object doesn't have a super klass. return null." << std::endl;
 #endif
 		} else {
 			_stack.push_back(_this->get_mirrored_who()->get_parent()->get_mirror());
 #ifdef DEBUG
-	std::wcout << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "] have a super klass: [" << _this->get_mirrored_who()->get_parent()->get_name() << "]. return it~" << std::endl;
+	sync_wcout{} << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "] have a super klass: [" << _this->get_mirrored_who()->get_parent()->get_name() << "]. return it~" << std::endl;
 #endif
 		}
 	}
@@ -274,7 +275,7 @@ void JVM_IsInterface(list<Oop *> & _stack){
 	}
 #ifdef DEBUG
 	wstring name = _this->get_mirrored_who() == nullptr ? _this->get_extra() : _this->get_mirrored_who()->get_name();
-	std::wcout << "(DEBUG) this klass: [" << name << "] is an interface ? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) this klass: [" << name << "] is an interface ? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 void JVM_IsInstance(list<Oop *> & _stack){
@@ -292,13 +293,15 @@ void JVM_IsAssignableFrom(list<Oop *> & _stack){
 		if (_this == _that)	_stack.push_back(new IntOop(true));
 		else					_stack.push_back(new IntOop(false));
 #ifdef DEBUG
-	std::wcout << "compare with [" << _this->get_extra() << "] and [" << _that->get_extra() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "compare with [" << _this->get_extra() << "] and [" << _that->get_extra() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 	} else {
 		// both are not primitive types.
 		auto sub = _this->get_klass();
 		auto super = _that->get_klass();
-		std::wcout << "compare with: " << sub->get_name() << " and " << super->get_name() << std::endl;
+#ifdef DEBUG
+		sync_wcout{} << "compare with: " << sub->get_name() << " and " << super->get_name() << std::endl;
+#endif
 		if (sub->get_type() == ClassType::InstanceClass && sub->get_type() == ClassType::InstanceClass) {
 			auto real_sub = std::static_pointer_cast<InstanceKlass>(sub);
 			auto real_super = std::static_pointer_cast<InstanceKlass>(super);
@@ -310,7 +313,7 @@ void JVM_IsAssignableFrom(list<Oop *> & _stack){
 				_stack.push_back(new IntOop(false));
 			}
 #ifdef DEBUG
-	std::wcout << "compare with [" << real_sub->get_name() << "] and [" << real_super->get_name() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "compare with [" << real_sub->get_name() << "] and [" << real_super->get_name() << "], result is [" << ((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 		} else {
 			std::wcerr << "I don't know how about ArrayKlass here..." << std::endl;
@@ -339,9 +342,9 @@ void JVM_IsArrayClass(list<Oop *> & _stack){
 	}
 #ifdef DEBUG
 	if (klass != nullptr)
-		std::wcout << "(DEBUG) klass: [" << klass->get_name() << "] is a array klass? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+		sync_wcout{} << "(DEBUG) klass: [" << klass->get_name() << "] is a array klass? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 	else
-		std::wcout << "(DEBUG) klass: [" << _this->get_extra() << "] is not a array klass." << std::endl;
+		sync_wcout{} << "(DEBUG) klass: [" << _this->get_extra() << "] is not a array klass." << std::endl;
 #endif
 }
 void JVM_IsPrimitiveClass(list<Oop *> & _stack){
@@ -350,12 +353,12 @@ void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 		assert(_this->get_extra() == L"");
 		_stack.push_back(new IntOop(false));
 #ifdef DEBUG
-	std::wcout << "[" << _this->get_mirrored_who()->get_name() << "] is not a Primitive klass. return false." << std::endl;
+	sync_wcout{} << "[" << _this->get_mirrored_who()->get_name() << "] is not a Primitive klass. return false." << std::endl;
 #endif
 	} else {
 		_stack.push_back(new IntOop(true));
 #ifdef DEBUG
-	std::wcout << "[" << _this->get_extra() << "] is a Primitive klass. return true." << std::endl;
+	sync_wcout{} << "[" << _this->get_extra() << "] is a Primitive klass. return true." << std::endl;
 #endif
 	}
 }
@@ -396,9 +399,9 @@ void JVM_GetComponentType(list<Oop *> & _stack){
 #ifdef DEBUG
 	MirrorOop *mirror = (MirrorOop *)_stack.back();
 	if (mirror->get_mirrored_who() == nullptr) {
-		std::wcout << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_extra() << "]." << std::endl;
+		sync_wcout{} << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_extra() << "]." << std::endl;
 	} else {
-		std::wcout << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_mirrored_who()->get_name() << "]." << std::endl;
+		sync_wcout{} << "(DEBUG) the element type of ArrayKlass [" << klass->get_name() << "] is [" << mirror->get_mirrored_who()->get_name() << "]." << std::endl;
 	}
 #endif
 }
@@ -408,12 +411,12 @@ void JVM_GetClassModifiers(list<Oop *> & _stack){
 	if (_this->get_mirrored_who() == nullptr) {	// primitive types		// see openjdk.
 		_stack.push_back(new IntOop(ACC_ABSTRACT | ACC_FINAL | ACC_PUBLIC));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) primitive type [" << _this->get_extra() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
+	sync_wcout{} << "(DEBUG) primitive type [" << _this->get_extra() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
 #endif
 	} else {
 		_stack.push_back(new IntOop(_this->get_mirrored_who()->get_access_flags()));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
+	sync_wcout{} << "(DEBUG) klass type [" << _this->get_mirrored_who()->get_name() << "]'s modifier is " << ((IntOop *)_stack.back())->value << std::endl;
 #endif
 	}
 
@@ -520,13 +523,13 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "===-------------- getClassDeclaredFields Pool (" << klass->get_name() << ")-------------===" << std::endl;
+	sync_wcout{} << "===-------------- getClassDeclaredFields Pool (" << klass->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < v.size(); i ++) {
 		Oop *result;
 		assert(v[i]->get_field_value(FIELD L":name:Ljava/lang/String;", &result));
-		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << ", address: [" << result << ']' << std::endl;
+		sync_wcout{} << java_lang_string::stringOop_to_wstring((InstanceOop *)result) << ", address: [" << result << ']' << std::endl;
 	}
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 
 	_stack.push_back(field_arr);
@@ -628,11 +631,11 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "===-------------- getClassDeclaredMethods Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
+	sync_wcout{} << "===-------------- getClassDeclaredMethods Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < methods.size(); i ++) {
-		std::wcout << i << ". " << methods[i].second->get_name() << ":" << methods[i].second->get_descriptor() << std::endl;
+		sync_wcout{} << i << ". " << methods[i].second->get_name() << ":" << methods[i].second->get_descriptor() << std::endl;
 	}
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 
 	_stack.push_back(method_arr);
@@ -722,11 +725,11 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	}
 
 #ifdef DEBUG
-	std::wcout << "===-------------- getClassDeclaredCtors Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
+	sync_wcout{} << "===-------------- getClassDeclaredCtors Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
 	for (int i = 0; i < ctors.size(); i ++) {
-		std::wcout << i << ". " << ctors[i].second->get_name() << ":" << ctors[i].second->get_descriptor() << std::endl;
+		sync_wcout{} << i << ". " << ctors[i].second->get_name() << ":" << ctors[i].second->get_descriptor() << std::endl;
 	}
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 
 	_stack.push_back(ctor_arr);
@@ -772,7 +775,7 @@ void JVM_GetClassTypeAnnotations(list<Oop *> & _stack){
 void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	wstring basic_type_klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get BasicTypeMirror of `" << basic_type_klass_name << "`" << std::endl;
+	sync_wcout{} << "(DEBUG) get BasicTypeMirror of `" << basic_type_klass_name << "`" << std::endl;
 #endif
 	auto get_basic_type_mirror = [](const wstring & name) -> MirrorOop * {
 		auto basic_type_mirror_iter = java_lang_class::get_single_basic_type_mirrors().find(name);

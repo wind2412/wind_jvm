@@ -73,7 +73,9 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	// 1. super_klass
 	if (this->parent != nullptr) {		// if this_klass is **NOT** java.lang.Object
 		auto & super_map = std::static_pointer_cast<InstanceKlass>(this->parent)->fields_layout;
-		std::wcout << "now this klass is ..." << this->get_name() << "... super klass is ..." << this->parent->get_name() << std::endl;
+#ifdef DEBUG
+		sync_wcout{} << "now this klass is ..." << this->get_name() << "... super klass is ..." << this->parent->get_name() << std::endl;
+#endif
 		for (auto iter : super_map) {		// 注意... unordered_map 乱序存储... 所以也不可能按照顺序来... 想要直接使用 vector<bool> 来指定一个 field 是否是自己的，使用下标来存取是落空了...因为顺序都不定...push_back 肯定是从 1..2..3.. 挨个走，而从 super 那里读取到的 map 却是乱序的 1..4..2.. 不断使用 reserve 或许可以。 我就懒一点，使用 unordered_map <int, bool> 好了... 暴力省事。虽然先计算出来所有的 field 数目才是好主意...
 			this->fields_layout[iter.first] = iter.second;
 			this->is_this_klass_field.insert(make_pair(this->fields_layout[iter.first].first, false));		// 不是自己的 field
@@ -120,19 +122,19 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	initialize_field(this->static_fields_layout, this->static_fields);
 
 #ifdef KLASS_DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
-	std::wcout << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
-	if (this->fields_layout.size() != 0)		std::cout << "non-static as below:" << std::endl;
+	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime FieldPool ---------------===" << std::endl;
+	sync_wcout{} << "static Field: " << this->static_fields_layout.size() << "; non-static Field: " << this->fields_layout.size() << std::endl;
+	if (this->fields_layout.size() != 0)		sync_wcout{} << "non-static as below:" << std::endl;
 	int counter = 0;
 	for (auto iter : this->fields_layout) {
-		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
+		sync_wcout{} << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
 	}
 	counter = 0;
-	if (this->static_fields_layout.size() != 0)	std::cout << "static as below:" << std::endl;
+	if (this->static_fields_layout.size() != 0)	sync_wcout{} << "static as below:" << std::endl;
 	for (auto iter : this->static_fields_layout) {
-		std::wcout << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
+		sync_wcout{} << "  #" << counter++ << "  name: " << iter.first << ", offset: " << iter.second.first << std::endl;
 	}
-	std::wcout << "===--------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -143,7 +145,6 @@ void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *load
 	} else {			// base class
 		assert(cf->constant_pool[cf->super_class-1]->tag == CONSTANT_Class);
 		wstring super_name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->super_class-1])->index-1])->convert_to_Unicode();
-		std::wcout << super_name << std::endl;
 		if (loader == nullptr) {	// bootstrap classloader do this
 			this->parent = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(super_name));
 		} else {		// my classloader do this
@@ -157,13 +158,13 @@ void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *load
 		}
 	}
 #ifdef KLASS_DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug SuperClass ---------------===" << std::endl;
+	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug SuperClass ---------------===" << std::endl;
 	if (cf->super_class == 0) {
-		std::cout << "this class is **java.lang.Object** class and doesn't have a superclass." << std::endl;
+		sync_wcout{} << "this class is **java.lang.Object** class and doesn't have a superclass." << std::endl;
 	} else {
-		std::wcout << "superclass:  #" << cf->super_class << ", name: " << this->parent->get_name() << std::endl;
+		sync_wcout{} << "superclass:  #" << cf->super_class << ", name: " << this->parent->get_name() << std::endl;
 	}
-	std::cout << "===-------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===-------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -184,13 +185,13 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 		this->interfaces.insert(make_pair(interface_name, interface));
 	}
 #ifdef KLASS_DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime InterfacePool ---------------===" << std::endl;
-	std::wcout << "interfaces: total " << this->interfaces.size() << std::endl;
+	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime InterfacePool ---------------===" << std::endl;
+	sync_wcout{} << "interfaces: total " << this->interfaces.size() << std::endl;
 	int counter = 0;
 	for (auto iter : this->interfaces) {
-		std::wcout << "  #" << counter++ << "  name: " << iter.first << std::endl;
+		sync_wcout{} << "  #" << counter++ << "  name: " << iter.first << std::endl;
 	}
-	std::wcout << "===------------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===------------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -221,13 +222,13 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 		ss.str(L"");		// make empty
 	}
 #ifdef KLASS_DEBUG
-	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
-	std::wcout << "methods: total " << this->methods.size() << std::endl;
+	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime MethodPool ---------------===" << std::endl;
+	sync_wcout{} << "methods: total " << this->methods.size() << std::endl;
 	int counter = 0;
 	for (auto iter : this->methods) {
-		std::wcout << "  #" << counter++ << "  " << iter.first << std::endl;
+		sync_wcout{} << "  #" << counter++ << "  " << iter.first << std::endl;
 	}
-	std::wcout << "===---------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===---------------------------------------------------------===" << std::endl;
 #endif
 }
 
@@ -237,7 +238,7 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
 #ifdef KLASS_DEBUG
 	// this has been deleted because lazy parsing constant_pool...
-//	std::wcout << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
+//	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
 //	this->rt_pool->print_debug();
 //	std::cout << "===------------------------------------------------------------===" << std::endl;
 #endif
@@ -356,7 +357,6 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descr
 	shared_ptr<InstanceKlass> instance_klass(shared_ptr<InstanceKlass>(this, [](auto *){}));
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
-		std::wcout << BIG_signature << std::endl;		// delete
 		// search in this->fields_layout
 		auto iter = this->fields_layout.find(BIG_signature);
 		if (iter == this->fields_layout.end()) {
@@ -469,7 +469,6 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bo
 
 shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature)
 {
-	std::wcout << this->name << std::endl;
 	if (this->name != L"java/lang/Object")			// 如果此类是 Object 类的话，默认也算作接口。	// 注意内部的分隔符变成了 '/' ！！
 		assert(this->is_interface() == true);		// TODO: 此处的 verify 应该改成抛出异常。
 	shared_ptr<Method> target;
@@ -545,9 +544,9 @@ void InstanceKlass::initialize_final_static_field()
 			auto const_val_attr = iter.second.second->get_constant_value();
 			if (const_val_attr != nullptr) {
 				int index = const_val_attr->constantvalue_index;
-				std::wcout << "ConstantValue_attribute point to index: " << index << std::endl;		// delete
+//				std::wcout << "ConstantValue_attribute point to index: " << index << std::endl;		// delete
 				auto _pair = (*this->rt_pool)[index - 1];
-				std::wcout << "initialize ConstantValue_attribute !" << std::endl;		// delete
+//				std::wcout << "initialize ConstantValue_attribute !" << std::endl;		// delete
 				switch (_pair.first) {
 					case CONSTANT_Long:{
 						this->set_static_field_value(iter.first, new LongOop(boost::any_cast<long>(_pair.second)));

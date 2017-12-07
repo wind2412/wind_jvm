@@ -95,7 +95,11 @@ public:
 	ConstantValue_attribute *get_constant_value() { return constant_value; }
 	wstring parse_signature();
 public:
-	void print() { std::wcout << name << ":" << descriptor; }
+	void print() {
+#ifdef DEBUG
+		sync_wcout{} << name << ":" << descriptor;
+#endif
+	}
 	// TODO: attributes 最后再补。
 	// TODO: 常量池要变成动态的。在此 class 变成 klass 之后，再做吧。
 	~Field_info ();

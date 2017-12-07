@@ -62,11 +62,24 @@ public:
 		}
 	}
 	static void print_table() {
-		std::wcout << "===------------- ThreadTable ----------------===" << std::endl;
+#ifdef DEBUG
+		sync_wcout{} << "===------------- ThreadTable ----------------===" << std::endl;
 		for (auto iter : get_thread_table()) {
-			std::wcout << "pthread_t :[" << iter.first << "], Thread Oop address: [" << iter.second << "]" << std::endl;
+			sync_wcout{} << "pthread_t :[" << iter.first << "], Thread Oop address: [" << iter.second << "]" << std::endl;
 		}
-		std::wcout << "===------------------------------------------===" << std::endl;
+		sync_wcout{} << "===------------------------------------------===" << std::endl;
+#endif
+	}
+	static void kill_all_except_main_thread(pthread_t main_tid) {
+		for (auto iter : get_thread_table()) {
+			if (iter.first == main_tid)	continue;
+			else {
+//				pthread_cancel(iter.first);
+				if (pthread_kill(iter.first, SIGINT) == -1) {
+					assert(false);
+				}
+			}
+		}
 	}
 };
 

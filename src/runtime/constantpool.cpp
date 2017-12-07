@@ -12,6 +12,7 @@
 #include "runtime/field.hpp"
 #include "runtime/bytecodeEngine.hpp"
 #include <string>
+#include "utils/synchronize_wcout.hpp"
 
 using std::make_pair;
 using std::wstring;
@@ -43,7 +44,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				assert(bufs[target->index-1]->tag == CONSTANT_Utf8);
 				wstring name = ((CONSTANT_Utf8_info *)bufs[target->index-1])->convert_to_Unicode();	// e.g. java/lang/Object
 				// load the class
-				std::wcout << "load class ===> " << "<" << name << ">" << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "load class ===> " << "<" << name << ">" << std::endl;
+#endif
 				shared_ptr<Klass> new_class = if_didnt_load_then_load(loader, name);	// TODO: 这里可能得到数组类！需要额外判断一下！
 				assert(new_class != nullptr);
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(new_class))));			// shared_ptr<Klass> ，不过可能可以是 InstanceKlass 或者 TypeArrayKlass 或者 ObjArrayKlass......
@@ -88,13 +91,17 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			// Methodref 和 InterfaceMethodref 的信息丢失了。他俩混杂在一块了。不知道会有什么样的后果？其实也没丢失。在 this->pool 的 pair.second.first 里边存着（逃
 			// 上边问题的解决：因为 解析 的方式不同，看下文方法的实现也不同。一个调用 get_class_method，另一个调用 get_interface_method。因此可以解除上边的疑惑。
 			if (target->tag == CONSTANT_Fieldref) {
-				std::wcout << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
 				shared_ptr<Field_info> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
 				assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
 			} else if (target->tag == CONSTANT_Methodref) {
-				std::wcout << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#endif
 				shared_ptr<Method> target;
 				if (new_class->get_type() == ClassType::ObjArrayClass || new_class->get_type() == ClassType::TypeArrayClass) {
 					target = std::static_pointer_cast<ArrayKlass>(new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。
@@ -107,7 +114,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				assert(target != nullptr);
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 			} else {	// InterfaceMethodref
-				std::wcout << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#ifdef DEBUG
+				sync_wcout{} << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
+#endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
 				shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
 				assert(target != nullptr);

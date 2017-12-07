@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include "utils/lock.hpp"
 #include "runtime/bytecodeEngine.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 class vm_thread;
 class wind_jvm;
@@ -41,7 +42,9 @@ public:
 	vm_thread(shared_ptr<Method> method, const std::list<Oop *> & arg) 	// usually `main()` or `run()` method.
 																: method(method), arg(arg), pc(0) {
 		LockGuard lg(thread_num_lock);
-		std::wcout << "this thread_no is " << all_thread_num << std::endl;		// delete
+#ifdef DEBUG
+		sync_wcout{} << "this thread_no is " << all_thread_num << std::endl;		// delete
+#endif
 		this->thread_no = all_thread_num ++;
 	}
 public:

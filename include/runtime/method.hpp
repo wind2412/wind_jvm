@@ -8,6 +8,7 @@
 #include "runtime/constantpool.hpp"
 #include "class_parser.hpp"
 #include "annotation.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 using std::wstring;
 using std::shared_ptr;
@@ -90,28 +91,30 @@ public:
 		return false;
 	}
 	void print_all_attribute_name() {		// for debug
-		std::wcout << "===-------------- print attributes name -------------------===" << std::endl;
-		std::wcout << "--- Runtime Visible Annotations: \n";
+#ifdef DEBUG
+		sync_wcout{} << "===-------------- print attributes name -------------------===" << std::endl;
+		sync_wcout{} << "--- Runtime Visible Annotations: \n";
 		if (rva != nullptr)
 			for (int i = 0; i < rva->num_annotations; i ++) {
-				std::wcout << rva->annotations[i].type << std::endl;
+				sync_wcout{} << rva->annotations[i].type << std::endl;
 			}
-		else std::wcout << "none." << std::endl;
-		std::wcout << "--- Runtime Visible Parameter Annotations: \n";
+		else sync_wcout{} << "none." << std::endl;
+		sync_wcout{} << "--- Runtime Visible Parameter Annotations: \n";
 		if (rvpa != nullptr)
 			for (int i = 0; i < num_RuntimeVisibleParameterAnnotation; i ++) {
 				for (int j = 0; j < rvpa[i].num_annotations; j ++) {
-					std::wcout << rvpa[i].annotations[j].type << std::endl;
+					sync_wcout{} << rvpa[i].annotations[j].type << std::endl;
 				}
 			}
-		else std::wcout << "none." << std::endl;
-		std::wcout << "--- Runtime Visible Type Annotations: \n";
+		else sync_wcout{} << "none." << std::endl;
+		sync_wcout{} << "--- Runtime Visible Type Annotations: \n";
 		if (rvta != nullptr)
 			for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
-				std::wcout << rvta[i].anno->type << std::endl;
+				sync_wcout{} << rvta[i].anno->type << std::endl;
 			}
-		else std::wcout << "none." << std::endl;
-		std::wcout << "===--------------------------------------------------------===" << std::endl;
+		else sync_wcout{} << "none." << std::endl;
+		sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
+#endif
 	}
 public:
 	bool operator== (const Method & rhs) const {
@@ -124,7 +127,7 @@ public:
 	const Code_attribute *get_code() { return code; }
 	shared_ptr<InstanceKlass> get_klass() { return klass; }
 	wstring parse_signature();
-	void print() { std::wcout << name << ":" << descriptor; }
+	void print() { sync_wcout{} << name << ":" << descriptor; }
 	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
 	CodeStub *get_ad() { if (ad) return &this->_ad; else return nullptr;}

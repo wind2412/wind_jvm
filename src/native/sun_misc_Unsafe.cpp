@@ -32,13 +32,17 @@ static unordered_map<wstring, void*> methods = {
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	ArrayOop *_array = (ArrayOop *)_stack.front();	_stack.pop_front();
-	std::wcout << "[arrayBaseOffset] " << _array->get_buf_offset() << std::endl;		// delete
+#ifdef DEBUG
+	sync_wcout{} << "[arrayBaseOffset] " << _array->get_buf_offset() << std::endl;		// delete
+#endif
 	_stack.push_back(new IntOop(_array->get_buf_offset()));
 }
 void JVM_ArrayIndexScale(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	ArrayOop *_array = (ArrayOop *)_stack.front();	_stack.pop_front();
-	std::wcout << "[arrayScaleOffset] " << sizeof(intptr_t) << std::endl;		// delete
+#ifdef DEBUG
+	sync_wcout{} << "[arrayScaleOffset] " << sizeof(intptr_t) << std::endl;		// delete
+#endif
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
 void JVM_AddressSize(list<Oop *> & _stack){
@@ -88,7 +92,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	int offset = outer_klass->new_instance()->get_all_field_offset(BIG_signature);			// TODO: GC!!
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) the field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
+	sync_wcout{} << "(DEBUG) the field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
 #endif
 
 	_stack.push_back(new LongOop(offset));		// 这时候万一有了 GC，我的内存布局就全都变了...
@@ -103,7 +107,7 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 	assert(obj->get_klass()->get_type() == ClassType::InstanceClass);
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) [dangerous] will get an int from obj oop:[" << obj << "], which klass_name is: [" <<
+	sync_wcout{} << "(DEBUG) [dangerous] will get an int from obj oop:[" << obj << "], which klass_name is: [" <<
 			std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_name() << "], offset: [" << offset << "]: " << std::endl;
 #endif
 	Oop *target;
@@ -119,7 +123,7 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 	int value = *((volatile int *)&((volatile IntOop *)target)->value);		// volatile
 	_stack.push_back(new IntOop(value));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) ---> int value is [" << ((IntOop *)target)->value << "] " << std::endl;
+	sync_wcout{} << "(DEBUG) ---> int value is [" << ((IntOop *)target)->value << "] " << std::endl;
 #endif
 
 }
@@ -150,7 +154,7 @@ void JVM_CompareAndSwapInt(list<Oop *> & _stack){
 	// CAS, from x86 assembly, and openjdk.
 	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)target)->value, expected) == expected));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 
@@ -167,7 +171,7 @@ void JVM_AllocateMemory(list<Oop *> & _stack){
 		_stack.push_back(new LongOop((uintptr_t)addr));		// 地址放入。不过会转成 long。
 	}
 #ifdef DEBUG
-	std::wcout << "(DEBUG) malloc size of [" << size << "] at address: [" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) malloc size of [" << size << "] at address: [" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 
@@ -179,7 +183,7 @@ void JVM_PutLong(list<Oop *> & _stack){
 	*((long *)addr) = val;
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) put long val [" << val << "] at address: [" << std::hex << addr << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) put long val [" << val << "] at address: [" << std::hex << addr << "]." << std::endl;
 #endif
 }
 
@@ -192,7 +196,7 @@ void JVM_GetByte(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(val));
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get byte val [" << std::dec << val << "] at address: [" << std::hex << addr << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) get byte val [" << std::dec << val << "] at address: [" << std::hex << addr << "]." << std::endl;
 #endif
 }
 
@@ -203,7 +207,7 @@ void JVM_FreeMemory(list<Oop *> & _stack){
 	::free((void *)addr);
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) free Memory of address: [" << std::hex << addr << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) free Memory of address: [" << std::hex << addr << "]." << std::endl;
 #endif
 }
 
@@ -258,7 +262,7 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier
 	);
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) get an Oop from address: [" << std::hex << addr << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) get an Oop from address: [" << std::hex << addr << "]." << std::endl;
 #endif
 
 	_stack.push_back(const_cast<Oop *&>(v));		// get rid of cv constrait symbol.
@@ -277,7 +281,7 @@ void JVM_CompareAndSwapObject(list<Oop *> & _stack){
 	// CAS, from x86 assembly, and openjdk.
 	_stack.push_back(new IntOop(cmpxchg((long)x, (volatile long *)&addr, (long)expected) == (long)expected));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 
@@ -296,7 +300,7 @@ void JVM_CompareAndSwapLong(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(cmpxchg(x, &((LongOop *)target)->value, expected) == expected));
 
 #ifdef DEBUG
-	std::wcout << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 

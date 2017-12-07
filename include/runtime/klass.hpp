@@ -15,6 +15,7 @@
 #include <memory>
 #include <utility>
 #include <bitset>
+#include "utils/synchronize_wcout.hpp"
 
 using std::unordered_map;
 using std::vector;

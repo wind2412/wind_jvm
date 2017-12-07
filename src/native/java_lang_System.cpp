@@ -40,7 +40,7 @@ void JVM_CurrentTimeMillis(list<Oop *> & _stack)		// static
 	}
 	_stack.push_back(new LongOop(time.tv_sec * 1000 + time.tv_usec / 1000));		// second * 10^3 + u_second / 10^3 = micro_second.
 #ifdef DEBUG
-	std::wcout << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 void JVM_NanoTime(list<Oop *> & _stack){				// static
@@ -50,7 +50,7 @@ void JVM_NanoTime(list<Oop *> & _stack){				// static
 	}
 	_stack.push_back(new LongOop(time.tv_sec * 1000 * 1000 * 1000 + time.tv_usec * 1000));		// second * 10^9 + u_second * 10^3 = nano_second.
 #ifdef DEBUG
-	std::wcout << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
+	sync_wcout{} << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
 void JVM_ArrayCopy(list<Oop *> & _stack){				// static
@@ -111,7 +111,7 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		assert(false);
 	}
 #ifdef DEBUG
-	std::wcout << "copy from objarray1[" << src_pos << "] to objarray2[" << dst_pos << "] for length: [" << length << "]." << std::endl;
+	sync_wcout{} << "copy from objarray1[" << src_pos << "] to objarray2[" << dst_pos << "] for length: [" << length << "]." << std::endl;
 #endif
 }
 void JVM_IdentityHashCode(list<Oop *> & _stack){		// static

@@ -12,6 +12,7 @@
 #include <climits>
 #include <cstring>
 #include "class_parser.hpp"
+#include "utils/synchronize_wcout.hpp"
 
 using namespace std;
 

@@ -13,6 +13,7 @@
 #include <functional>
 #include <cassert>
 #include <iostream>
+#include "utils/synchronize_wcout.hpp"
 
 using std::wstring;
 using std::unordered_map;
