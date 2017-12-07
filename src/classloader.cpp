@@ -11,7 +11,7 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
-shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// TODO: ... 如果我恶意删掉 java.lang.Object 会怎样......
+shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *)	// TODO: ... 如果我恶意删掉 java.lang.Object 会怎样......
 {
 	// TODO: add lock simply... because it will cause code very ugly...
 //	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
@@ -56,7 +56,6 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname)	// 
 				wstring _true = temp.substr(0, temp.size()-1);	// "java.lang.Object;" --> "java.lang.Object"
 				std::wcout << layer << " " << _true << std::endl;
 				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
-				std::wcout << (inner == nullptr) << std::endl;
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
@@ -129,11 +128,11 @@ void BootStrapClassLoader::print()
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
-shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
+shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
 {
 //	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
-	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {
+	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
 	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom.zxl.Haha'.
 		// TODO: 可以加上 classpath。
@@ -141,21 +140,28 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 
 		if (classmap.find(target) != classmap.end()) {
 			return classmap[target];
 		} else {
-			ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);
-			if(!f.is_open()) {
-				std::cerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
-				return nullptr;
+			std::istream *stream;
+			shared_ptr<ClassFile> cf(new ClassFile);
+			if (byte_buf == nullptr) {
+				ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);		// use `ifstream`
+				if(!f.is_open()) {
+					std::cerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
+					return nullptr;
+				}
+				stream = &f;
+			} else {		// use ByteBuffer:
+				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
+				stream = &s;
 			}
 			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
-			shared_ptr<ClassFile> cf(new ClassFile);
-			f >> *cf;
+			(*stream) >> *cf;
 			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 			// convert to a MetaClass (link)
-			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this);
+			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this, loader_mirror);	// set the Java ClassLoader's mirror!!!
 			classmap.insert(make_pair(target, newklass));
 #ifdef KLASS_DEBUG
-	BootStrapClassLoader::get_bootstrap().print();
-	MyClassLoader::get_loader().print();
+BootStrapClassLoader::get_bootstrap().print();
+MyClassLoader::get_loader().print();
 #endif
 			return newklass;
 		}
@@ -180,7 +186,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
 				if (layer == 1) {
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr, loader_mirror);	// set the Java ClassLoader's mirror!!!
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
 #ifdef KLASS_DEBUG
@@ -191,7 +197,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 
 					wstring temp_inner = classname.substr(1);		// strip one '[' only
 					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
 					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
+					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr, loader_mirror);	// use for this dimension array klass
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
@@ -202,6 +208,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 
 					return newklass;
 				}
 			} else {
+				assert(false);		// 其实我认为不可能由 MyClassLoader 去 load 一个 primitive array... BootStrap 会先做。所以这里关闭掉了。
 				assert(classname.size() == (layer + 1));	// because it is basic type, so like '[[[C', it must be [layer + 1].
 				wstring type_name = classname.substr(pos);
 				// b. parse type array

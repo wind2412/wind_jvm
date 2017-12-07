@@ -300,7 +300,7 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 	}
 }
 
-InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType classtype) : loader(loader), Klass()/*, classtype(classtype)*/
+InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, MirrorOop *java_loader, ClassType classtype) : java_loader(java_loader), loader(loader), Klass()/*, classtype(classtype)*/
 {
 	this->classtype = classtype;
 	// this_class (only name)
@@ -316,7 +316,7 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Clas
 	cf->attributes_count = 0;
 
 	// set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}), loader);
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}), java_loader);
 
 	// super_class
 	parse_superclass(cf, loader);
@@ -663,7 +663,7 @@ shared_ptr<Method> InstanceKlass::search_method_in_slot(int slot)
 }
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/
-MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *loader) {
+MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *loader) {
 	// 注意 mirrored_who 可以为 nullptr。因为在数组类使用了 new_mirror(nullptr, nullptr).
 	LockGuard lg(system_classmap_lock);
 	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
@@ -677,18 +677,15 @@ MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *
 	auto mirror = new MirrorOop(mirrored_who);
 	if (loader != nullptr) {
 		// need to initialize the `ClassLoader.class` by using ClassLoader's constructor!!
-		// TODO !!!!!!!! 这里千万别忘了写了！！！需要由 AppClassLoader 类来加载这个 Klass ！！！
-//		mirror->set_field_value(CLS L":classLoader:Ljava/lang/ClassLoader;", loader);
-//		mirror->set_field_value(CLS L":classLoader:Ljava/lang/ClassLoader;", nullptr);	// TODO: 先用 nullptr 代替了。
-		std::cerr << "**Please** load sun/misc/Launcher$AppClassLoader.class first !! " << std::endl;
-//		assert(false);
+		mirror->set_field_value(L"java/lang/Class:classLoader:Ljava/lang/ClassLoader;", loader);
+//		std::cerr << "**Please** load sun/misc/Launcher$AppClassLoader.class first !! " << std::endl;
 	}
 
 	return mirror;
 }
 
 /*===---------------    ArrayKlass    --------------------===*/
-ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), Klass()/*, classtype(classtype)*/ {
+ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), java_loader(java_loader), Klass()/*, classtype(classtype)*/ {
 	assert(dimension > 0);
 	this->classtype = classtype;		// 这个变量不能放在初始化列表中初始化，即【不能用初始化列表直接初始化 不在基类构造函数参数列表 中的 基类的 protected 成员。】。会提示：error: member initializer 'classtype' does not name a non-static data member or base class
 	// set super class
@@ -738,7 +735,7 @@ ArrayOop* ArrayKlass::new_instance(int length)
 }
 
 /*===---------------  TypeArrayKlass  --------------------===*/
-TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype) : type(type), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, classtype)
+TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype) : type(type), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
 {	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
@@ -752,49 +749,49 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 		case Type::BOOLEAN:{
 			ss << L"Z";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::BYTE:{
 			ss << L"B";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::CHAR:{
 			ss << L"C";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::SHORT:{
 			ss << L"S";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::INT:{
 			ss << L"I";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::FLOAT:{
 			ss << L"F";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::LONG:{
 			ss << L"J";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::DOUBLE:{
 			ss << L"D";
 			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		default:{
@@ -806,7 +803,7 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
 }
 
-ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, classtype)
+ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
 {
 	// 1. set name
 	wstringstream ss;
@@ -816,6 +813,6 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	ss << L"L" << element_klass->get_name() << L";";
 	this->name = ss.str();
 	// 2. set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), loader);
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 }
 

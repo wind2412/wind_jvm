@@ -116,7 +116,7 @@ MirrorOop *java_lang_class::get_basic_type_mirror(const wstring & signature) {	/
 	return nullptr;
 }
 
-void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, ClassLoader *loader) {
+void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, MirrorOop *loader_mirror) {
 	// set java_mirror
 	// this if only for Primitive Array/Primitive Type.
 	if (java_lang_class::state() != java_lang_class::Fixed) {	// java.lang.Class not loaded... delay it.
@@ -133,7 +133,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Cl
 		}
 	} else {
 		if (klass->get_type() == ClassType::InstanceClass) {
-			klass->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>(klass), loader));	// set java_mirror
+			klass->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>(klass), loader_mirror));	// set java_mirror
 		}
 		else if (klass->get_type() == ClassType::TypeArrayClass) {
 			MirrorOop *mirror;

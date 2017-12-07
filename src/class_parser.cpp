@@ -15,17 +15,17 @@
 
 using namespace std;
 
-u1 peek1(std::ifstream & f) {	// peek u1
+u1 peek1(std::istream & f) {	// peek u1
 	return f.peek();
 }
 
-u2 peek2(std::ifstream & f) {
+u2 peek2(std::istream & f) {
 	u1 first = f.get();
 	u1 second = f.peek();f.unget();
 	return ((first << 8) + second) & 0xFFFF;
 }
 
-u4 peek4(std::ifstream & f) {
+u4 peek4(std::istream & f) {
 	u1 first = f.get();
 	u1 second = f.get();
 	u1 third = f.get();
@@ -34,19 +34,19 @@ u4 peek4(std::ifstream & f) {
 	return ((first << 24) + (second << 16) + (third << 8) + forth) & 0xFFFFFFFF;
 }
 
-u1 read1(std::ifstream & f) {
+u1 read1(std::istream & f) {
 	u1 result;
 	f.read((char *)&result, sizeof(u1));
 	return result;
 }
 
-u2 read2(std::ifstream & f) {		// normal order !!!
+u2 read2(std::istream & f) {		// normal order !!!
 	u2 result;
 	f.read((char *)&result, sizeof(u2));
 	return htons(result);
 }
 
-u4 read4(std::ifstream & f) {
+u4 read4(std::istream & f) {
 	u4 result;
 	f.read((char *)&result, sizeof(u4));
 	return htonl(result);
@@ -55,14 +55,14 @@ u4 read4(std::ifstream & f) {
 /*===----------- constant pool --------------===*/
 
 // CONSTANT_CS_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_CS_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_CS_info & i) {
 	i.tag = read1(f);
 	i.index = read2(f);
 	return f;
 }
 
 // CONSTANT_FMI_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_FMI_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_FMI_info & i) {
 	i.tag = read1(f);
 	i.class_index = read2(f);
 	i.name_and_type_index = read2(f);
@@ -70,7 +70,7 @@ std::ifstream & operator >> (std::ifstream & f, CONSTANT_FMI_info & i) {
 }
 
 // CONSTANT_Integer_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_Integer_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_Integer_info & i) {
 	i.tag = read1(f);
 	i.bytes = read4(f);
 	return f;
@@ -80,7 +80,7 @@ int CONSTANT_Integer_info::get_value() {
 }
 
 // CONSTANT_Float_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_Float_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_Float_info & i) {
 	i.tag = read1(f);
 	i.bytes = read4(f);
 	return f;
@@ -98,7 +98,7 @@ float CONSTANT_Float_info::get_value() {
 }
 
 // CONSTANT_Long_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_Long_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_Long_info & i) {
 	i.tag = read1(f);
 	i.high_bytes = read4(f);
 	i.low_bytes = read4(f);
@@ -109,7 +109,7 @@ long CONSTANT_Long_info::get_value() {
 }
 
 // CONSTANT_Double_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_Double_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_Double_info & i) {
 	i.tag = read1(f);
 	i.high_bytes = read4(f);
 	i.low_bytes = read4(f);
@@ -130,7 +130,7 @@ double CONSTANT_Double_info::get_value() {
 }
 
 // CONSTANT_NameAndType_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_NameAndType_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_NameAndType_info & i) {
 	i.tag = read1(f);
 	i.name_index = read2(f);
 	i.descriptor_index = read2(f);
@@ -138,7 +138,7 @@ std::ifstream & operator >> (std::ifstream & f, CONSTANT_NameAndType_info & i) {
 }
 
 // CONSTANT_Utf8_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_Utf8_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_Utf8_info & i) {
 	i.tag = read1(f);
 	i.length = read2(f);
 	i.bytes = new u1[i.length];
@@ -212,7 +212,7 @@ std::wstring CONSTANT_Utf8_info::convert_to_Unicode() {
 CONSTANT_Utf8_info::~CONSTANT_Utf8_info() { if (bytes != nullptr)	delete bytes; }
 
 // CONSTANT_MethodHandle_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_MethodHandle_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_MethodHandle_info & i) {
 	i.tag = read1(f);
 	i.reference_kind = read1(f);
 	i.reference_index = read2(f);
@@ -220,14 +220,14 @@ std::ifstream & operator >> (std::ifstream & f, CONSTANT_MethodHandle_info & i) 
 }
 
 // CONSTANT_MethodType_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_MethodType_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_MethodType_info & i) {
 	i.tag = read1(f);
 	i.descriptor_index = read2(f);
 	return f;
 }
 
 // CONSTANT_InvokeDynamic_info
-std::ifstream & operator >> (std::ifstream & f, CONSTANT_InvokeDynamic_info & i) {
+std::istream & operator >> (std::istream & f, CONSTANT_InvokeDynamic_info & i) {
 	i.tag = read1(f);
 	i.bootstrap_method_attr_index = read2(f);
 	i.name_and_type_index = read2(f);
@@ -373,15 +373,15 @@ void print_constant_pool(cp_info **bufs, int length) {	// constant pool length
 /*===------------ Field && Method --------------===*/
 
 // attribute_info
-std::ifstream & operator >> (std::ifstream & f, attribute_info & i) {
+std::istream & operator >> (std::istream & f, attribute_info & i) {
 	i.attribute_name_index = read2(f);
 	i.attribute_length = read4(f);
 	return f;
 }
 
 // field_info
-//std::ifstream & operator >> (std::ifstream & f, field_info & i) {
-void field_info::fill(std::ifstream & f, cp_info **constant_pool) {
+//std::istream & operator >> (std::istream & f, field_info & i) {
+void field_info::fill(std::istream & f, cp_info **constant_pool) {
 	access_flags = read2(f);
 	name_index = read2(f);
 	descriptor_index = read2(f);
@@ -402,8 +402,8 @@ field_info::~field_info() {
 }
 
 // method_info
-//std::ifstream & operator >> (std::ifstream & f, method_info & i) {
-void method_info::fill(std::ifstream & f, cp_info **constant_pool) {
+//std::istream & operator >> (std::istream & f, method_info & i) {
+void method_info::fill(std::istream & f, cp_info **constant_pool) {
 	access_flags = read2(f);
 	name_index = read2(f);
 	descriptor_index = read2(f);
@@ -454,7 +454,7 @@ std::unordered_map<std::wstring, int> attribute_table {
 
 
 // aux function
-int peek_attribute(u2 attribute_name_index, cp_info **constant_pool) {	// look ahead ifstream to see which attribute the next is.
+int peek_attribute(u2 attribute_name_index, cp_info **constant_pool) {	// look ahead istream to see which attribute the next is.
 	assert(constant_pool[attribute_name_index-1]->tag == CONSTANT_Utf8);		// must be a UTF8 tag.
 	std::wstring str = ((CONSTANT_Utf8_info *)constant_pool[attribute_name_index-1])->convert_to_Unicode();
 	if(attribute_table.find(str) != attribute_table.end()) {
@@ -467,7 +467,7 @@ int peek_attribute(u2 attribute_name_index, cp_info **constant_pool) {	// look a
 }
 
 // ConstantValue_attribute
-std::ifstream & operator >> (std::ifstream & f, ConstantValue_attribute & i) {
+std::istream & operator >> (std::istream & f, ConstantValue_attribute & i) {
 	f >> *((attribute_info *)&i);		// force to invoke [attribute_info class]'s [friend operator >> ].
 	i.constantvalue_index = read2(f);
 //	i.attribute_length = 2;		// ??? should be input or not ??????
@@ -475,15 +475,15 @@ std::ifstream & operator >> (std::ifstream & f, ConstantValue_attribute & i) {
 }
 
 // Code_attribute
-std::ifstream & operator >> (std::ifstream & f, Code_attribute::exception_table_t & i) {
+std::istream & operator >> (std::istream & f, Code_attribute::exception_table_t & i) {
 	i.start_pc = read2(f);
 	i.end_pc = read2(f);
 	i.handler_pc = read2(f);
 	i.catch_type = read2(f);
 	return f;
 }
-void Code_attribute::fill(std::ifstream & f, cp_info **constant_pool) {
-//	friend std::ifstream & operator >> (std::ifstream & f, Code_attribute & i) {		// because we need constant pool. so operator >> 's arguments are not enough. so we should cancel the operator >> and subsitute it with a funciton with 3 argument: this, f, and constant pool....
+void Code_attribute::fill(std::istream & f, cp_info **constant_pool) {
+//	friend std::istream & operator >> (std::istream & f, Code_attribute & i) {		// because we need constant pool. so operator >> 's arguments are not enough. so we should cancel the operator >> and subsitute it with a funciton with 3 argument: this, f, and constant pool....
 	f >> *((attribute_info *)this);
 	max_stack = read2(f);
 	max_locals = read2(f);
@@ -503,7 +503,7 @@ void Code_attribute::fill(std::ifstream & f, cp_info **constant_pool) {
 	if (attributes_count != 0)
 		attributes = new attribute_info*[attributes_count];
 	for(int pos = 0; pos < attributes_count; pos ++) {
-		attribute_info* new_attribute(std::ifstream &, cp_info **);
+		attribute_info* new_attribute(std::istream &, cp_info **);
 		attributes[pos] = new_attribute(f, constant_pool);
 	}
 }
@@ -530,51 +530,51 @@ Code_attribute::~Code_attribute() {
 #define ITEM_Uninitialized		8
 
 // StackMapTable_attribute
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::verification_type_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::verification_type_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Top_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Top_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Integer_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Integer_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Float_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Float_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Double_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Double_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Long_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Long_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Null_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Null_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::UninitializedThis_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::UninitializedThis_variable_info & i) {
 	i.tag = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Object_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Object_variable_info & i) {
 	i.tag = read1(f);
 	i.cpool_index = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::Uninitialized_variable_info & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::Uninitialized_variable_info & i) {
 	i.tag = read1(f);
 	i.offset = read2(f);
 	return f;
 }
 	
 // StackMapTable aux function
-static StackMapTable_attribute::verification_type_info* create_verification_type(std::ifstream & f) {		// static 的函数竟然能够直接访问内部非 static 的类......emmmmm。
+static StackMapTable_attribute::verification_type_info* create_verification_type(std::istream & f) {		// static 的函数竟然能够直接访问内部非 static 的类......emmmmm。
 	u1 verification_tag = peek1(f);
 	
 	switch (verification_tag) {
@@ -629,38 +629,38 @@ static StackMapTable_attribute::verification_type_info* create_verification_type
 		}
 	}
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::stack_map_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::stack_map_frame & i) {
 	i.frame_type = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::same_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::same_frame & i) {
 	i.frame_type = read1(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::same_locals_1_stack_item_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::same_locals_1_stack_item_frame & i) {
 	i.frame_type = read1(f);
 	i.stack[0] = create_verification_type(f);
 	return f;
 }
 StackMapTable_attribute::same_locals_1_stack_item_frame::~same_locals_1_stack_item_frame() { delete stack[0]; }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::same_locals_1_stack_item_frame_extended & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::same_locals_1_stack_item_frame_extended & i) {
 	i.frame_type = read1(f);
 	i.offset_delta = read2(f);
 	i.stack[0] = create_verification_type(f);
 	return f;
 }
 StackMapTable_attribute::same_locals_1_stack_item_frame_extended::~same_locals_1_stack_item_frame_extended() { delete stack[0]; }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::chop_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::chop_frame & i) {
 	i.frame_type = read1(f);
 	i.offset_delta = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::same_frame_extended & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::same_frame_extended & i) {
 	i.frame_type = read1(f);
 	i.offset_delta = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::append_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::append_frame & i) {
 	i.frame_type = read1(f);
 	i.offset_delta = read2(f);
 	if (i.frame_type - 251 != 0)
@@ -678,7 +678,7 @@ StackMapTable_attribute::append_frame::~append_frame() {
 		delete[] locals;
 	}
 }
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute::full_frame & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute::full_frame & i) {
 	i.frame_type = read1(f);
 	i.offset_delta = read2(f);
 	i.number_of_locals = read2(f);
@@ -711,7 +711,7 @@ StackMapTable_attribute::full_frame::~full_frame() {
 }
 	
 // StackMapTable aux function
-static StackMapTable_attribute::stack_map_frame* peek_stackmaptable_frame(std::ifstream & f) {
+static StackMapTable_attribute::stack_map_frame* peek_stackmaptable_frame(std::istream & f) {
 	u1 frame_type = peek1(f);
 	if (frame_type >= 0 && frame_type <= 63) {
 		auto *frame = new StackMapTable_attribute::same_frame;
@@ -748,7 +748,7 @@ static StackMapTable_attribute::stack_map_frame* peek_stackmaptable_frame(std::i
 }
 	
 // per se ---- StackMapTable
-std::ifstream & operator >> (std::ifstream & f, StackMapTable_attribute & i) {
+std::istream & operator >> (std::istream & f, StackMapTable_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.number_of_entries = read2(f);
 	if (i.number_of_entries != 0)
@@ -768,7 +768,7 @@ StackMapTable_attribute::~StackMapTable_attribute() {
 }
 
 // Exceptions_attribute
-std::ifstream & operator >> (std::ifstream & f, Exceptions_attribute & i) {
+std::istream & operator >> (std::istream & f, Exceptions_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.number_of_exceptions = read2(f);
 	if (i.number_of_exceptions != 0)
@@ -781,14 +781,14 @@ std::ifstream & operator >> (std::ifstream & f, Exceptions_attribute & i) {
 Exceptions_attribute::~Exceptions_attribute() { delete[] exception_index_table; }
 
 // InnerClasses_attribute
-std::ifstream & operator >> (std::ifstream & f, InnerClasses_attribute::classes_t & i) {
+std::istream & operator >> (std::istream & f, InnerClasses_attribute::classes_t & i) {
 	i.inner_class_info_index = read2(f);
 	i.outer_class_info_index = read2(f);
 	i.inner_name_index = read2(f);
 	i.inner_class_access_flags = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, InnerClasses_attribute & i) {
+std::istream & operator >> (std::istream & f, InnerClasses_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.number_of_classes = read2(f);
 	// struct classes_t has no polymorphism. so dont need to define: `struct classes_t **classes`, use `struct classes_t *class` is okay.
@@ -802,7 +802,7 @@ std::ifstream & operator >> (std::ifstream & f, InnerClasses_attribute & i) {
 InnerClasses_attribute::~InnerClasses_attribute() { delete[] classes; }
 
 // EnclosingMethod_attribute
-std::ifstream & operator >> (std::ifstream & f, EnclosingMethod_attribute & i) {
+std::istream & operator >> (std::istream & f, EnclosingMethod_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.class_index = read2(f);
 	i.method_index = read2(f);
@@ -810,27 +810,27 @@ std::ifstream & operator >> (std::ifstream & f, EnclosingMethod_attribute & i) {
 }
 
 // Synthetic_attribute
-std::ifstream & operator >> (std::ifstream & f, Synthetic_attribute & i) {
+std::istream & operator >> (std::istream & f, Synthetic_attribute & i) {
 	f >> *((attribute_info *)&i);
 	return f;
 }
 
 // Signature_attribute
-std::ifstream & operator >> (std::ifstream & f, Signature_attribute & i) {
+std::istream & operator >> (std::istream & f, Signature_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.signature_index = read2(f);
 	return f;
 }
 
 // SourceFile_attribute
-std::ifstream & operator >> (std::ifstream & f, SourceFile_attribute & i) {
+std::istream & operator >> (std::istream & f, SourceFile_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.sourcefile_index = read2(f);
 	return f;
 }
 
 // SourceDebugExtension_attribute
-std::ifstream & operator >> (std::ifstream & f, SourceDebugExtension_attribute & i) {
+std::istream & operator >> (std::istream & f, SourceDebugExtension_attribute & i) {
 	f >> *((attribute_info *)&i);
 	if (i.attribute_length != 0)
 		i.debug_extension = new u1[i.attribute_length];
@@ -840,12 +840,12 @@ std::ifstream & operator >> (std::ifstream & f, SourceDebugExtension_attribute &
 SourceDebugExtension_attribute::~SourceDebugExtension_attribute() { delete[] debug_extension; }
 
 // LineNumberTable_attribute
-std::ifstream & operator >> (std::ifstream & f, LineNumberTable_attribute::line_number_table_t & i) {
+std::istream & operator >> (std::istream & f, LineNumberTable_attribute::line_number_table_t & i) {
 	i.start_pc = read2(f);
 	i.line_number = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, LineNumberTable_attribute & i) {
+std::istream & operator >> (std::istream & f, LineNumberTable_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.line_number_table_length = read2(f);
 	if (i.line_number_table_length != 0)
@@ -858,7 +858,7 @@ std::ifstream & operator >> (std::ifstream & f, LineNumberTable_attribute & i) {
 LineNumberTable_attribute::~LineNumberTable_attribute() { delete[] line_number_table; }
 
 // LocalVariableTable_attribute
-std::ifstream & operator >> (std::ifstream & f, LocalVariableTable_attribute::local_variable_table_t & i) {
+std::istream & operator >> (std::istream & f, LocalVariableTable_attribute::local_variable_table_t & i) {
 	i.start_pc = read2(f);
 	i.length = read2(f);
 	i.name_index = read2(f);
@@ -866,7 +866,7 @@ std::ifstream & operator >> (std::ifstream & f, LocalVariableTable_attribute::lo
 	i.index = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, LocalVariableTable_attribute & i) {
+std::istream & operator >> (std::istream & f, LocalVariableTable_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.local_variable_table_length = read2(f);
 	if (i.local_variable_table_length != 0)
@@ -879,7 +879,7 @@ std::ifstream & operator >> (std::ifstream & f, LocalVariableTable_attribute & i
 LocalVariableTable_attribute::~LocalVariableTable_attribute() { delete[] local_variable_table; }
 
 // LocalVariableTypeTable_attribute
-std::ifstream & operator >> (std::ifstream & f, LocalVariableTypeTable_attribute::local_variable_type_table_t & i) {
+std::istream & operator >> (std::istream & f, LocalVariableTypeTable_attribute::local_variable_type_table_t & i) {
 	i.start_pc = read2(f);
 	i.length = read2(f);
 	i.name_index = read2(f);
@@ -887,7 +887,7 @@ std::ifstream & operator >> (std::ifstream & f, LocalVariableTypeTable_attribute
 	i.index = read2(f);
 	return f;
 }
-std::ifstream & operator >> (std::ifstream & f, LocalVariableTypeTable_attribute & i) {
+std::istream & operator >> (std::istream & f, LocalVariableTypeTable_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.local_variable_type_table_length = read2(f);
 	if (i.local_variable_type_table_length != 0)
@@ -900,21 +900,21 @@ std::ifstream & operator >> (std::ifstream & f, LocalVariableTypeTable_attribute
 LocalVariableTypeTable_attribute::~LocalVariableTypeTable_attribute() { delete[] local_variable_type_table; }
 
 // Deprecated_attribute
-std::ifstream & operator >> (std::ifstream & f, Deprecated_attribute & i) {
+std::istream & operator >> (std::istream & f, Deprecated_attribute & i) {
 	f >> *((attribute_info *)&i);
 	return f;
 }
 
 // element_value
 
-std::ifstream & operator >> (std::ifstream & f, const_value_t & i) {
+std::istream & operator >> (std::istream & f, const_value_t & i) {
 	i.const_value_index = read2(f);
 	// CodeStub
 	i.stub.inject(i.const_value_index);
 	return f;	
 }
 
-std::ifstream & operator >> (std::ifstream & f, enum_const_value_t & i) {
+std::istream & operator >> (std::istream & f, enum_const_value_t & i) {
 	i.type_name_index = read2(f);
 	i.const_name_index = read2(f);
 	// CodeStub
@@ -923,14 +923,14 @@ std::ifstream & operator >> (std::ifstream & f, enum_const_value_t & i) {
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, class_info_t & i) {
+std::istream & operator >> (std::istream & f, class_info_t & i) {
 	i.class_info_index = read2(f);
 	// CodeStub
 	i.stub.inject(i.class_info_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, array_value_t & i) {
+std::istream & operator >> (std::istream & f, array_value_t & i) {
 	i.num_values = read2(f);
 	if (i.num_values != 0)		// 这里写成了 i.values...... 本来就是 nullptr 是 0 ....... 结果调了一个小时...... 一直显示在下边 f >> i.values[pos] 进入函数中的第一行出错...... 唉（ 还以为是标准库错了（逃 我真是个白痴（打脸
 		i.values = new element_value[i.num_values];
@@ -946,7 +946,7 @@ std::ifstream & operator >> (std::ifstream & f, array_value_t & i) {
 }
 array_value_t::~array_value_t() { delete[] values; }		// 本来没有问题却说 array_value_t 内部的构造函数被删除了。但我估计应该是 annotation 不完全类型的原因。明天重构，把 .h 和 .c 分开来。
 
-std::ifstream & operator >> (std::ifstream & f, element_value & i) {
+std::istream & operator >> (std::istream & f, element_value & i) {
 	i.tag = read1(f);
 	switch ((char)i.tag) {
 		case 'B':
@@ -995,7 +995,7 @@ std::ifstream & operator >> (std::ifstream & f, element_value & i) {
 element_value::~element_value() { delete value; }
 	
 // annotation
-std::ifstream & operator >> (std::ifstream & f, annotation::element_value_pairs_t & i) {
+std::istream & operator >> (std::istream & f, annotation::element_value_pairs_t & i) {
 	i.element_name_index = read2(f);
 	f >> i.value;
 	// CodeStub
@@ -1004,7 +1004,7 @@ std::ifstream & operator >> (std::ifstream & f, annotation::element_value_pairs_
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, annotation & i) {
+std::istream & operator >> (std::istream & f, annotation & i) {
 	i.type_index = read2(f);
 	i.num_element_value_pairs = read2(f);
 	if (i.num_element_value_pairs != 0)
@@ -1024,21 +1024,21 @@ std::ifstream & operator >> (std::ifstream & f, annotation & i) {
 annotation::~annotation() { delete[] element_value_pairs; }
 
 // type_annotation
-std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::type_parameter_target & i) {
 	i.type_parameter_index = read1(f);
 	// CodeStub
 	i.stub.inject(i.type_parameter_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::supertype_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::supertype_target & i) {
 	i.supertype_index = read2(f);
 	// CodeStub
 	i.stub.inject(i.supertype_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_bound_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::type_parameter_bound_target & i) {
 	i.type_parameter_index = read1(f);
 	i.bound_index = read1(f);
 	// CodeStub
@@ -1047,25 +1047,25 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_parameter_
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::empty_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::empty_target & i) {
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::formal_parameter_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::formal_parameter_target & i) {
 	i.formal_parameter_index = read1(f);
 	// CodeStub
 	i.stub.inject(i.formal_parameter_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::throws_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::throws_target & i) {
 	i.throws_type_index = read2(f);
 	// CodeStub
 	i.stub.inject(i.throws_type_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target::table_t & i) {
+std::istream & operator >> (std::istream & f, type_annotation::localvar_target::table_t & i) {
 	i.start_pc = read2(f);
 	i.length = read2(f);
 	i.index = read2(f);
@@ -1076,7 +1076,7 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::localvar_target & i) {
 	i.table_length = read2(f);
 	if (i.table_length != 0)
 		i.table = new type_annotation::localvar_target::table_t[i.table_length];
@@ -1093,21 +1093,21 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::localvar_target
 
 type_annotation::localvar_target::~localvar_target()	{ delete[] table; }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::catch_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::catch_target & i) {
 	i.exception_table_index = read2(f);
 	// CodeStub
 	i.stub.inject(i.exception_table_index);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::offset_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::offset_target & i) {
 	i.offset = read2(f);
 	// CodeStub
 	i.stub.inject(i.offset);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::type_argument_target & i) {
+std::istream & operator >> (std::istream & f, type_annotation::type_argument_target & i) {
 	i.offset = read2(f);
 	i.type_argument_index = read1(f);
 	// CodeStub
@@ -1116,7 +1116,7 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_argument_t
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path::path_t & i) {
+std::istream & operator >> (std::istream & f, type_annotation::type_path::path_t & i) {
 	i.type_path_kind = read1(f);
 	i.type_argument_index = read1(f);
 	// CodeStub
@@ -1125,7 +1125,7 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path::path
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path & i) {
+std::istream & operator >> (std::istream & f, type_annotation::type_path & i) {
 	i.path_length = read1(f);
 	if (i.path_length != 0)
 		i.path = new type_annotation::type_path::path_t[i.path_length];
@@ -1142,7 +1142,7 @@ std::ifstream & operator >> (std::ifstream & f, type_annotation::type_path & i) 
 
 type_annotation::type_path::~type_path() { delete[] path; }
 
-std::ifstream & operator >> (std::ifstream & f, type_annotation & i) {
+std::istream & operator >> (std::istream & f, type_annotation & i) {
 	i.target_type = read1(f);
 	if (i.target_type == 0x00 || i.target_type == 0x01) {
 		auto *result = new type_annotation::type_parameter_target;
@@ -1204,7 +1204,7 @@ type_annotation::~type_annotation() {
 	delete anno;
 }
 
-std::ifstream & operator >> (std::ifstream & f, parameter_annotations_t & i) {
+std::istream & operator >> (std::istream & f, parameter_annotations_t & i) {
 	i.num_annotations = read2(f);
 	if (i.num_annotations != 0)
 		i.annotations = new annotation[i.num_annotations];
@@ -1221,7 +1221,7 @@ std::ifstream & operator >> (std::ifstream & f, parameter_annotations_t & i) {
 
 parameter_annotations_t::~parameter_annotations_t() { delete[] annotations; }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeVisibleAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.parameter_annotations;
 	// check
@@ -1231,7 +1231,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleAnnotations_attrib
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeInvisibleAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.parameter_annotations;
 	// check
@@ -1240,7 +1240,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleAnnotations_attr
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleParameterAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeVisibleParameterAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.num_parameters = read1(f);
 	if (i.num_parameters != 0)
@@ -1264,7 +1264,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleParameterAnnotatio
 }
 RuntimeVisibleParameterAnnotations_attribute::~RuntimeVisibleParameterAnnotations_attribute() { delete[] parameter_annotations; }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleParameterAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeInvisibleParameterAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.num_parameters = read1(f);
 	if (i.num_parameters != 0)	
@@ -1283,7 +1283,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleParameterAnnotat
 }
 RuntimeInvisibleParameterAnnotations_attribute::~RuntimeInvisibleParameterAnnotations_attribute() { delete[] parameter_annotations; }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleTypeAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeVisibleTypeAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.num_annotations = read2(f);
 	if (i.num_annotations != 0)
@@ -1302,7 +1302,7 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeVisibleTypeAnnotations_at
 }
 RuntimeVisibleTypeAnnotations_attribute::~RuntimeVisibleTypeAnnotations_attribute() { delete[] annotations; }
 
-std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleTypeAnnotations_attribute & i) {
+std::istream & operator >> (std::istream & f, RuntimeInvisibleTypeAnnotations_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.num_annotations = read2(f);
 	if (i.num_annotations != 0)
@@ -1321,13 +1321,13 @@ std::ifstream & operator >> (std::ifstream & f, RuntimeInvisibleTypeAnnotations_
 }
 RuntimeInvisibleTypeAnnotations_attribute::~RuntimeInvisibleTypeAnnotations_attribute() { delete[] annotations; }
 
-std::ifstream & operator >> (std::ifstream & f, AnnotationDefault_attribute & i) {
+std::istream & operator >> (std::istream & f, AnnotationDefault_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.default_value;
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, BootstrapMethods_attribute::bootstrap_methods_t & i) {
+std::istream & operator >> (std::istream & f, BootstrapMethods_attribute::bootstrap_methods_t & i) {
 	i.bootstrap_method_ref = read2(f);
 	i.num_bootstrap_arguments = read2(f);
 	if (i.num_bootstrap_arguments != 0)
@@ -1339,7 +1339,7 @@ std::ifstream & operator >> (std::ifstream & f, BootstrapMethods_attribute::boot
 }
 BootstrapMethods_attribute::bootstrap_methods_t::~bootstrap_methods_t() { delete[] bootstrap_arguments; }
 
-std::ifstream & operator >> (std::ifstream & f, BootstrapMethods_attribute & i) {
+std::istream & operator >> (std::istream & f, BootstrapMethods_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.num_bootstrap_methods = read2(f);
 	if (i.num_bootstrap_methods != 0)
@@ -1351,13 +1351,13 @@ std::ifstream & operator >> (std::ifstream & f, BootstrapMethods_attribute & i) 
 }
 BootstrapMethods_attribute::~BootstrapMethods_attribute() { delete[] bootstrap_methods; }
 
-std::ifstream & operator >> (std::ifstream & f, MethodParameters_attribute::parameters_t & i) {
+std::istream & operator >> (std::istream & f, MethodParameters_attribute::parameters_t & i) {
 	i.name_index = read2(f);
 	i.access_flags = read2(f);
 	return f;
 }
 
-std::ifstream & operator >> (std::ifstream & f, MethodParameters_attribute & i) {
+std::istream & operator >> (std::istream & f, MethodParameters_attribute & i) {
 	f >> *((attribute_info *)&i);
 	i.parameters_count = read1(f);
 	if (i.parameters_count != 0)
@@ -1370,7 +1370,7 @@ std::ifstream & operator >> (std::ifstream & f, MethodParameters_attribute & i) 
 MethodParameters_attribute::~MethodParameters_attribute() { delete[] parameters; }
 
 // aux function2
-attribute_info* new_attribute(std::ifstream & f, cp_info **constant_pool) {		// new an attribute from ifstream using `peek`
+attribute_info* new_attribute(std::istream & f, cp_info **constant_pool) {		// new an attribute from istream using `peek`
 	u2 attribute_name_index = peek2(f);
 	int attribute_tag = peek_attribute(attribute_name_index, constant_pool);
 	switch (attribute_tag) {
@@ -2651,7 +2651,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 
 /*===----------- .class ----------------===*/
 
-std::ifstream & operator >> (std::ifstream & f, ClassFile & cf) {
+std::istream & operator >> (std::istream & f, ClassFile & cf) {
 	
 	cf.parse_header(f);
 	cf.parse_constant_pool(f);
@@ -2688,7 +2688,7 @@ ClassFile::~ClassFile() {
 	// todo: delete others memory !!!!!!!!!!!
 }
 
-void ClassFile::parse_header(std::ifstream & f) {
+void ClassFile::parse_header(std::istream & f) {
 	// for header
 	f.read((char *)&magic, sizeof(magic));
 	magic = htonl(magic);
@@ -2707,7 +2707,7 @@ void ClassFile::parse_header(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_constant_pool(std::ifstream & f) {
+void ClassFile::parse_constant_pool(std::istream & f) {
 	// for constant pool
 	if (constant_pool_count != 1)
 		constant_pool = new cp_info*[constant_pool_count - 1];
@@ -2775,7 +2775,7 @@ void ClassFile::parse_constant_pool(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_class_msgs(std::ifstream & f) {
+void ClassFile::parse_class_msgs(std::istream & f) {
 	access_flags = read2(f);
 	this_class = read2(f);
 	super_class = read2(f);
@@ -2786,7 +2786,7 @@ void ClassFile::parse_class_msgs(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_interfaces(std::ifstream & f) {
+void ClassFile::parse_interfaces(std::istream & f) {
 	interfaces_count = read2(f);
 	if (interfaces_count != 0)	interfaces = new u2[interfaces_count];
 	for(int i = 0; i < interfaces_count; i ++) {
@@ -2805,7 +2805,7 @@ void ClassFile::parse_interfaces(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_fields(std::ifstream & f) {
+void ClassFile::parse_fields(std::istream & f) {
 	fields_count = read2(f);
 	if (fields_count != 0)
 		fields = new field_info[fields_count];
@@ -2822,7 +2822,7 @@ void ClassFile::parse_fields(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_methods(std::ifstream & f) {
+void ClassFile::parse_methods(std::istream & f) {
 	methods_count = read2(f);
 	if (methods_count != 0)
 		methods = new method_info[methods_count];
@@ -2839,7 +2839,7 @@ void ClassFile::parse_methods(std::ifstream & f) {
 #endif
 }
 
-void ClassFile::parse_attributes(std::ifstream & f) {
+void ClassFile::parse_attributes(std::istream & f) {
 	attributes_count = read2(f);
 	if (attributes_count != 0)
 		attributes = new attribute_info*[attributes_count];

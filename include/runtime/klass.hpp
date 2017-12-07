@@ -121,6 +121,7 @@ class InstanceKlass : public Klass {
 private:
 //	ClassFile *cf;		// origin non-dynamic constant pool
 	ClassLoader *loader;
+	MirrorOop *java_loader = nullptr;		// maybe the Launcher$AppClassLoader.
 
 	u2 constant_pool_count;
 	cp_info **constant_pool;			// 同样，留一个指针在这里。留作 rt_pool 的 parse 的参照标准用。
@@ -184,6 +185,7 @@ public:
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
+	MirrorOop *get_java_loader() { return this->java_loader; }
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & BIG_signature);	// [classname + ':' + name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
@@ -217,7 +219,7 @@ public:		// for reflection.
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
-	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
+	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, MirrorOop *java_loader = nullptr, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
 	~InstanceKlass();
 };
 
@@ -228,12 +230,13 @@ class MirrorKlass : public InstanceKlass {		// this class, only used to static_c
 private:
 	MirrorKlass();
 public:
-	MirrorOop *new_mirror(shared_ptr<Klass> mirrored_who, ClassLoader *loader);
+	MirrorOop *new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *loader);
 };
 
 class ArrayKlass : public Klass {
 private:
 	ClassLoader *loader;
+	MirrorOop *java_loader = nullptr;
 
 	int dimension;			// (n) dimension (this)
 	shared_ptr<Klass> higher_dimension;	// (n+1) dimension
@@ -251,13 +254,14 @@ public:
 private:
 	ArrayKlass(const ArrayKlass &);
 public:
+	MirrorOop *get_java_loader() { return this->java_loader; }
 	shared_ptr<Method> get_class_method(const wstring & signature) {	// 这里其实就是直接去 java.lang.Object 中去查找。
 		shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
 		assert(target != nullptr);
 		return target;
 	}
 public:
-	ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype);
+	ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype);
 	~ArrayKlass() {};
 };
 
@@ -269,7 +273,7 @@ public:
 private:
 	TypeArrayKlass(const TypeArrayKlass &);
 public:
-	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype = ClassType::TypeArrayClass);
+	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::TypeArrayClass);
 	~TypeArrayKlass() {};
 };
 
@@ -281,7 +285,7 @@ public:
 private:
 	ObjArrayKlass(const ObjArrayKlass &);
 public:
-	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, ClassType classtype = ClassType::ObjArrayClass);
+	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::ObjArrayClass);
 	~ObjArrayKlass() {};
 };
 

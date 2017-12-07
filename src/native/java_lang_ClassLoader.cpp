@@ -18,7 +18,7 @@
 static unordered_map<wstring, void*> methods = {
     {L"findLoadedClass0:(" STR ")" CLS,				(void *)&JVM_FindLoadedClass},
     {L"findBootstrapClass:(" STR ")" CLS,				(void *)&JVM_FindBootStrapClass},
-    {L"defineClass1:(" STR "[BIIL" PD STR ")" CLS,	(void *)&JVM_DefineClass1},
+    {L"defineClass1:(" STR "[BII" PD STR ")" CLS,	(void *)&JVM_DefineClass1},
 };
 
 void JVM_FindLoadedClass(list<Oop *> & _stack){
@@ -86,11 +86,23 @@ void JVM_DefineClass1(list<Oop *> & _stack){
 	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();		// 我忽略掉这东西了。安全机制就算了。
 	InstanceOop *source_str = (InstanceOop *)_stack.front();	_stack.pop_front();				// 这东西也算了。不过如果不是 nullptr，可以打印出来玩玩。
 
+	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
+
 	wstring klass_name = java_lang_string::stringOop_to_wstring(name);
 
-	auto klass = MyClassLoader::get_loader().loadClass(klass_name);
+	char *buf = new char[len];
+
+	for (int i = offset, j = 0; i < offset + len; i ++, j ++) {
+		buf[j] = (char)((IntOop *)(*bytes)[i])->value;
+	}
+
+	ByteStream byte_buf(buf, len);
+
+	auto klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf);
 	assert(klass != nullptr);
 	_stack.push_back(klass->get_mirror());
+
+	delete[] buf;
 
 #ifdef DEBUG
 	std::wcout << "(DEBUG) DefineClass1(): [" << klass_name << "]." << std::endl;
