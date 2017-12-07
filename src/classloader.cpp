@@ -24,7 +24,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 			// parse a ClassFile (load)
 			ifstream f(wstring_to_utf8(jl.get_sun_dir() + L"/" + target).c_str(), std::ios::binary);
 			if(!f.is_open()) {
-				std::cerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
+				std::wcerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				return nullptr;
 			}
 			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
@@ -146,16 +146,18 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 			if (byte_buf == nullptr) {
 				ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);		// use `ifstream`
 				if(!f.is_open()) {
-					std::cerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
+					std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
 					return nullptr;
 				}
-				stream = &f;
+				std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+				f >> *cf;
 			} else {		// use ByteBuffer:
 				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
-				stream = &s;
+				std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+				s >> *cf;
 			}
-			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
-			(*stream) >> *cf;
+//			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
+//			(*stream) >> *cf;		// bug report !!! 注意：*stream 是不可以的！！*直接解引用，无法触发多态！！必须用 `.` 或者 `->` 才可以！！
 			std::wcout << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 			// convert to a MetaClass (link)
 			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this, loader_mirror);	// set the Java ClassLoader's mirror!!!

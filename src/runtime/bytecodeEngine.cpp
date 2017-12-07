@@ -599,7 +599,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0x17:{		// fload		// bus error bug 的发生地！
 //				assert(false);			// 然后我在前边加了一句 assert(false)，来确定程序真的没走到这。没想到加了这一句之后，程序竟然通了！这说明加了 assert(false) 之后，clang++ 的某项优化应该失效了，所以才正常了。到时候要对比一下汇编码了。
 				int index = pc[1];
-				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 fload_0~3.
 				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::FLOAT);
 				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[index])->value));
 #ifdef DEBUG		// 去掉这一段，bus error bug 匪夷所思地消失了... 然而程序根本没走到这啊？？？？！！到底是什么情况？？？？看来应该是编译器优化的原因吗......
@@ -607,11 +607,19 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
+			case 0x18:{		// dload
+				int index = pc[1];
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 dload_0~3.
+				assert(localVariableTable[index]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[index])->get_type() == Type::DOUBLE);
+				op_stack.push(new DoubleOop(((DoubleOop *)localVariableTable[index])->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push localVariableTable[" << index << "] double: "<< ((DoubleOop *)op_stack.top())->value << " on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x19:{		// aload
 				int index = pc[1];
-				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 lload_0~3.
+				assert(localVariableTable.size() > index && index > 3);	// 如果是 3 以下，那么会用 aload_0~3.
 				if (localVariableTable[index] != nullptr)	assert(localVariableTable[index]->get_ooptype() != OopType::_BasicTypeOop);		// 因为也有可能是数组。所以只要保证不是基本类型就行。
 				op_stack.push(localVariableTable[index]);
 #ifdef DEBUG
@@ -715,6 +723,38 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				op_stack.push(new FloatOop(((FloatOop *)localVariableTable[3])->value));
 #ifdef DEBUG
 	std::wcout << "(DEBUG) push localVariableTable[3] float: "<< ((FloatOop *)op_stack.top())->value << "f on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x26:{		// dload_0
+				assert(localVariableTable[0]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[0])->get_type() == Type::DOUBLE);
+				op_stack.push(new DoubleOop(((DoubleOop *)localVariableTable[0])->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push localVariableTable[0] double: "<< ((DoubleOop *)op_stack.top())->value << "ld on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x27:{		// dload_1
+				assert(localVariableTable[1]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[1])->get_type() == Type::DOUBLE);
+				op_stack.push(new DoubleOop(((DoubleOop *)localVariableTable[1])->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push localVariableTable[1] double: "<< ((DoubleOop *)op_stack.top())->value << "ld on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x28:{		// dload_2
+				assert(localVariableTable[2]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[2])->get_type() == Type::DOUBLE);
+				op_stack.push(new DoubleOop(((DoubleOop *)localVariableTable[2])->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push localVariableTable[2] double: "<< ((DoubleOop *)op_stack.top())->value << "ld on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x29:{		// dload_3
+				assert(localVariableTable[3]->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)localVariableTable[3])->get_type() == Type::DOUBLE);
+				op_stack.push(new DoubleOop(((DoubleOop *)localVariableTable[3])->value));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) push localVariableTable[3] double: "<< ((DoubleOop *)op_stack.top())->value << "ld on stack." << std::endl;
 #endif
 				break;
 			}
@@ -837,6 +877,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[C");		// assert char[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
+				std::wcout << charsequence->get_length() << " " << index << std::endl;		// delete
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));			// TODO: ...... 我取消了 CharOop，因此造成了没法扩展......一定要回来重看...
 #ifdef DEBUG
@@ -875,6 +916,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				localVariableTable[index] = new FloatOop(ref->value);	op_stack.pop();
 #ifdef DEBUG
 		std::wcout << "(DEBUG) pop float [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
+#endif
+				break;
+			}
+			case 0x39:{		// dstore
+				int index = pc[1];
+				assert(index > 3);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				DoubleOop *ref = (DoubleOop *)op_stack.top();
+				localVariableTable[index] = new DoubleOop(ref->value);	op_stack.pop();
+#ifdef DEBUG
+		std::wcout << "(DEBUG) pop double [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
 #endif
 				break;
 			}
@@ -960,6 +1012,38 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+			case 0x47:{		// dstore_0
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				localVariableTable[0] = new DoubleOop(((DoubleOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top double: "<< ((DoubleOop *)localVariableTable[0])->value << " to localVariableTable[0] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x48:{		// dstore_1
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				localVariableTable[1] = new DoubleOop(((DoubleOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top double: "<< ((DoubleOop *)localVariableTable[1])->value << " to localVariableTable[1] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x49:{		// dstore_2
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				localVariableTable[2] = new DoubleOop(((DoubleOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top double: "<< ((DoubleOop *)localVariableTable[2])->value << " to localVariableTable[2] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x4a:{		// dstore_3
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				localVariableTable[3] = new DoubleOop(((DoubleOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	std::wcout << "(DEBUG) pop stack top double: "<< ((DoubleOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
+#endif
+				break;
+			}
 			case 0x4b:{		// astore_0
 				if (op_stack.top() != nullptr)	assert(op_stack.top()->get_ooptype() != OopType::_BasicTypeOop);
 				Oop *ref = op_stack.top();
@@ -1253,6 +1337,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 
 
+			case 0x67:{		// dsub		// TODO: 正负 0.0 到底怎么回事？？OWO
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val1 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new DoubleOop(val1 - val2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) sub double value from stack: "<< val1 << " - " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x68:{		// imul
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
@@ -1260,7 +1355,18 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				op_stack.push(new IntOop(val1 * val2));
 #ifdef DEBUG
-	std::wcout << "(DEBUG) sub int value from stack: "<< val1 << " * " << val2 << "(on top) and put " << (val1-val2) << " on stack." << std::endl;
+	std::wcout << "(DEBUG) mul int value from stack: "<< val1 << " * " << val2 << "(on top) and put " << (val1 * val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
+			case 0x69:{		// lmul
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(val1 * val2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) mul long value from stack: "<< val1 << " * " << val2 << "(on top) and put " << (val1 * val2) << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -1272,7 +1378,6 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val1 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
-
 #ifdef DEBUG
 	auto print_float = [](float val) {
 		if (val == FLOAT_NAN)	std::wcout << "NAN";
@@ -1303,6 +1408,56 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #ifdef DEBUG
 	print_float(((FloatOop *)op_stack.top())	->value);
 	std::wcout << "]." << std::endl;
+#endif
+				break;
+			}
+			case 0x6b:{		// dmul
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val1 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+
+#ifdef DEBUG
+	auto print_double = [](double val) {
+		if (val == DOUBLE_NAN)	std::wcout << "NAN";
+		else if (val == DOUBLE_INFINITY)	std::wcout << "DOUBLE_INFINITY";
+		else if (val == DOUBLE_NEGATIVE_INFINITY)	std::wcout << "DOUBLE_NEGATIVE_INFINITY";
+		else std::wcout << val;
+	};
+	std::wcout << "(DEBUG) dmul of val2: [";
+	print_double(val2);
+	std::wcout << "] and val1: [";
+	print_double(val1);
+	std::wcout << "], result is: [";
+#endif
+				if (val2 == DOUBLE_NAN || val1 == DOUBLE_NAN) {		// NAN * (any other)
+					op_stack.push(new DoubleOop(DOUBLE_NAN));		// [x] 不兼容.....[x] 注意 cmath 中的 INFINITY, -INFINITY 以及 NAN 全是针对 fp 浮点数来说的！！
+				} else if (((val2 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY) && val1 == 0.0) || ((val1 == DOUBLE_INFINITY || val1 == DOUBLE_NEGATIVE_INFINITY) && val2 == 0.0)) {
+					op_stack.push(new DoubleOop(DOUBLE_NAN));			// INFINITY * 0
+				} else if ((val2 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY) && (val1 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY)) {
+					if ((val1 == DOUBLE_INFINITY && val2 == DOUBLE_INFINITY) || (val1 == DOUBLE_NEGATIVE_INFINITY && val2 == DOUBLE_NEGATIVE_INFINITY)) {
+						op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+					} else {											// INFINITY * INFINITY
+						op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+					}
+				} else {
+					double result = val2 * val1;
+					op_stack.push(new DoubleOop(result));
+				}
+#ifdef DEBUG
+	print_double(((DoubleOop *)op_stack.top())->value);
+	std::wcout << "]." << std::endl;
+#endif
+				break;
+			}
+			case 0x6c:{		// idiv
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(val1 / val2));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) sub int value from stack: "<< val1 << " / " << val2 << "(on top) and put " << (val1 / val2) << " on stack." << std::endl;
 #endif
 				break;
 			}
@@ -1382,6 +1537,28 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+
+			case 0x74:{		// ineg
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop(-val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [ -" << val << "], result is " << ((IntOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+			case 0x75:{		// lneg
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new LongOop(-val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [ -" << val << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
+
+
+
 			case 0x78:{		// ishl
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -1420,8 +1597,18 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
+			case 0x7b:{		// lshr
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				int s = (val2 & 0x3F);
+				op_stack.push(new LongOop(val1 >> s));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val1 << " >> " << s << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 			case 0x7c:{		// iushr
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -1429,7 +1616,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 
 				int s = (val2 & 0x1F);
-				if (val1 > 0) {
+				if (val1 >= 0) {
 					op_stack.push(new IntOop(val1 >> s));
 				} else {
 					op_stack.push(new IntOop((val1 >> s)+(2 << ~s)));
@@ -1439,8 +1626,23 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x7d:{		// lushr
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
 
-
+				int s = (val2 & 0x3F);
+				if (val1 >= 0) {
+					op_stack.push(new LongOop(val1 >> s));
+				} else {
+					op_stack.push(new LongOop((val1 >> s)+(2l << ~s)));
+				}
+#ifdef DEBUG
+	std::wcout << "(DEBUG) do [" << val1 << " >> " << s << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 			case 0x7e:{		// iand
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -1535,7 +1737,15 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
+			case 0x87:{		// i2d
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new DoubleOop((double)val));
+#ifdef DEBUG
+	std::wcout << "(DEBUG) convert int: [" << val << "] to double: [" << ((DoubleOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x88:{		// l2i
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 				long val = ((LongOop*)op_stack.top())->value; op_stack.pop();

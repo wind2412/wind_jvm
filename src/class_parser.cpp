@@ -2695,7 +2695,7 @@ void ClassFile::parse_header(std::istream & f) {
 	f.read((char *)&magic, sizeof(magic));
 	magic = htonl(magic);
 	if(magic != MAGIC_NUMBER) {
-		cout << "can't recognize this file!" << endl;
+		wcout << "can't recognize this file!" << endl;
 		exit(1);
 	}
 	f.read((char *)&minor_version, sizeof(minor_version));

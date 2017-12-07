@@ -194,11 +194,15 @@ static unordered_map<wstring, void*> methods = {
 void JVM_GetClassName(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
-	Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
+	if (_this->get_mirrored_who() == nullptr) {		// primitive type
+		_stack.push_back(java_lang_string::intern(_this->get_extra()));
+	} else {
+		Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
+		_stack.push_back(str);
+	}
 #ifdef DEBUG
-	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)str) << "]." << std::endl;
+	std::wcout << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
 #endif
-	_stack.push_back(str);
 }
 void JVM_ForClassName(list<Oop *> & _stack){		// static
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
