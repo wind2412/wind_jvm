@@ -129,7 +129,7 @@ void BootStrapClassLoader::print()
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
-shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)
+shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
 {
 //	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
@@ -242,4 +242,14 @@ void MyClassLoader::print()
 		std::wcout << "  " << iter.first << std::endl;
 	}
 	std::wcout <<  "===------------------------------------------------------------------------===" << std::endl;
+}
+
+shared_ptr<Klass> MyClassLoader::find_in_classmap(const wstring & classname)
+{
+	auto iter = this->classmap.find(classname);
+	if (iter == this->classmap.end()) {
+		return nullptr;
+	} else {
+		return iter->second;
+	}
 }

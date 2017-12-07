@@ -15,6 +15,7 @@ using std::list;
 
 void JVM_FindLoadedClass(list<Oop *> & _stack);
 void JVM_FindBootStrapClass(list<Oop *> & _stack);
+void JVM_DefineClass1(list<Oop *> & _stack);
 
 
 

@@ -867,6 +867,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x38:{		// fstore
+				int index = pc[1];
+				assert(index > 3);
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				FloatOop *ref = (FloatOop *)op_stack.top();
+				localVariableTable[index] = new FloatOop(ref->value);	op_stack.pop();
+#ifdef DEBUG
+		std::wcout << "(DEBUG) pop float [" << ref->value << "] from stack, to localVariableTable[" << index << "]." << std::endl;
+#endif
+				break;
+			}
 
 
 			case 0x3a:{		// astore

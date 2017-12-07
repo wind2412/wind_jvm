@@ -55,6 +55,7 @@ public:
 	}	// singleton
 	shared_ptr<Klass> loadClass(const wstring & classname) override;
 	void print() override;
+	shared_ptr<Klass> find_in_classmap(const wstring & classname);
 };
 
 
