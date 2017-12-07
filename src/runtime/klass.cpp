@@ -652,6 +652,20 @@ vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()
 	return v;
 }
 
+vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_declared_methods()
+{
+	vector<pair<int, shared_ptr<Method>>> v;
+	for (auto iter : this->methods) {
+		if (iter.second.second->get_name() == L"<clinit>") {
+			continue;
+		} else {
+			v.push_back(iter.second);
+		}
+	}
+	assert(v.size() >= 1);		// 至少要有一个构造函数。
+	return v;
+}
+
 shared_ptr<Method> InstanceKlass::search_method_in_slot(int slot)
 {
 	for (auto iter : this->methods) {

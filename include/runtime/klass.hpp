@@ -216,6 +216,7 @@ public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 public:		// for reflection.
 	vector<pair<int, shared_ptr<Method>>> get_constructors();
+	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

@@ -47,6 +47,7 @@ using std::function;
 #define STRING				L"java/lang/String"
 #define FIELD				L"java/lang/reflect/Field"
 #define CONSTRUCTOR			L"java/lang/reflect/Constructor"
+#define METHOD				L"java/lang/reflect/Method"
 #define CLASS				L"java/lang/Class"
 #define THREAD				L"java/lang/Thread"
 #define FILEINPUTSTREAM		L"java/io/FileInputStream"

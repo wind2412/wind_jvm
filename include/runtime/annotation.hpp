@@ -40,6 +40,7 @@ struct Element_value {
 	Value_t *value = nullptr;	// [1]
 	Element_value(cp_info **constant_pool, const element_value & v);
 	~Element_value();
+	CodeStub stub;
 };
 
 // 对 annotation 的封装

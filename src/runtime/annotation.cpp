@@ -26,7 +26,7 @@ Class_info_t::Class_info_t(cp_info **constant_pool, const class_info_t & v) : cl
 	assert(constant_pool[v.class_info_index-1]->tag == CONSTANT_Utf8);
 }
 
-Element_value::Element_value(cp_info **constant_pool, const element_value & v) : tag(v.tag) {
+Element_value::Element_value(cp_info **constant_pool, const element_value & v) : tag(v.tag), stub(v.stub) {
 	switch ((char)tag) {
 		case 'B':
 		case 'C':

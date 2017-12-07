@@ -95,6 +95,7 @@ Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **cons
 				auto element_value = ((AnnotationDefault_attribute *)this->attributes[i])->default_value;
 				this->ad = (Element_value *)malloc(sizeof(Element_value));
 				constructor(this->ad, constant_pool, element_value);
+				this->_ad = ((AnnotationDefault_attribute *)this->attributes[i])->stub;
 				break;
 			}
 			case 6:
@@ -207,12 +208,24 @@ vector<MirrorOop *> Method::parse_argument_list()
 				}
 			}
 		} else if (args[i][0] == L'L') {	// InstanceOop type
-			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
+			ClassLoader *loader = this->klass->get_classloader();
+			shared_ptr<Klass> klass;
+			if (loader == nullptr) {
+				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
+			} else {
+				klass = loader->loadClass(args[i].substr(1, args[i].size() - 2));
+			}
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		} else {		// ArrayType
 			assert(args[i][0] == L'[');
-			auto klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
+			ClassLoader *loader = this->klass->get_classloader();
+			shared_ptr<Klass> klass;
+			if (loader == nullptr) {
+				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
+			} else {
+				klass = loader->loadClass(args[i]);
+			}
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		}
@@ -225,6 +238,66 @@ vector<MirrorOop *> Method::parse_argument_list()
 	std::wcout << "===--------------------------------------------------------===" << std::endl;
 #endif
 	return v;
+}
+
+MirrorOop *Method::parse_return_type()
+{
+	wstring return_type = this->return_type();
+	if (return_type.size() == 1) {		// primitive type
+		switch (return_type[0]) {
+			case L'Z':{
+				return java_lang_class::get_basic_type_mirror(L"Z");
+			}
+			case L'B':{
+				return java_lang_class::get_basic_type_mirror(L"B");
+			}
+			case L'S':{
+				return java_lang_class::get_basic_type_mirror(L"S");
+			}
+			case L'C':{
+				return java_lang_class::get_basic_type_mirror(L"C");
+			}
+			case L'I':{
+				return java_lang_class::get_basic_type_mirror(L"I");
+			}
+			case L'F':{
+				return java_lang_class::get_basic_type_mirror(L"F");
+			}
+			case L'J':{
+				return java_lang_class::get_basic_type_mirror(L"J");
+			}
+			case L'D':{
+				return java_lang_class::get_basic_type_mirror(L"D");
+			}
+			case L'V':{			// **IMPORTANT** the return type `V` is the java/lang/Void!!!
+				return BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();
+			}
+			default:{
+				assert(false);
+			}
+		}
+	} else if (return_type[0] == L'L') {	// InstanceOop type
+		ClassLoader *loader = this->klass->get_classloader();
+		shared_ptr<Klass> klass;
+		if (loader == nullptr) {
+			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type.substr(1, return_type.size() - 2));
+		} else {
+			klass = loader->loadClass(return_type.substr(1, return_type.size() - 2));
+		}
+		assert(klass != nullptr);
+		return klass->get_mirror();
+	} else {		// ArrayType
+		assert(return_type[0] == L'[');
+		ClassLoader *loader = this->klass->get_classloader();
+		shared_ptr<Klass> klass;
+		if (loader == nullptr) {
+			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type);
+		} else {
+			klass = loader->loadClass(return_type);
+		}
+		assert(klass != nullptr);
+		return klass->get_mirror();
+	}
 }
 
 int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)

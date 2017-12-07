@@ -529,11 +529,116 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 }
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+	assert(_this != nullptr);
+	assert(_this->get_mirrored_who()->get_type() == ClassType::InstanceClass);
+
+	// load java/lang/reflect/Method
+	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Method"));
+	assert(klass != nullptr);
+	auto Method_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Method;"));
+	assert(Method_arr_klass != nullptr);
+	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	assert(Byte_arr_klass != nullptr);
+
+	// get all this_klass_methods except <clinit>.	// see JDK API.
+	vector<pair<int, shared_ptr<Method>>> methods = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who())->get_declared_methods();
+
+	vector<InstanceOop *> v;
+
+	// become java/lang/reflect/Constructor
+	for (auto iter : methods) {
+		if (public_only && !iter.second->is_public())		continue;
+		shared_ptr<Method> method = iter.second;
+		auto method_oop = klass->new_instance();
+
+		method_oop->set_field_value(METHOD L":clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
+		method_oop->set_field_value(METHOD L":slot:I", new IntOop(iter.first));
+		method_oop->set_field_value(METHOD L":name:Ljava/lang/String;", java_lang_string::intern(method->get_name()));
+
+		// parse return type:
+		auto return_mirror = method->parse_return_type();
+		method_oop->set_field_value(METHOD L":returnType:Ljava/lang/Class;", return_mirror);
+
+		// parse arg list.
+		vector<MirrorOop *> args = method->parse_argument_list();
+		// create [Ljava/lang/Class arr obj.
+		shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+		auto class_array_obj = class_arr_klass->new_instance(args.size());
+		for (int i = 0; i < args.size(); i ++) {
+			(*class_array_obj)[i] = args[i];
+		}
+		method_oop->set_field_value(METHOD L":parameterTypes:[Ljava/lang/Class;", class_array_obj);
+
+
+		// parse exceptions list.
+		vector<MirrorOop *> excepts = method->if_didnt_parse_exceptions_then_parse();
+		// create [Ljava/lang/Class arr obj.
+		auto except_array_obj = class_arr_klass->new_instance(excepts.size());
+		for (int i = 0; i < excepts.size(); i ++) {
+			(*except_array_obj)[i] = excepts[i];
+		}
+		method_oop->set_field_value(METHOD L":exceptionTypes:[Ljava/lang/Class;", except_array_obj);
+
+		method_oop->set_field_value(METHOD L":modifiers:I", new IntOop(method->get_flag() & (~ACC_ANNOTATION)));
+		method_oop->set_field_value(L"java/lang/reflect/AccessibleObject:override:Z", new IntOop(false));
+		wstring template_signature = method->parse_signature();
+		if (template_signature != L"")
+			method_oop->set_field_value(METHOD L":signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
+
+		// set RuntimeVisiableAnnotations
+		CodeStub *stub = method->get_rva();		// RuntimeVisibleAnnotations' bytecode
+		if (stub) {
+			ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+			for (int i = 0; i < stub->stub.size(); i ++) {
+				(*byte_arr)[i] = new IntOop(stub->stub[i]);
+			}
+			method_oop->set_field_value(METHOD L":annotations:[B", byte_arr);
+		}
+		// set RuntimeVisiableParameterAnnotations
+		stub = method->get_rvpa();		// RuntimeVisibleParameterAnnotations' bytecode
+		if (stub) {
+			ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+			for (int i = 0; i < stub->stub.size(); i ++) {
+				(*byte_arr)[i] = new IntOop(stub->stub[i]);
+			}
+			method_oop->set_field_value(METHOD L":parameterAnnotations:[B", byte_arr);
+		}
+		// set AnnotationDefault
+		stub = method->get_ad();		// AnnotationDefault' bytecode
+		if (stub) {
+			ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
+			for (int i = 0; i < stub->stub.size(); i ++) {
+				(*byte_arr)[i] = new IntOop(stub->stub[i]);
+			}
+			method_oop->set_field_value(METHOD L":annotationDefault:[B", byte_arr);
+		}
+
+		v.push_back(method_oop);
+	}
+
+	ArrayOop *method_arr = Method_arr_klass->new_instance(v.size());
+	for (int i = 0; i < v.size(); i ++) {
+		(*method_arr)[i] = v[i];
+	}
+
+#ifdef DEBUG
+	std::wcout << "===-------------- getClassDeclaredMethods Pool (" << _this->get_mirrored_who()->get_name() << ")-------------===" << std::endl;
+	for (int i = 0; i < methods.size(); i ++) {
+		std::wcout << i << ". " << methods[i].second->get_name() << ":" << methods[i].second->get_descriptor() << std::endl;
+	}
+	std::wcout << "===--------------------------------------------------------===" << std::endl;
+#endif
+
+	_stack.push_back(method_arr);
 }
+
 void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
+	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
+
 	assert(_this != nullptr);
 	assert(_this->get_mirrored_who()->get_type() == ClassType::InstanceClass);
 
@@ -552,6 +657,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 
 	// become java/lang/reflect/Constructor
 	for (auto iter : ctors) {
+		if (public_only && !iter.second->is_public())		continue;
 		shared_ptr<Method> method = iter.second;
 		auto ctor_oop = klass->new_instance();
 
@@ -685,6 +791,8 @@ void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 		_stack.push_back(get_basic_type_mirror(L"J"));
 	} else if (basic_type_klass_name == L"double") {
 		_stack.push_back(get_basic_type_mirror(L"D"));
+	} else if (basic_type_klass_name == L"void") {		// **IMPORTANT** java/lang/Void!!
+		_stack.push_back(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror());
 	} else {
 		std::wcerr << "can't get here!" << std::endl;
 		assert(false);

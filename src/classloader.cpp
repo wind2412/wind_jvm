@@ -132,6 +132,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 {
 //	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
+	std::wcout << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
 	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
 	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom.zxl.Haha'.

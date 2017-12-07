@@ -708,6 +708,7 @@ struct RuntimeInvisibleTypeAnnotations_attribute : public attribute_info {
 struct AnnotationDefault_attribute : public attribute_info {
 	element_value default_value;
 	friend std::istream & operator >> (std::istream & f, AnnotationDefault_attribute & i);
+	CodeStub stub;
 };
 
 struct BootstrapMethods_attribute : public attribute_info {

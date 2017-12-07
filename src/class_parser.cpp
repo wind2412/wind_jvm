@@ -1324,6 +1324,8 @@ RuntimeInvisibleTypeAnnotations_attribute::~RuntimeInvisibleTypeAnnotations_attr
 std::istream & operator >> (std::istream & f, AnnotationDefault_attribute & i) {
 	f >> *((attribute_info *)&i);
 	f >> i.default_value;
+	// CodeStub
+	i.stub += i.default_value.stub;
 	return f;
 }
 

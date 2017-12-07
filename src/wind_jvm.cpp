@@ -66,8 +66,9 @@ void vm_thread::start(list<Oop *> & arg)
 	}
 }
 
-void vm_thread::execute()
+Oop *vm_thread::execute()
 {
+	Oop *all_jvm_return_value = nullptr;
 	while(!vm_stack.empty()) {		// run over when stack is empty...
 		StackFrame & cur_frame = vm_stack.back();
 		if (cur_frame.method->is_native()) {
@@ -88,11 +89,13 @@ void vm_thread::execute()
 				assert(return_val == nullptr);
 				// do nothing
 			} else {
+				all_jvm_return_value = return_val;
 				cur_frame.op_stack.push(return_val);
 			}
 		}
 		vm_stack.pop_back();	// another half push_back() is in wind_jvm() constructor.
 	}
+	return all_jvm_return_value;
 }
 
 Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
@@ -278,12 +281,28 @@ void vm_thread::init_and_do_main()
 	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
 	shared_ptr<Method> load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
 	// new a String.
-	InstanceOop *main_class = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
+	InstanceOop *main_klass = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
 
-	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_class}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_klass}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	MirrorOop *main_class_mirror = (MirrorOop *)this->execute();
+	assert(main_class_mirror->get_ooptype() == OopType::_InstanceOop);
+
+	// first execute <clinit> if has
+	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class_mirror->get_mirrored_who()), *this);
+	// get the `public static void main()`.
+	auto main_method = std::static_pointer_cast<InstanceKlass>(main_class_mirror->get_mirrored_who())->get_static_void_main();
+	// new a String[], for the arguments.
+	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
+	auto iter = system_classmap.find(L"java/lang/String.class");
+	assert(iter != system_classmap.end());
+	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
+	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
+		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
+	}
+
+	// The World's End!
+	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
-
-
 
 //	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 //
@@ -293,20 +312,8 @@ void vm_thread::init_and_do_main()
 //	assert(main_method != nullptr);
 //	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
 //
-//	// first execute <clinit> if has
-//	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class), *this);
 //	// second execute [public static void main].
 //
-//	// new a String[].
-//	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
-//	auto iter = system_classmap.find(L"java/lang/String.class");
-//	assert(iter != system_classmap.end());
-//	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
-//	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
-//		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
-//	}
-//	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
-//	this->execute();
 
 }
 

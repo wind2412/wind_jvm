@@ -62,6 +62,7 @@ private:
 
 	u2 signature_index = 0;
 	Element_value *ad = nullptr;
+	CodeStub _ad;
 //	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
 
 public:
@@ -79,6 +80,7 @@ public:
 public:
 	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();
 	vector<MirrorOop *> parse_argument_list();
+	MirrorOop *parse_return_type();
 	int get_java_source_lineno(int pc_no);
 public:
 	bool has_annotation_name_in_method(const wstring & name) {
@@ -125,6 +127,7 @@ public:
 	void print() { std::wcout << name << ":" << descriptor; }
 	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
+	CodeStub *get_ad() { if (ad) return &this->_ad; else return nullptr;}
 	int where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp);
 
 	~Method() {
