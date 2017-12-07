@@ -142,8 +142,11 @@ void JVM_Interrupt(list<Oop *> & _stack){
 }
 void JVM_IsInterrupted(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-//	BooleanOop *b1 = (BooleanOop *)_stack.front();	_stack.pop_front();			// 错！！jvm 中不能出现 BooleanOop !!!用 IntOop 代替！
-	assert(false);
+	bool _clear_interrupted = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+
+	// TODO: 暂不实现。因为还没有理解透彻。
+
+	_stack.push_back(new IntOop(false));
 }
 void JVM_HoldsLock(list<Oop *> & _stack){		// static, no this...
 	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();

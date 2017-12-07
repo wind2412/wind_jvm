@@ -41,7 +41,7 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 	((InstanceOop *)oop)->get_field_value(FILEDESCRIPTOR L":fd:I", &oop);
 	int fd = ((IntOop *)oop)->value;
 
-	assert(bytes->get_length() > offset && bytes->get_length() > (offset + len));		// ArrayIndexOutofBoundException
+	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
 
 	char *buf = new char[len];
 
@@ -49,9 +49,11 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 		buf[j] = (char)((IntOop *)(*bytes)[i])->value;
 	}
 
-	if (write(fd, buf, len) == -1) {
+	if (write(fd, buf, len) == -1) {			// TODO: 对中断进行处理！！
 		assert(false);
 	}
+
+	delete[] buf;
 }
 
 

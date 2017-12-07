@@ -49,6 +49,7 @@ using std::function;
 #define CONSTRUCTOR			L"java/lang/reflect/Constructor"
 #define CLASS				L"java/lang/Class"
 #define THREAD				L"java/lang/Thread"
+#define FILEINPUTSTREAM		L"java/io/FileInputStream"
 #define FILEOUTPUTSTREAM		L"java/io/FileOutputStream"
 #define FILEDESCRIPTOR		L"java/io/FileDescriptor"
 #define JFILE				L"java/io/File"

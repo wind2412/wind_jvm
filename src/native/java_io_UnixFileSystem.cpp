@@ -30,7 +30,23 @@ void JVM_Canonicalize0(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
-	_stack.push_back(java_lang_string::intern(boost::filesystem::canonical(java_lang_string::stringOop_to_wstring(str)).wstring()));
+	std::wstring path = java_lang_string::stringOop_to_wstring(str);
+
+	// 注意：此地略有玄机。在 jdk 源码中，FilePermission.init() 中，会向文件 xx/xxxx/xx/ 的后边加上一个 "-" 表示递归文件夹。还有一个 "*".
+	bool has_final_char = false;
+	wchar_t final_char = path[path.size() - 1];
+	if (final_char == L'*' || final_char == L'-') {
+		path.erase(path.end() - 1);		// remove the final char.
+		has_final_char = true;
+	}
+
+	wstring canonical_path = boost::filesystem::canonical(path).wstring();
+
+	if (has_final_char) {
+		canonical_path += final_char;
+	}
+
+	_stack.push_back(java_lang_string::intern(canonical_path));
 
 #ifdef DEBUG
 	std::wcout << "(DEBUG) canonical path of [" << java_lang_string::stringOop_to_wstring(str) << "] is [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
@@ -78,7 +94,6 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 	std::wcout << "(DEBUG) file: [" << path << "]'s attribute: [" << std::hex << mode << "]." << std::endl;
 #endif
 }
-
 
 
 // 返回 fnPtr.

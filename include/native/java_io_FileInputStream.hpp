@@ -14,6 +14,9 @@
 using std::list;
 
 void JVM_FIS_InitIDs(list<Oop *> & _stack);
+void JVM_Open0(list<Oop *> & _stack);
+void JVM_ReadBytes(list<Oop *> & _stack);
+void JVM_Close0(list<Oop *> & _stack);
 
 
 
