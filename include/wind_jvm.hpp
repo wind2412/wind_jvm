@@ -43,7 +43,7 @@ public:
 																: method(method), arg(arg), pc(0) {
 		LockGuard lg(thread_num_lock);
 #ifdef DEBUG
-		sync_wcout{} << "this thread_no is " << all_thread_num << std::endl;		// delete
+		sync_wcout{} << "[*]this thread_no is [" << all_thread_num << "]:" << std::endl;		// delete
 #endif
 		this->thread_no = all_thread_num ++;
 	}

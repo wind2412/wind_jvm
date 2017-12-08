@@ -125,7 +125,9 @@ void JVM_SetThreadPriority(list<Oop *> & _stack){
 	// TODO: finish it...
 }
 void JVM_Yield(list<Oop *> & _stack){			// static
-	assert(false);
+	if (sched_yield() == -1) {
+		assert(false);
+	}
 }
 void JVM_Sleep(list<Oop *> & _stack){			// static
 	LongOop *l1 = (LongOop *)_stack.front();	_stack.pop_front();

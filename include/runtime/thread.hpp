@@ -16,9 +16,11 @@
 #include <signal.h>
 #include <errno.h>
 #include "utils/lock.hpp"
+#include <utility>
 
 using std::unordered_map;
 using std::make_pair;
+using std::pair;
 
 class InstanceOop;
 
@@ -28,24 +30,32 @@ private:
 		static Lock lock;
 		return lock;
 	}
-	static unordered_map<pthread_t, InstanceOop *> & get_thread_table() {
-		static unordered_map<pthread_t, InstanceOop *> thread_table;
+	static unordered_map<pthread_t, pair<int, InstanceOop *>> & get_thread_table() {
+		static unordered_map<pthread_t, pair<int, InstanceOop *>> thread_table;
 		return thread_table;
 	}
 public:
 	static void add_a_thread(pthread_t tid, InstanceOop *_thread) {
 		LockGuard lg(get_lock());
-		get_thread_table().insert(make_pair(tid, _thread));		// Override!!!! because tid maybe the same...?
+		get_thread_table().insert(make_pair(tid, make_pair(get_thread_table().size(), _thread)));		// Override!!!! because tid maybe the same...?
 	}
 	static void remove_a_thread(pthread_t tid) {
 		LockGuard lg(get_lock());
 		get_thread_table().erase(tid);
 	}
+	static int get_threadno(pthread_t tid) {
+		LockGuard lg(get_lock());
+		auto iter = get_thread_table().find(tid);
+		if (iter != get_thread_table().end()) {
+			return (*iter).second.first;
+		}
+		return -1;
+	}
 	static InstanceOop * get_a_thread(pthread_t tid) {
 		LockGuard lg(get_lock());
 		auto iter = get_thread_table().find(tid);
 		if (iter != get_thread_table().end()) {
-			return (*iter).second;
+			return (*iter).second.second;
 		}
 		return nullptr;
 	}
@@ -65,7 +75,7 @@ public:
 #ifdef DEBUG
 		sync_wcout{} << "===------------- ThreadTable ----------------===" << std::endl;
 		for (auto iter : get_thread_table()) {
-			sync_wcout{} << "pthread_t :[" << iter.first << "], Thread Oop address: [" << iter.second << "]" << std::endl;
+			sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << iter.second.first << "] thread, Thread Oop address: [" << iter.second.second << "]" << std::endl;
 		}
 		sync_wcout{} << "===------------------------------------------===" << std::endl;
 #endif
