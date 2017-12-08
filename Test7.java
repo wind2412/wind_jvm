@@ -36,9 +36,9 @@ public class Test7 extends Thread{
 		Test7 t1 = new Test7();
 		Test7 t2 = new Test7();
 		
-//		t.start();
-//		t1.start();
-//		t2.start();
+		t.start();
+		t1.start();
+		t2.start();
 		
 		
 		Field[] field = Test7.class.getDeclaredFields();

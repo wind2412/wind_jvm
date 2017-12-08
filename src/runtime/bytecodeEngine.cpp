@@ -2755,7 +2755,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 //						exit(-1);		// 不行......整个进程全部退出，会造成此 thread 析构，把全局的东西析构了......
 						InstanceOop *thread_obj = ThreadTable::get_a_thread(pthread_self());
 						assert(thread_obj != nullptr);
-						auto final_method = std::static_pointer_cast<InstanceKlass>(thread_obj->get_klass())->get_this_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V");
+						auto final_method = std::static_pointer_cast<InstanceKlass>(thread_obj->get_klass())->get_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V", false);
 						assert(final_method != nullptr);
 						thread.add_frame_and_execute(final_method, {thread_obj, exception_obj});
 						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......
