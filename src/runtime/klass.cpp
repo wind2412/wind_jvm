@@ -761,50 +761,34 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 	switch (type) {
 		case Type::BOOLEAN:{
 			ss << L"Z";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::BYTE:{
 			ss << L"B";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::CHAR:{
 			ss << L"C";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::SHORT:{
 			ss << L"S";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::INT:{
 			ss << L"I";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::FLOAT:{
 			ss << L"F";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::LONG:{
 			ss << L"J";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		case Type::DOUBLE:{
 			ss << L"D";
-			// set java_mirror
-			java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 			break;
 		}
 		default:{
@@ -813,6 +797,8 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 		}
 	}
 	this->name = ss.str();
+	// set java_mirror
+	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
 	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
 }
 

@@ -136,7 +136,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Mi
 		}
 		else if (klass->get_type() == ClassType::TypeArrayClass) {
 			MirrorOop *mirror;
-			if ((mirror = get_basic_type_mirror(klass->get_name())) != nullptr) {
+			if ((mirror = get_basic_type_mirror(klass->get_name())) == nullptr) {
 				mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
 				get_single_basic_type_mirrors().insert(make_pair(klass->get_name(), mirror));
 			}
