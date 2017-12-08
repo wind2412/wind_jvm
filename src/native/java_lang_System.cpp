@@ -115,8 +115,8 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 #endif
 }
 void JVM_IdentityHashCode(list<Oop *> & _stack){		// static
-	Oop *obj = (Oop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	_stack.push_back(new IntOop((intptr_t)obj));
 }
 void JVM_InitProperties(list<Oop *> & _stack){		// static
 	InstanceOop *prop = (InstanceOop *)_stack.front();	_stack.pop_front();

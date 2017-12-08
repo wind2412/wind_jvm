@@ -14,6 +14,8 @@
 using std::list;
 
 void JVM_FillInStackTrace(list<Oop *> & _stack);
+void JVM_GetStackTraceDepth(list<Oop *> & _stack);
+void JVM_GetStackTraceElement(list<Oop *> & _stack);
 
 void *java_lang_throwable_search_method(const wstring & str);
 

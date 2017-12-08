@@ -23,8 +23,8 @@ public class Test7 extends Thread{
 			if (i == 10)
 				Thread.yield();
 		}
-		throw new RuntimeException();
 		System.out.println(Thread.currentThread());
+		throw new RuntimeException();
 	}
 	
 	int [][][] b = null;
@@ -33,48 +33,48 @@ public class Test7 extends Thread{
 	public static void main(String[] args) throws Throwable {
 		
 		Test7 t = new Test7();
-//		Test7 t1 = new Test7();
-//		Test7 t2 = new Test7();
+		Test7 t1 = new Test7();
+		Test7 t2 = new Test7();
 		
 		t.start();
-//		t1.start();
-//		t2.start();
+		t1.start();
+		t2.start();
 		
-//		
-//		Field[] field = Test7.class.getDeclaredFields();
-//		for (Field f : field) {
-//			System.out.println(f.getType());
+		
+		Field[] field = Test7.class.getDeclaredFields();
+		for (Field f : field) {
+			System.out.println(f.getType());
+		}
+	
+		
+		Class clzz = int.class;
+		System.out.println(clzz);
+		
+
+		Signal.handle(new Signal("INT"), new SignalHandler() {
+            public void handle(Signal sig) {
+                System.out
+                        .println("Aaarggh, a user is trying to interrupt me!!");
+                System.out
+                        .println("(throw garlic at user, say `shoo, go away')");
+            }
+        });
+		Signal.handle(new Signal("INT"), SignalHandler.SIG_IGN);
+	
+//		LauncherHelper
+//		UnixFileSystem
+		System.out.println(Float.POSITIVE_INFINITY / 0);
+		System.out.println(-0.0f == 0.0f);
+		
+		String s = new String();
+		
+//		try {
+//			s.wait();
+//		} catch (InterruptedException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
 //		}
-//	
-//		
-//		Class clzz = int.class;
-//		System.out.println(clzz);
-//		
-//
-//		Signal.handle(new Signal("INT"), new SignalHandler() {
-//            public void handle(Signal sig) {
-//                System.out
-//                        .println("Aaarggh, a user is trying to interrupt me!!");
-//                System.out
-//                        .println("(throw garlic at user, say `shoo, go away')");
-//            }
-//        });
-//		Signal.handle(new Signal("INT"), SignalHandler.SIG_IGN);
-//	
-////		LauncherHelper
-////		UnixFileSystem
-//		System.out.println(Float.POSITIVE_INFINITY / 0);
-//		System.out.println(-0.0f == 0.0f);
-//		
-//		String s = new String();
-//		
-////		try {
-////			s.wait();
-////		} catch (InterruptedException e) {
-////			// TODO Auto-generated catch block
-////			e.printStackTrace();
-////		}
-//		
+		
 		FileInputStream f = new FileInputStream("/");
 		
 		
