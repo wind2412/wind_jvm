@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
+#include "classloader.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"initIDs:()V",				(void *)&JVM_FIS_InitIDs},
@@ -61,10 +62,21 @@ void JVM_Open0(list<Oop *> & _stack){
 
 	if (ret == -1)	assert(false);
 
-	if (S_ISDIR(fd)) {		// check whether `fd` is a dir. FileInputStream.open() can only open the `file`, not `dir`.
+	if (S_ISDIR(stat.st_mode)) {		// check whether `fd` is a dir. FileInputStream.open() can only open the `file`, not `dir`.
 		close(fd);
 		// throw FileNotFoundException: xxx is a directory.
-		assert(false);
+		auto excp_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/FileNotFoundException"));
+		auto excp_obj = excp_klass->new_instance();
+		vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
+		thread.set_exception_at_last_second_frame();		// set exception.
+		auto init_method = excp_klass->get_this_class_method(L"<init>:(Ljava/lang/String;)V");
+		assert(init_method != nullptr);
+		std::string msg0(filename);
+		wstring msg = utf8_to_wstring(msg0);
+		msg += L" (Is a directory)";
+		thread.add_frame_and_execute(init_method, {excp_obj, java_lang_string::intern(msg)});
+		_stack.push_back(excp_obj);
+		return;
 	}
 
 	// inject into FileInputStream.fd !!

@@ -58,7 +58,7 @@ void JVM_StartThread(list<Oop *> & _stack){		// static
 	}
 	wind_jvm::lock().unlock();
 	// start!
-	new_thread->launch();
+	new_thread->launch(_this);
 }
 
 void JVM_StopThread(list<Oop *> & _stack){

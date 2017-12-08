@@ -21,18 +21,19 @@ int all_thread_num;
 
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
+	if (real->cur_thread_obj != nullptr) {
+		ThreadTable::add_a_thread(pthread_self(), real->cur_thread_obj);		// the cur_thread_obj is from `java/lang/Thread.start0()`.
+	}
 	real->thread->start(*real->arg);
 	return nullptr;
 };
 
-void vm_thread::launch()
+void vm_thread::launch(InstanceOop *cur_thread_obj)
 {
 	// start one thread
 	p.thread = this;
 	p.arg = &const_cast<std::list<Oop *> &>(arg);
-
-	// 在这里，需要初始化全局变量。线程还没有开启。
-	init_native();
+	p.cur_thread_obj = cur_thread_obj;
 
 	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
@@ -386,5 +387,9 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 		init_thread = &wind_jvm::threads().back();
 	}
 	wind_jvm::lock().unlock();
+
+	// 在这里，需要初始化全局变量。线程还没有开启。
+	init_native();
+
 	init_thread->launch();		// begin this thread.
 }

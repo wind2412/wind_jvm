@@ -23,6 +23,7 @@ class wind_jvm;
 struct temp {		// pthread aux struct...
 	vm_thread *thread;
 	std::list<Oop *> *arg;
+	InstanceOop *cur_thread_obj;
 };
 
 extern Lock thread_num_lock;
@@ -48,7 +49,7 @@ public:
 		this->thread_no = all_thread_num ++;
 	}
 public:
-	void launch();
+	void launch(InstanceOop * = nullptr);
 	void start(std::list<Oop *> & arg);
 	Oop *execute();
 	Oop *add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list);
@@ -56,6 +57,12 @@ public:
 	void init_and_do_main();
 	ArrayOop *get_stack_trace();
 	int get_stack_size() { return vm_stack.size(); }
+	void set_exception_at_last_second_frame() {
+		assert(this->vm_stack.size() >= 2);
+		auto iter = this->vm_stack.rbegin();
+		++iter;							// get cur_frame's prev...
+		iter->has_exception = true;
+	}
 };
 
 class wind_jvm {

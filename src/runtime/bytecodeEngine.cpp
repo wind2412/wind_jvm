@@ -20,6 +20,7 @@
 #include <map>
 #include <utility>
 #include "utils/synchronize_wcout.hpp"
+#include "runtime/thread.hpp"
 
 using std::wstringstream;
 using std::list;
@@ -2335,8 +2336,11 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						// 然后弹出并恢复 pc......
 						thread.vm_stack.pop_back();
 						pc = backup_pc;
-						// return value.
-						if (!new_method->is_void()) {
+
+						if (cur_frame.has_exception) {
+							assert(arg_list.size() >= 1);
+							op_stack.push(arg_list.back());
+						} else if (!new_method->is_void()) {	// return value.
 							assert(arg_list.size() >= 1);
 							op_stack.push(arg_list.back());
 #ifdef DEBUG
@@ -2349,13 +2353,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	sync_wcout{} << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 #endif
 					Oop *result = thread.add_frame_and_execute(target_method, arg_list);
-					if (!target_method->is_void()) {
+
+					if (cur_frame.has_exception) {
+						op_stack.push(result);
+					} else if (!target_method->is_void()) {
 						op_stack.push(result);
 #ifdef DEBUG
 	sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
 #endif
 					}
 				}
+
 				// unsynchronize
 				if (target_method->is_synchronized()) {
 					ref->leave_monitor();
@@ -2365,7 +2373,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 
 				// **IMPORTANT** judge whether returns an Exception!!!
-				if (cur_frame.has_exception && !new_method->is_void()) {
+				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
@@ -2503,8 +2511,11 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						// 然后弹出并恢复 pc......
 						thread.vm_stack.pop_back();
 						pc = backup_pc;
-						// return value.
-						if (!new_method->is_void()) {
+
+						if (cur_frame.has_exception) {
+							assert(arg_list.size() >= 1);
+							op_stack.push(arg_list.back());
+						} else if (!new_method->is_void()) {	// return value.
 							assert(arg_list.size() >= 1);
 							op_stack.push(arg_list.back());
 #ifdef DEBUG
@@ -2520,7 +2531,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
 #endif
 					Oop *result = thread.add_frame_and_execute(new_method, arg_list);
-					if (!new_method->is_void()) {
+
+					if (cur_frame.has_exception) {
+						op_stack.push(result);
+					} else if (!new_method->is_void()) {
 						op_stack.push(result);
 #ifdef DEBUG
 	sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
@@ -2543,7 +2557,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 
 				// **IMPORTANT** judge whether returns an Exception!!!
-				if (cur_frame.has_exception && !new_method->is_void()) {
+				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
 						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
@@ -2732,7 +2746,15 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) [athrow] TERMINALED because of exception!!!" << std::endl;
 #endif
-						exit(-1);
+
+						// 千万注意这里！！这一步此线程 exit() 执行，那么会回收所有资源！这样肯定其他线程肯定会出故障！
+						// 我先简单 kill 处理了。
+						// TODO: 好好看看 openjdk 怎么实现的？多线程的异常？
+
+//						ThreadTable::kill_all_except_main_thread(pthread_self());
+//						exit(-1);		// 不行......整个进程全部退出，会造成此 thread 析构，把全局的东西析构了......
+						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......
+
 					} else {
 						auto iter = thread.vm_stack.rbegin();
 						++iter;							// get cur_frame's prev...
