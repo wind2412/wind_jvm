@@ -332,7 +332,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			if (ref_klass->get_type() == ClassType::ObjArrayClass) {
 				auto ref_klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(ref_klass)->get_element_klass();
 				auto klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass();
-				if (ref_klass_inner_type == klass_inner_type || ref_klass_inner_type->get_parent() == klass_inner_type) {
+				if (ref_klass_inner_type == klass_inner_type || std::static_pointer_cast<InstanceKlass>(ref_klass_inner_type)->check_parent(std::static_pointer_cast<InstanceKlass>(klass_inner_type))) {
 					result = true;
 				} else {
 					result = false;

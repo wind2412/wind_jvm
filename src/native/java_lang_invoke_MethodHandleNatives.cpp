@@ -63,7 +63,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
 	int flags = ((IntOop *)oop)->value;
 
-	std::wcout << clazz->get_mirrored_who()->get_name() << " " << java_lang_string::stringOop_to_wstring(name) << std::endl;
+	std::wcout << clazz->get_mirrored_who()->get_name() << " " << java_lang_string::stringOop_to_wstring(name) << std::endl;		// delete
 
 	auto klass = clazz->get_mirrored_who();
 
@@ -93,41 +93,58 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		assert(false);
 	}
 
-	// 0. create a empty wstring: descriptor
-	wstring descriptor(L"(");
-	// 1. should parse the `Object type;` member first.
-	if (type->get_klass()->get_name() == L"java/lang/invoke/MethodType") {
-		Oop *oop;
-		// 1-a-1: get the args type.
-		type->get_field_value(METHODTYPE L":ptypes:[" CLS, &oop);
-		assert(oop != nullptr);
-		auto class_arr_obj = (ArrayOop *)oop;
-		for (int i = 0; i < class_arr_obj->get_length(); i ++) {
-			descriptor += get_full_name((MirrorOop *)(*class_arr_obj)[i]);
-		}
-		descriptor += L")";
-		// 1-a-2: get the return type.
-		type->get_field_value(METHODTYPE L":rtype:" CLS, &oop);
-		assert(oop != nullptr);
-		descriptor += get_full_name((MirrorOop *)oop);
-	} else if (type->get_klass()->get_name() == L"java/lang/Class") {
-		assert(false);
-	} else if (type->get_klass()->get_name() == L"java/lang/String") {
-		assert(false);
-	} else {
-		assert(false);
-	}
-
 	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
 	wstring real_name = java_lang_string::stringOop_to_wstring(name);
 	if (real_name == L"<clinit>" || real_name == L"<init>") {
 		assert(false);		// can't be the two names.
 	}
+
+	// 0. create a empty wstring: descriptor
+	wstring descriptor;
+	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
+	if (real_klass->get_name() == L"java/lang/invoke/MethodHandle" &&
+				(real_name == L"invoke"
+				|| real_name == L"invokeBasic"				// 钦定这些。
+				|| real_name == L"invokeExact"
+				|| real_name == L"invokeWithArauments"
+				|| real_name == L"linkToSpecial"
+				|| real_name == L"linkToStatic"
+				|| real_name == L"linkToVirtual"
+				|| real_name == L"linkToInterface"))  {		// 悲伤。由于历史原因（，我的查找是通过字符串比对来做的......简直无脑啊......这样这里效率好低吧QAQ。不过毕竟只是个玩具，跑通就好......
+		descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";
+	} else {
+		descriptor += L"(";
+		// 1. should parse the `Object type;` member first.
+		if (type->get_klass()->get_name() == L"java/lang/invoke/MethodType") {
+			Oop *oop;
+			// 1-a-1: get the args type.
+			type->get_field_value(METHODTYPE L":ptypes:[" CLS, &oop);
+			assert(oop != nullptr);
+			auto class_arr_obj = (ArrayOop *)oop;
+			for (int i = 0; i < class_arr_obj->get_length(); i ++) {
+				descriptor += get_full_name((MirrorOop *)(*class_arr_obj)[i]);
+			}
+			descriptor += L")";
+			// 1-a-2: get the return type.
+			type->get_field_value(METHODTYPE L":rtype:" CLS, &oop);
+			assert(oop != nullptr);
+			descriptor += get_full_name((MirrorOop *)oop);
+		} else if (type->get_klass()->get_name() == L"java/lang/Class") {
+			assert(false);
+		} else if (type->get_klass()->get_name() == L"java/lang/String") {
+			assert(false);
+		} else {
+			assert(false);
+		}
+	}
+
+
 	wstring signature = real_name + L":" + descriptor;
 
 	if (flags & 0x10000) {		// Method:
 		shared_ptr<Method> target_method;
 		if (ref_kind == 6)	{	// invokeStatic
+			std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 			target_method = real_klass->get_this_class_method(signature);
 			assert(target_method != nullptr);
 		} else {
