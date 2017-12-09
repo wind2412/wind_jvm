@@ -2578,12 +2578,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 				break;
 			}
+			case 0xba:{		// invokeDynamic
 
-
-
-
-
-
+				break;
+			}
 			case 0xbb:{		// new // 仅仅分配了内存！
 				// TODO: 这里不是很明白。规范中写：new 的后边可能会跟上一个常量池索引，这个索引指向类或接口......接口是什么鬼???? 还能被实例化吗 ???
 				int rtpool_index = ((pc[1] << 8) | pc[2]);

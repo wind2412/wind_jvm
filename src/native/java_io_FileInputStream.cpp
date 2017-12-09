@@ -64,7 +64,7 @@ void JVM_Open0(list<Oop *> & _stack){
 
 	if (S_ISDIR(stat.st_mode)) {		// check whether `fd` is a dir. FileInputStream.open() can only open the `file`, not `dir`.
 		close(fd);
-		// throw FileNotFoundException: xxx is a directory.
+		// throw FileNotFoundException: xxx is a directory.			// TODO: 封装一下，然后扩展到各种需要抛异常的地方！！
 		auto excp_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/FileNotFoundException"));
 		auto excp_obj = excp_klass->new_instance();
 		vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
