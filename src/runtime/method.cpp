@@ -271,7 +271,8 @@ MirrorOop *Method::parse_return_type()
 				return java_lang_class::get_basic_type_mirror(L"D");
 			}
 			case L'V':{			// **IMPORTANT** the return type `V` is the java/lang/Void!!!
-				return BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();
+				return java_lang_class::get_basic_type_mirror(L"V");
+//				return BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();		// bug fix.
 			}
 			default:{
 				assert(false);

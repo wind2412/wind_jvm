@@ -800,6 +800,7 @@ void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	} else if (basic_type_klass_name == L"double") {
 		_stack.push_back(get_basic_type_mirror(L"D"));
 	} else if (basic_type_klass_name == L"void") {		// **IMPORTANT** java/lang/Void!!
+std::wcout << "..????" << std::endl;
 		_stack.push_back(get_basic_type_mirror(L"V"));
 //		_stack.push_back(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror());		// wrong.
 	} else {
