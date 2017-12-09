@@ -2070,19 +2070,19 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				// jump begin~
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int key = ((IntOop *)op_stack.top())->value;
-				if (key > jump_tbl.size() - 1) {
+				if (key > jump_tbl.size() - 1 + lowbyte || key < lowbyte) {
 					// goto default
 					pc = (code_begin + jump_tbl.back());
 					pc -= occupied;
-//#ifdef DEBUG
-	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
-//#endif
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) it is [tableswitch] switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
 				} else {
-					pc = (code_begin + jump_tbl[key]);
+					pc = (code_begin + jump_tbl[key - lowbyte]);
 					pc -= occupied;
-//#ifdef DEBUG
-	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
-//#endif
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) it is [tableswitch] switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+#endif
 				}
 				break;
 			}
@@ -2117,13 +2117,13 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					pc = (code_begin + jump_tbl[INT_MAX]);
 					pc -= occupied;
 #ifdef DEBUG
-	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+	sync_wcout{} << "(DEBUG) it is [lookupswitch] switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
 #endif
 				} else {
 					pc = (code_begin + iter->second);
 					pc -= occupied;
 #ifdef DEBUG
-	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+	sync_wcout{} << "(DEBUG) it is [lookupswitch] switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
 #endif
 				}
 				break;
@@ -2366,6 +2366,13 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
 						void *native_method = find_native(new_klass->get_name(), signature);
 						// no need to add a stack frame!
+						if (native_method == nullptr) {
+							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
+							if (new_method->is_static()) {
+								std::wcout << "[static]";
+							}
+							std::wcout << " method!" << std::endl;
+						}
 						assert(native_method != nullptr);
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
@@ -2489,7 +2496,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 				// 这里用作魔改。比如，禁用 System.loadLibrary 方法。
 				if (new_method->get_klass()->get_name() == L"java/lang/System" && new_method->get_name() == L"loadLibrary") break;
-				// 这里用作魔改。比如，禁用 Perf 类。
+				// 这里用作魔改。比如，禁用 Perf 类。		// TODO: 这里的魔改可以去掉。是程序分支走错才走到这里的。不过留着亦可。
 				if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
 					if (new_method->is_void()) {
 						break;
@@ -2532,14 +2539,21 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
 					} else {
-//#ifdef DEBUG
+#ifdef DEBUG
 	if (*pc == 0xb7)
 		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 	else if (*pc == 0xb8)
 		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-//#endif
+#endif
 						void *native_method = find_native(new_klass->get_name(), signature);
 						// no need to add a stack frame!
+						if (native_method == nullptr) {
+							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
+							if (new_method->is_static()) {
+								std::wcout << "[static]";
+							}
+							std::wcout << " method!" << std::endl;
+						}
 						assert(native_method != nullptr);
 						if (*pc == 0xb7)
 							arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
@@ -2569,12 +2583,12 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						}
 					}
 				} else {
-//#ifdef DEBUG
+#ifdef DEBUG
 	if (*pc == 0xb7)
 		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 	else if (*pc == 0xb8)
 		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-//#endif
+#endif
 					Oop *result = thread.add_frame_and_execute(new_method, arg_list);
 
 					if (cur_frame.has_exception) {
@@ -2624,7 +2638,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0xba:{		// invokeDynamic
-assert(false);
+
 				break;
 			}
 			case 0xbb:{		// new // 仅仅分配了内存！

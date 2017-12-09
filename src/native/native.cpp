@@ -31,6 +31,8 @@
 #include "native/java_lang_Throwable.hpp"
 #include "native/java_io_FileSystem.hpp"
 #include "native/java_lang_Package.hpp"
+#include "native/java_lang_invoke_MethodHandleNatives.hpp"
+#include "native/java_lang_reflect_Array.hpp"
 
 static unordered_map<wstring, function<void*(const wstring &)>> native_map;		// such as: {L"java/lang/Object", search [native method]'s method lambda for java/lang/Object}
 
@@ -60,6 +62,8 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"java/lang/Throwable"] = java_lang_throwable_search_method;
 	native_map[L"java/io/FileSystem"] = java_io_fileSystem_search_method;
 	native_map[L"java/lang/Package"] = java_lang_package_search_method;
+	native_map[L"java/lang/invoke/MethodHandleNatives"] = java_lang_invoke_methodHandleNatives_search_method;
+	native_map[L"java/lang/reflect/Array"] = java_lang_reflect_array_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().

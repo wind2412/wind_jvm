@@ -44,6 +44,7 @@ using std::function;
 #define BB  L"Ljava/nio/ByteBuffer;"
 #define VOD L"Ljava/lang/Void;"
 #define BA  "[B"
+#define MN  L"Ljava/lang/invoke/MemberName;"
 
 #define STRING				L"java/lang/String"
 #define FIELD				L"java/lang/reflect/Field"
@@ -57,6 +58,8 @@ using std::function;
 #define JFILE				L"java/io/File"
 #define THROWABLE			L"java/lang/Throwable"
 #define STACKTRACEELEMENT	L"java/lang/StackTraceElement"
+#define MEMBERNAME			L"java/lang/invoke/MemberName"
+#define METHODTYPE			L"java/lang/invoke/MethodType"
 
 void init_native();
 

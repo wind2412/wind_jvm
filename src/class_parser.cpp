@@ -2200,7 +2200,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						std::cout << " {" << std::endl;
 						for (int pos = 0; pos < jump_tbl.size(); pos ++) {
 							if (pos != jump_tbl.size() - 1) {
-								printf("(DEBUG)%20d", pos + 1);
+								printf("(DEBUG)%20d", pos + lowbyte);		// fix the bug: if switch...case is 4~7, I will print 1~4...
 							} else {
 								printf("(DEBUG)%20s", "default");
 							}
@@ -2401,7 +2401,7 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 				} else if (inner_name_index == 0 && outer_class_info_index != 0) {
 					wstring outer_class_info = (outer_class_info_index != 0) ? ((CONSTANT_Utf8_info *)constant_pool[((CONSTANT_CS_info *)constant_pool[outer_class_info_index-1])->index-1])->convert_to_Unicode()
 																			: L"";		// *** 防止 openjdk 8 java/lang/String parse 不了，会被 assert 给停止！
-					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_class_info_index << "  //<class:> " << outer_class_info << endl;
+					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << outer_class_info_index << "  //<class:> " << outer_class_info << endl;
 				} else {
 					// extra: 但是这时，虽然能够保证 inner_name_index 不为 0，但是却不能保证 outer_class_info_index 不为 0！
 					std::wcout << "(DEBUG)    " << ss.str().c_str() << " #" << inner_name_index << "= #" << inner_class_info_index << " of #" << outer_class_info_index;

@@ -27,6 +27,7 @@ static unordered_map<wstring, void*> methods = {
     {L"getObjectVolatile:(" OBJ "J)" OBJ ,					(void *)&JVM_GetObjectVolatile},
     {L"compareAndSwapObject:(" OBJ "J" OBJ OBJ ")Z",			(void *)&JVM_CompareAndSwapObject},
     {L"compareAndSwapLong:(" OBJ "JJJ)Z",						(void *)&JVM_CompareAndSwapLong},
+    {L"shouldBeInitialized:(" CLS ")Z",						(void *)&JVM_ShouldBeInitialized},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -53,8 +54,14 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();	// java/lang/reflect/Field obj.
 
-	// 需要 new 一个对象... 实测...				// TODO: 还要支持 static 的！这时不用 new 对象了。
 	Oop *oop;
+	assert(field->get_field_value(FIELD L":modifiers:I", &oop));
+	int modifier = ((IntOop *)oop)->value;
+	if ((modifier & ACC_STATIC) == ACC_STATIC) {
+		assert(false);		// TODO: 暂不支持 static...
+	}
+
+	// 需要 new 一个对象... 实测...				// TODO: 还要支持 static 的！这时不用 new 对象了。
 	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
@@ -69,11 +76,11 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 		if (mirrored_who->get_type() == ClassType::InstanceClass) {
 			descriptor += (L"L" + mirrored_who->get_name() + L";");
 		} else if (mirrored_who->get_type() == ClassType::ObjArrayClass) {
-			assert(false);		// TODO: 因为我并不知道怎么写，而且怕写错...
+			descriptor += mirrored_who->get_name();
 		} else if (mirrored_who->get_type() == ClassType::TypeArrayClass) {
 			descriptor += mirrored_who->get_name();
 		} else {
-			assert(false);		// TODO: 同上...
+			assert(false);
 		}
 	} else {
 		assert(mirror->get_extra() != L"");
@@ -302,6 +309,13 @@ void JVM_CompareAndSwapLong(list<Oop *> & _stack){
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
+}
+
+void JVM_ShouldBeInitialized(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();
+	assert(klass->get_mirrored_who() != nullptr);
+	_stack.push_back(new IntOop(klass->get_mirrored_who()->get_state() == Klass::KlassState::NotInitialized));
 }
 
 

@@ -195,7 +195,39 @@ void JVM_GetClassName(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
 	if (_this->get_mirrored_who() == nullptr) {		// primitive type
-		_stack.push_back(java_lang_string::intern(_this->get_extra()));
+		assert(_this->get_extra().size() == 1);
+		wchar_t type = _this->get_extra()[0];
+		switch (type) {
+			case L'B':
+				_stack.push_back(java_lang_string::intern(L"byte"));
+				break;
+			case L'Z':
+				_stack.push_back(java_lang_string::intern(L"boolean"));
+				break;
+			case L'S':
+				_stack.push_back(java_lang_string::intern(L"short"));
+				break;
+			case L'C':
+				_stack.push_back(java_lang_string::intern(L"char"));
+				break;
+			case L'I':
+				_stack.push_back(java_lang_string::intern(L"int"));
+				break;
+			case L'F':
+				_stack.push_back(java_lang_string::intern(L"float"));
+				break;
+			case L'J':
+				_stack.push_back(java_lang_string::intern(L"long"));
+				break;
+			case L'D':
+				_stack.push_back(java_lang_string::intern(L"double"));
+				break;
+			case L'V':
+				_stack.push_back(java_lang_string::intern(L"void"));
+				break;
+			default:
+				assert(false);
+		}
 	} else {
 		Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
 		_stack.push_back(str);
@@ -739,13 +771,56 @@ void JVM_GetProtectionDomain(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_GetDeclaredClasses(list<Oop *> & _stack){
+void JVM_GetDeclaredClasses(list<Oop *> & _stack){		// return the mirror's inner: public/protected/private inner classes.
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
-void JVM_GetDeclaringClass(list<Oop *> & _stack){
+void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用，返回这个内部类的 outer。
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	if (_this == nullptr) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	if (_this->get_mirrored_who() == nullptr) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	if (!_this->get_mirrored_who()->get_type() == ClassType::InstanceClass) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	auto klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+	auto rt_pool = klass->get_rtpool();
+	auto inner_class_attr = klass->get_inner_class();
+	if (inner_class_attr == nullptr) {
+		_stack.push_back(nullptr);
+		return;
+	}
+
+	// traverse
+	for (int i = 0; i < inner_class_attr->number_of_classes; i ++) {
+		int ioff = inner_class_attr->classes[i].inner_class_info_index;
+		int ooff = inner_class_attr->classes[i].outer_class_info_index;
+		int noff = inner_class_attr->classes[i].inner_name_index;		// of no use.
+
+		if (ioff != 0) {
+			auto target_inner_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[ioff-1].second);
+			if (target_inner_klass == klass) {		// get the inner is `this`. then find the outer.
+				if (ooff == 0) {
+					_stack.push_back(nullptr);
+					return;
+				} else {
+					auto target_outer_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[ooff-1].second);
+					_stack.push_back(target_outer_klass->get_mirror());
+					return;
+				}
+			}
+		}
+	}
+
+	_stack.push_back(nullptr);
+	return;
+
 }
 void JVM_GetClassSignature(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -767,7 +842,58 @@ void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 }
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	if (_this == nullptr) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	if (_this->get_mirrored_who() == nullptr) {		// primitive type, wrong.
+		_stack.push_back(nullptr);
+		return;
+	}
+	if (_this->get_mirrored_who()->get_type() != ClassType::InstanceClass) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	auto klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+	auto enclosing_method_attr = klass->get_enclosing_method();
+	if (enclosing_method_attr == nullptr) {
+		_stack.push_back(nullptr);
+		return;
+	}
+	assert(enclosing_method_attr->class_index != 0);
+	auto rt_pool = klass->get_rtpool();
+
+	// 0. initialize the container: Object[3].
+	auto obj_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Object;"));
+	assert(obj_arr_klass != nullptr);
+	auto obj_arr = obj_arr_klass->new_instance(3);
+
+	// 1. get the klass: ---> ClassInfo
+	int target_klass_index = enclosing_method_attr->class_index;
+	auto target_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[target_klass_index-1].second);
+	assert(target_klass != nullptr);
+	// 1.5. put in.
+	(*obj_arr)[0] = target_klass->get_mirror();
+
+	// 2. get the method: ---> NameAndTypeInfo
+	int target_name_and_type_index = enclosing_method_attr->method_index;
+	if (target_name_and_type_index == 0) {	// if it's 0, return.
+		_stack.push_back(obj_arr);
+		return;
+	}
+	auto _pair = boost::any_cast<pair<int, int>>((*rt_pool)[target_name_and_type_index-1].second);
+	// 2.3. get the String: name
+	auto name = java_lang_string::intern(boost::any_cast<wstring>((*rt_pool)[_pair.first-1].second));
+	// 2.5. put it in.
+	(*obj_arr)[1] = name;
+	// 2.6. get the String: descriptor
+	auto descriptor = java_lang_string::intern(boost::any_cast<wstring>((*rt_pool)[_pair.second-1].second));
+	// 2.8. put it in.
+	(*obj_arr)[2] = descriptor;
+
+	// 3.0. return.
+	_stack.push_back(obj_arr);
+
 }
 void JVM_GetClassTypeAnnotations(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -800,7 +926,6 @@ void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	} else if (basic_type_klass_name == L"double") {
 		_stack.push_back(get_basic_type_mirror(L"D"));
 	} else if (basic_type_klass_name == L"void") {		// **IMPORTANT** java/lang/Void!!
-std::wcout << "..????" << std::endl;
 		_stack.push_back(get_basic_type_mirror(L"V"));
 //		_stack.push_back(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror());		// wrong.
 	} else {

@@ -91,18 +91,7 @@ bool InstanceOop::get_field_value(const wstring & BIG_signature, Oop **result) 	
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
 
-//	// volatile [0]
-//	bool is_volatile = iter->second.second->is_volatile();
-//	// volatile [1]
-//	if (is_volatile) {
-//		this->fields[offset]->enter_monitor();
-//	}
-	// field value not 0, maybe basic type.
 	*result = this->fields[offset];
-//	// volatile [2]
-//	if (is_volatile) {
-//		this->fields[offset]->leave_monitor();
-//	}
 	return true;
 }
 
@@ -117,19 +106,7 @@ void InstanceOop::set_field_value(const wstring & BIG_signature, Oop *value)
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important!!
 
-//	// volatile [0]		// TODO:
-//	bool is_volatile = iter->second.second->is_volatile();
-//	// volatile [1]
-//	if (is_volatile) {
-//		this->fields[offset]->enter_monitor();
-//	}
-	// field value not 0, maybe basic type.
 	this->fields[offset] = value;
-//	// volatile [2]
-//	if (is_volatile) {
-//		this->fields[offset]->leave_monitor();
-//	}
-
 }
 
 int InstanceOop::get_all_field_offset(const wstring & BIG_signature)
@@ -143,18 +120,6 @@ int InstanceOop::get_all_field_offset(const wstring & BIG_signature)
 	}
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
-
-//	// volatile [0]
-//	bool is_volatile = iter->second.second->is_volatile();
-//	// volatile [1]
-//	if (is_volatile) {
-//		this->fields[offset]->enter_monitor();
-//	}
-	// field value not 0, maybe basic type.
-//	// volatile [2]
-//	if (is_volatile) {
-//		this->fields[offset]->leave_monitor();
-//	}
 
 	// 不行，完全支持不了。java 默认所有 同一 klass 的 obj 都是相同的内存布局。我把 fields 挂在外边计算和 this 的距离，根本算不出来！每次都不同！！
 	// [√] 只有一种手段可以解决 ———— 变绝对距离成相对距离，就像分布式系统变绝对时间为相对逻辑时间一样！！这样应该可以完美解决！！
@@ -178,8 +143,6 @@ int InstanceOop::get_static_field_offset(const wstring & signature)
 	}
 	int offset = iter->second.first;
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
-
-	// TODO: volatile?
 
 #ifdef DEBUG
 	sync_wcout{} << "this: [" << this << "], klass_name:[" << instance_klass->get_name() << "], (static)" << signature << ":[" << &this->fields[offset] << "(encoding: " << offset + instance_klass->non_static_field_num() << ")]" << std::endl;

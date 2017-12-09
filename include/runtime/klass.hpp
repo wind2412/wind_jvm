@@ -181,6 +181,8 @@ public:
 	void initialize_final_static_field();
 	wstring parse_signature();
 	wstring get_source_file_name();
+	auto get_enclosing_method() { return enclosing_method; }
+	auto get_inner_class() { return inner_classes; }
 public:
 	vector<Oop *> & get_static_fields_addr() { return static_fields; }
 private:
@@ -218,6 +220,8 @@ public:
 public:		// for reflection.
 	vector<pair<int, shared_ptr<Method>>> get_constructors();
 	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
+public:		// for invokedynamic.
+
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
