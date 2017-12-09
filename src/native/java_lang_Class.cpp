@@ -42,6 +42,7 @@ void java_lang_class::init() {		// must execute this method before jvm!!!
 	delay_mirrors.push(L"F");
 	delay_mirrors.push(L"J");
 	delay_mirrors.push(L"D");
+	delay_mirrors.push(L"V");	// void...
 	delay_mirrors.push(L"[I");
 	delay_mirrors.push(L"[Z");
 	delay_mirrors.push(L"[B");
@@ -69,7 +70,7 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		shared_ptr<Klass> klass = system_classmap.find(L"java/lang/Class.class")->second;
 		if (name.size() == 1)	// ... switch only accept an integer... can't accept a wstring.
 			switch (name[0]) {
-				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
+				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':case L'V':{	// include `void`.
 					// insert into.
 					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
 					basic_type_mirror->set_extra(name);			// set the name `I`, `J` if it's a primitve type.
@@ -799,7 +800,8 @@ void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	} else if (basic_type_klass_name == L"double") {
 		_stack.push_back(get_basic_type_mirror(L"D"));
 	} else if (basic_type_klass_name == L"void") {		// **IMPORTANT** java/lang/Void!!
-		_stack.push_back(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror());
+		_stack.push_back(get_basic_type_mirror(L"V"));
+//		_stack.push_back(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror());		// wrong.
 	} else {
 		std::wcerr << "can't get here!" << std::endl;
 		assert(false);

@@ -406,7 +406,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #ifdef DEBUG
 		sync_wcout{} << L"(DEBUG) [thread " << thread_no << "] <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 #endif
-		int occupied = bccode_map[*pc].second + 1;		// the bytecode takes how many bytes.(include itself)		// TODO: tableswitch, lookupswitch, wide is NEGATIVE!!!
+		int occupied = bccode_map[*pc].second + 1;
 		switch(*pc) {
 			case 0x00:{		// nop
 				// do nothing.
@@ -2041,6 +2041,51 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			}
 
 
+			case 0xaa:{		// tableswitch
+				int bc_num = pc - code_begin;
+				uint8_t *code = code_begin;
+				int origin_bc_num = bc_num;
+				if (bc_num % 4 != 0) {
+					bc_num += (4 - bc_num % 4);
+				} else {
+					bc_num += 4;
+				}
+				int ptr = bc_num;
+
+				// calculate basic values
+				int defaultbyte = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3]));
+				int lowbyte = ((code[ptr+4] << 24) | (code[ptr+5] << 16) | (code[ptr+6] << 8) | (code[ptr+7]));
+				int highbyte = ((code[ptr+8] << 24) | (code[ptr+9] << 16) | (code[ptr+10] << 8) | (code[ptr+11]));
+//						std::cout << defaultbyte << " " << lowbyte << " " << highbyte << std::endl;	// delete
+				int num = highbyte - lowbyte + 1;
+				ptr += 12;
+				// create jump_table
+				vector<int> jump_tbl;
+				for (int pos = 0; pos < num; pos ++) {
+					int jump_pos = ((code[ptr] << 24) | (code[ptr+1] << 16) | (code[ptr+2] << 8) | (code[ptr+3])) + origin_bc_num;
+					ptr += 4;
+					jump_tbl.push_back(jump_pos);
+				}
+				jump_tbl.push_back(defaultbyte + origin_bc_num);		// 额外多 push 一个 default 跳转址
+				// jump begin~
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int key = ((IntOop *)op_stack.top())->value;
+				if (key > jump_tbl.size() - 1) {
+					// goto default
+					pc = (code_begin + jump_tbl.back());
+					pc -= occupied;
+//#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, didn't match... so will jump to [default]: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+//#endif
+				} else {
+					pc = (code_begin + jump_tbl[key]);
+					pc -= occupied;
+//#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) it is switch(" << key << ") {...}, so will jump to: <bytecode>: $" << std::dec << (pc - code_begin + occupied) << std::endl;
+//#endif
+				}
+				break;
+			}
 			case 0xab:{		// lookupswitch
 				int bc_num = pc - code_begin;
 				uint8_t *code = code_begin;
@@ -2487,15 +2532,15 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
 					} else {
-						void *native_method = find_native(new_klass->get_name(), signature);
-						// no need to add a stack frame!
-						assert(native_method != nullptr);
-#ifdef DEBUG
+//#ifdef DEBUG
 	if (*pc == 0xb7)
 		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 	else if (*pc == 0xb8)
 		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-#endif
+//#endif
+						void *native_method = find_native(new_klass->get_name(), signature);
+						// no need to add a stack frame!
+						assert(native_method != nullptr);
 						if (*pc == 0xb7)
 							arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
 						else
@@ -2524,12 +2569,12 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						}
 					}
 				} else {
-#ifdef DEBUG
+//#ifdef DEBUG
 	if (*pc == 0xb7)
 		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
 	else if (*pc == 0xb8)
 		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-#endif
+//#endif
 					Oop *result = thread.add_frame_and_execute(new_method, arg_list);
 
 					if (cur_frame.has_exception) {
@@ -2579,7 +2624,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0xba:{		// invokeDynamic
-
+assert(false);
 				break;
 			}
 			case 0xbb:{		// new // 仅仅分配了内存！

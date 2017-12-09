@@ -12,6 +12,8 @@ import sun.misc.SignalHandler;
 import sun.misc.URLClassPath;
 import sun.nio.fs.UnixFileSystemProvider;
 
+import java.lang.Void;
+
 // 粗略计算了一下。执行这个文件，需要执行 85w+ 个字节码。iterm 都被输出卡死了...
 
 public class Test7 extends Thread{
@@ -40,7 +42,6 @@ public class Test7 extends Thread{
 		t1.start();
 		t2.start();
 		
-		
 		Field[] field = Test7.class.getDeclaredFields();
 		for (Field f : field) {
 			System.out.println(f.getType());
@@ -49,6 +50,11 @@ public class Test7 extends Thread{
 		
 		Class clzz = int.class;
 		System.out.println(clzz);
+		Class clzz1 = void.class;
+		System.out.println(clzz1);
+		Class clzz2 = Void.class;
+		System.out.println(clzz2);
+		System.out.println(clzz1 == clzz2);
 		
 
 		Signal.handle(new Signal("INT"), new SignalHandler() {

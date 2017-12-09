@@ -79,7 +79,11 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 	// get file msg
 	struct stat64 stat;
 	if (stat64(path, &stat) == -1) {
-		assert(false);
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) didn't find the file: [" << path << "]..." << std::endl;
+#endif
+		_stack.push_back(new IntOop(0));
+		return;
 	}
 
 	int mode = 0;
