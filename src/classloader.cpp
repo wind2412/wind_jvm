@@ -72,8 +72,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 	MyClassLoader::get_loader().print();
 #endif
 				} else {
-					wstring temp_inner = classname.substr(1);		// strip one '[' only
-					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
+					wstring temp_true_inner = classname.substr(1);		// strip one '[' only
 					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
 					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
 					assert(last_dimension_array->get_higher_dimension() == nullptr);

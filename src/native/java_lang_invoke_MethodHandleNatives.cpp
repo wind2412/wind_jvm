@@ -104,7 +104,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
 	if (real_klass->get_name() == L"java/lang/invoke/MethodHandle" &&
 				(real_name == L"invoke"
-				|| real_name == L"invokeBasic"				// 钦定这些。
+				|| real_name == L"invokeBasic"				// 钦定这些。因为 else 中都是通过把 ptypes 加起来做到的。但是 MethodHandle 中的变长参数是一个例外。其他类中的变长参数没问题，因为最后编译器会全部转为 Object[]。只有 MethodHandle 是例外～
 				|| real_name == L"invokeExact"
 				|| real_name == L"invokeWithArauments"
 				|| real_name == L"linkToSpecial"

@@ -1227,10 +1227,34 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
+			case 0x5b:{		// dup_x2
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				Oop *val2 = op_stack.top();	op_stack.pop();
+				if (val2->get_ooptype() == OopType::_BasicTypeOop && 		// 分类二
+						(((BasicTypeOop *)val2)->get_type() == Type::LONG || ((BasicTypeOop *)val2)->get_type() == Type::DOUBLE)) {
+					// case 2
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val2);
+					op_stack.push(val1);
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) dup_x2[2] from stack." << std::endl;
+#endif
+				} else {
+					// case 1
+					Oop *val3 = op_stack.top();	op_stack.pop();
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val3);
+					op_stack.push(val2);
+					op_stack.push(val1);
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) dup_x2[1] from stack." << std::endl;
+#endif
+				}
+				break;
+			}
 			case 0x5c:{		// dup2
 				Oop *val1 = op_stack.top();	op_stack.pop();
-				if (val1->get_ooptype() == OopType::_BasicTypeOop && 		// case 2
+				if (val1->get_ooptype() == OopType::_BasicTypeOop && 		// 分类二
 						(((BasicTypeOop *)val1)->get_type() == Type::LONG || ((BasicTypeOop *)val1)->get_type() == Type::DOUBLE)) {
 					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
 					op_stack.push(val1);
@@ -1247,6 +1271,51 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	sync_wcout{} << "(DEBUG) dup_2[2] from stack." << std::endl;
 #endif
 				}
+				break;
+			}
+
+
+			case 0x5e:{		// dup2_x2
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				Oop *val2 = op_stack.top();	op_stack.pop();
+				if (val1->get_ooptype() == OopType::_BasicTypeOop &&
+						(((BasicTypeOop *)val1)->get_type() == Type::LONG || ((BasicTypeOop *)val1)->get_type() == Type::DOUBLE)) {	// 1. val1 是 分类2
+					if (val2->get_ooptype() == OopType::_BasicTypeOop &&
+						(((BasicTypeOop *)val2)->get_type() == Type::LONG || ((BasicTypeOop *)val2)->get_type() == Type::DOUBLE)) {	// 1-a. val2 也是 分类2
+						// case 4
+						op_stack.push(if_BasicType_then_copy_else_return_only(val1));		// TODO: !!! 是不是不安全...按照 primitive type 默认复制的原则，是不是应该从弹栈的那一刻开始，原先的 value 就应该失效，就应该复制一份！！！
+						op_stack.push(val2);
+						op_stack.push(val1);
+					} else {		// 1-b. val2 是 分类1，当然 val3 也是。
+						// case 2
+						Oop *val3 = op_stack.top();	op_stack.pop();
+						op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+						op_stack.push(val3);
+						op_stack.push(val2);
+						op_stack.push(val1);
+					}
+				} else {		// 2. val1 是 分类1，余下的情况中，val2 必然也是 分类1
+					Oop *val3 = op_stack.top();	op_stack.pop();
+					if (val3->get_ooptype() == OopType::_BasicTypeOop &&
+							(((BasicTypeOop *)val3)->get_type() == Type::LONG || ((BasicTypeOop *)val3)->get_type() == Type::DOUBLE)) {	// 2-a. val3 是 分类2
+						// case 3
+						op_stack.push(if_BasicType_then_copy_else_return_only(val2));
+						op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+						op_stack.push(val3);
+						op_stack.push(val2);
+						op_stack.push(val1);
+					} else {		// 2-b. val3 是 分类1
+						// case 1
+						Oop *val4 = op_stack.top();	op_stack.pop();
+						op_stack.push(if_BasicType_then_copy_else_return_only(val2));
+						op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+						op_stack.push(val4);
+						op_stack.push(val3);
+						op_stack.push(val2);
+						op_stack.push(val1);
+					}
+				}
+
 				break;
 			}
 
@@ -1870,7 +1939,15 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
+			case 0x93:{		// i2s
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
+				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				op_stack.push(new IntOop((short)val));
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) convert int: [" << val << "] to short: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x94:{		// lcmp
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
 				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
@@ -2718,7 +2795,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0xbd:{		// anewarray		// 创建引用(对象)的[一维]数组。
 				/**
 				 * java 的数组十分神奇。在这里需要有所解释。
-				 * String[][] x = new String[2][3]; 调用的是 mulanewarray. 这样初始化出来的 ArrayOop 是 [二维] 的。即 dimension == 2.
+				 * String[][] x = new String[2][3]; 调用的是 mulanewarray. 这样初始化出来的 ArrayOop 是 [二维] 的。即 dimension == 2. 这样，内部的数组可以“参差不齐”，也就是可以放 3 个一维，但是长度任意的数组了。
 				 * String[][] x = new String[2][]; x[0] = new String[2]; x[1] = new String[3]; 调用的是 anewarray. 这样初始化出来的 ArrayOop [全部] 都是 [一维] 的。即 dimension == 1.
 				 * 虽然句柄的表示 String[][] 都是这个格式，但是 dimension 不同！前者，x 仅仅是一个 二维的 ArrayOop，element 是 java.lang.String。
 				 * 而后者的 x 是一个 一维的 ArrayOop，element 是 [Ljava.lang.String;。
@@ -2759,6 +2836,11 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					}
+				} else if (klass->get_type() == ClassType::TypeArrayClass) {	// [[I --> will new an [[[I. e.g.: int[][][] = { {{1,2,3},{4,5}}, {{1},{2}}, {{1},{2}} };
+					auto real_klass = std::static_pointer_cast<TypeArrayKlass>(klass);
+					auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
+					assert(arr_klass->get_type() == ClassType::TypeArrayClass);
+					op_stack.push(arr_klass->new_instance(length));
 				} else {
 					assert(false);
 				}
@@ -2906,6 +2988,81 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 
+
+			case 0xc5:{		// multianewarray
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				int dimensions = pc[3];
+				assert(dimensions > 0);		// 维度肯定要 > 0 ! 至少是 1！！
+				vector<int> counts;			// 所以这里才能保证至少有 1 个元素！！
+				for (int i = 0; i < dimensions; i ++) {
+					Oop *count = op_stack.top();
+					assert(count->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)count)->get_type() == Type::INT);
+					if (((IntOop *)op_stack.top())->value < 0) {
+						std::wcerr << "array length can't be negative!!" << std::endl;
+						assert(false);
+					}
+					counts.push_back(((IntOop *)count)->value);
+				}
+
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
+				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				if (klass->get_type() == ClassType::InstanceClass) {			// e.g.: java/lang/Class
+					assert(false);		// TODO:没有碰到过这种情况...先注释掉......以后再补上。	// 其实我感觉规范是不是写错了？？？这根本不可能出现 InstanceKlass 的情况啊...... 毕竟下边注释也说了，给出的 rt_pool 的 klass 是正确的，不用像 anewarray 一样加上一维了......所以感觉 Spec 应该是错的？？因为根本就没有指向 InstanceKlass 的情况？
+//					auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+//					// 由于仅仅是创建一维数组：所以仅仅需要把高一维的数组类加载就好。
+//					shared_ptr<ObjArrayKlass> arr_klass;
+//					if (real_klass->get_classloader() == nullptr) {
+//						arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
+//					} else {
+//						arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
+//					}
+//					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+//					op_stack.push(arr_klass->new_instance(length));
+				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// e.g.: [[[Ljava/lang/Class	// 注意：这回不用再加上一维了！编译器给出的是真·数组 klass name！直接拿来用就好！
+					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
+					// 创建数组的数组。不过也和 if 中的逻辑相同。
+					// 不过由于数组类没有设置 classloader，需要从 element 中去找。
+					shared_ptr<ObjArrayKlass> arr_klass;
+					if (real_klass->get_element_klass()->get_classloader() == nullptr) {
+						arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(real_klass->get_name()));
+					} else {
+						arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_klass()->get_classloader()->loadClass(real_klass->get_name()));
+					}
+					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
+					assert(arr_klass->get_dimension() == dimensions);	// I think must be equal here!
+
+					// lambda:
+					function<Oop *(shared_ptr<ObjArrayKlass>, int)> recursive_create_multianewarray = [&counts, &recursive_create_multianewarray](shared_ptr<ObjArrayKlass> arr_klass, int index) -> Oop *{
+						// 1. new an multianewarray, which length is counts[index]!! ( counts[0] first )
+						auto arr_obj = arr_klass->new_instance(counts[index]);
+						// 2-a. if this is the last dimension(1), then return.
+						if (index == counts.size() - 1) {
+							assert(arr_klass->get_dimension() == 1);		// or judge with this is okay.
+							return arr_obj;		// create over.
+						}
+						// 2-b. else, get the inner multianewarray type.
+						auto inner_arr_klass = std::static_pointer_cast<ObjArrayKlass>(arr_klass->get_lower_dimension());
+						assert(inner_arr_klass != nullptr);
+						// 3. fill in every element in this `fake multiarray`, which is really one dimension... (java 的多维数组是伪的，众人皆知)
+						for (int i = 0; i < arr_obj->get_length(); i ++) {
+							(*arr_obj)[i] = recursive_create_multianewarray(inner_arr_klass, index + 1);
+						}
+						return arr_obj;
+					};
+
+					op_stack.push(recursive_create_multianewarray(arr_klass, 0));
+
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) new an multianewarray: [" << arr_klass->get_name() << "]." << std::endl;
+#endif
+
+
+				} else {
+					assert(false);
+				}
+
+				break;
+			}
 			case 0xc6:		// ifnull
 			case 0xc7:{		// ifnonnull
 				short branch_pc = ((pc[1] << 8) | pc[2]);

@@ -302,6 +302,16 @@ void vm_thread::init_and_do_main()
 		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
 	}
 
+	// load some useful klass...
+	{
+		auto methodtype_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
+		BytecodeEngine::initial_clinit(methodtype_klass, *this);
+
+	}
+
+
+
+
 	// The World's End!
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
