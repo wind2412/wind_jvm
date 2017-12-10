@@ -221,7 +221,7 @@ public:		// for reflection.
 	vector<pair<int, shared_ptr<Method>>> get_constructors();
 	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
 public:		// for invokedynamic.
-
+	bool is_in_vtable(shared_ptr<Method> m) { return std::find(vtable.begin(), vtable.end(), m) != vtable.end(); }
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

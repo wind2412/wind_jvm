@@ -28,6 +28,7 @@ static unordered_map<wstring, void*> methods = {
     {L"compareAndSwapObject:(" OBJ "J" OBJ OBJ ")Z",			(void *)&JVM_CompareAndSwapObject},
     {L"compareAndSwapLong:(" OBJ "JJJ)Z",						(void *)&JVM_CompareAndSwapLong},
     {L"shouldBeInitialized:(" CLS ")Z",						(void *)&JVM_ShouldBeInitialized},
+    {L"defineAnonymousClass:(" CLS "[B[" OBJ ")" CLS,			(void *)&JVM_ShouldBeInitialized},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -316,6 +317,21 @@ void JVM_ShouldBeInitialized(list<Oop *> & _stack){
 	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(klass->get_mirrored_who() != nullptr);
 	_stack.push_back(new IntOop(klass->get_mirrored_who()->get_state() == Klass::KlassState::NotInitialized));
+}
+
+void defineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp:Unsafe_DefineAnonymousClass_impl().
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();			// hostclass. see java sourcecode backtrace can see, It can get from: @CallerSensitive: getCallerClass.
+	TypeArrayOop *array = (TypeArrayOop *)_stack.front();	_stack.pop_front();		// bytecodes.
+	ObjArrayOop *obj_arr = (ObjArrayOop *)_stack.front();	_stack.pop_front();		// cp_patch array, maybe null.
+
+
+
+
+
+
+	assert(false);
+
 }
 
 

@@ -1891,8 +1891,33 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x8e:{		// d2i
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
 
-
+				if (val == DOUBLE_NAN) {
+					op_stack.push(new IntOop(0));
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) convert double: [DOUBLE_NAN] to int: [0]." << std::endl;
+#endif
+				} else if (val == DOUBLE_INFINITY) {
+					op_stack.push(new IntOop(INT_MAX));
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) convert double: [DOUBLE_INFINITY] to int: [INT_MAX]." << std::endl;
+#endif
+				} else if (val == DOUBLE_NEGATIVE_INFINITY) {
+					op_stack.push(new IntOop(INT_MIN));
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) convert double: [DOUBLE_NEGATIVE_INFINITY] to int: [INT_MIN]." << std::endl;
+#endif
+				} else {
+					op_stack.push(new IntOop((int)val));
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) convert double: [" << val << "ld] to int: [" << ((IntOop *)op_stack.top())->value << "]." << std::endl;
+#endif
+				}
+				break;
+			}
 			case 0x8f:{		// d2l
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
 				double val = ((DoubleOop*)op_stack.top())->value; op_stack.pop();

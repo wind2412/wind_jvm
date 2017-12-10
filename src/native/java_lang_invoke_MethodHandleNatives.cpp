@@ -18,6 +18,7 @@ static unordered_map<wstring, void*> methods = {
     {L"getConstant:(I)I",							(void *)&JVM_GetConstant},
     {L"resolve:(" MN CLS ")" MN,						(void *)&JVM_Resolve},
     {L"expand:(" MN ")V",							(void *)&JVM_Expand},
+    {L"init:(" MN OBJ ")V",							(void *)&JVM_Init},
 };
 
 void JVM_GetConstant(list<Oop *> & _stack){		// static
@@ -59,6 +60,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	assert(name != nullptr);
 	member_name_obj->get_field_value(MEMBERNAME L":type:" OBJ, &oop);
 	InstanceOop *type = (InstanceOop *)oop;	// maybe a String, or maybe an Object[]...
+			// type 这个变量的类型可能是 String, Class, MethodType!
 	assert(type != nullptr);
 	member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
 	int flags = ((IntOop *)oop)->value;
@@ -138,7 +140,6 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		}
 	}
 
-
 	wstring signature = real_name + L":" + descriptor;
 
 	if (flags & 0x10000) {		// Method:
@@ -182,6 +183,86 @@ void JVM_Expand(list<Oop *> & _stack) {
 	// 这个方法无法使用。因为我的实现没有 itable...而且我也并不知道 vmindex 应该被放到哪里。
 }
 
+void JVM_Init(list<Oop *> & _stack){		// static
+	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *target = (InstanceOop *)_stack.front();	_stack.pop_front();			// java/lang/Object
+
+	/**
+	 * in fact, `target` will be one of the three:
+	 * 1. java/lang/reflect/Constructor.
+	 * 2. java/lang/reflect/Field.
+	 * 3. java/lang/reflect/Method.
+	 */
+	assert(member_name_obj != nullptr);
+	assert(target != nullptr);
+	auto klass = std::static_pointer_cast<InstanceKlass>(target->get_klass());
+
+	if (klass->get_name() == L"java/lang/reflect/Constructor") {
+		Oop *oop;
+		target->get_field_value(CONSTRUCTOR L":slot:I", &oop);
+		int slot = ((IntOop *)oop)->value;
+		shared_ptr<Method> target_method = klass->search_method_in_slot(slot);
+
+		int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
+		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
+			new_flag |= 0x100000;
+		}
+
+		new_flag |= 0x10000 | (7 << 24);		// invokeSpecial: 7
+
+		member_name_obj->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+//		member_name_obj->set_field_value(MEMBERNAME L":name:" STR, name);		// in JDK source code: MemberName::public MemberName(Field fld, boolean makeSetter), the `name` and `type` are settled by the java source code.
+//		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, type);
+		member_name_obj->set_field_value(MEMBERNAME L":clazz:" CLS, klass->get_mirror());
+
+	} else if (klass->get_name() == L"java/lang/reflect/Field") {
+		Oop *oop;
+		target->get_field_value(FIELD L":modifiers:I", &oop);
+		int new_flag = ((IntOop *)oop)->value;
+		target->get_field_value(FIELD L":clazz:" CLS, &oop);
+		Oop *clazz = oop;
+
+		new_flag = (new_flag & (~ACC_ANNOTATION));
+
+		member_name_obj->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+//		member_name_obj->set_field_value(MEMBERNAME L":name:" STR, name);
+//		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, type);
+		member_name_obj->set_field_value(MEMBERNAME L":clazz:" CLS, clazz);
+
+	} else if (klass->get_name() == L"java/lang/reflect/Method") {
+		Oop *oop;
+		target->get_field_value(METHOD L":slot:I", &oop);
+		int slot = ((IntOop *)oop)->value;
+		shared_ptr<Method> target_method = klass->search_method_in_slot(slot);
+
+		int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
+		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
+			new_flag |= 0x100000;
+		}
+
+		if (target_method->is_private() && !target_method->is_static()) {		// use invokeSpecial.
+			new_flag |= 0x10000 | (7 << 24);		// invokeSpecial: 7
+		} else if (target_method->is_static()) {
+			new_flag |= 0x10000 | (6 << 24);		// invokeStatic: 6
+		} else {
+			if (klass->is_in_vtable(target_method)) {
+				new_flag |= 0x10000 | (5 << 24);		// invokeVirtual: 5
+			} else {
+				new_flag |= 0x10000 | (9 << 24);		// invokeInterface: 9
+			}
+		}
+
+		member_name_obj->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+//		member_name_obj->set_field_value(MEMBERNAME L":name:" STR, name);		// in JDK source code: MemberName::public MemberName(Field fld, boolean makeSetter), the `name` and `type` are settled by the java source code.
+//		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, type);
+		member_name_obj->set_field_value(MEMBERNAME L":clazz:" CLS, klass->get_mirror());
+
+	} else {
+		assert(false);
+	}
+
+
+}
 
 
 // 返回 fnPtr.
