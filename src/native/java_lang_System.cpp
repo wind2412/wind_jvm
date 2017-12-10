@@ -43,6 +43,7 @@ void JVM_CurrentTimeMillis(list<Oop *> & _stack)		// static
 	sync_wcout{} << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
+
 void JVM_NanoTime(list<Oop *> & _stack){				// static
 	timeval time;
 	if (gettimeofday(&time, nullptr) == -1) {
@@ -53,6 +54,13 @@ void JVM_NanoTime(list<Oop *> & _stack){				// static
 	sync_wcout{} << "(DEBUG) now the nanotime is: [" << ((LongOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
+
+//shared_ptr<InstanceKlass> get_real_element_klass(shared_ptr<ObjArrayKlass> obj_arr_klass)		// [x]见下文 ArrayCopy 中的 bug 说明。旨在对泛型擦除引发的 bug 打补丁。	// [x] 替换所有 get_element_klass！！甚至可以钦定此方法替换掉 get_element_klass!!
+//{
+//		// [x] 设计修改！成为：如果放置元素进去，那么就设置...
+//		// [x] 再改！！因为泛型擦除只对 Object 成立......所以我如果看到 [Object，那就钦定......
+//}
+
 void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 	Oop *obj1 = (Oop *)_stack.front();	_stack.pop_front();
 	int src_pos = ((IntOop *)_stack.front())->value;	_stack.pop_front();
@@ -81,11 +89,63 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		assert(obj2->get_ooptype() == OopType::_ObjArrayOop);
 		ObjArrayOop *objarr1 = (ObjArrayOop *)obj1;
 		ObjArrayOop *objarr2 = (ObjArrayOop *)obj2;
+
+		function<shared_ptr<InstanceKlass>(ObjArrayOop *)> get_ObjArray_real_element_klass_recursive = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> shared_ptr<InstanceKlass> {
+			int length = objarr->get_length();		// total length
+			shared_ptr<ObjArrayKlass> objarr_klass = std::static_pointer_cast<ObjArrayKlass>(objarr->get_klass());		// this klass is not trusted. because it is the alloced array's obj_array_type, not the inner element type.
+			if (length == 0) {
+				// 1. if we can't find the inner-element, we can only return the objarr_klass's element-type... but thinking of the recursive function can return `objarr_klass->element_type()`, too, we return nullptr instead, it shows that we can't judge the **REAL** type.
+//				return objarr_klass->get_element_klass();
+				return nullptr;
+			} else {
+				for (int i = 0; i < length; i ++) {
+					Oop *oop = (*objarr)[i];		// get the element.
+					if (oop == nullptr) {
+						// 2. if the inner is null:
+						continue;
+					} else {
+						// 3. if not null: judge whether it is another ObjectArrayOop / InstanceOop.
+						if (oop->get_ooptype() == OopType::_InstanceOop) {
+							// 3.3. if InstanceOop, return it. This is the **REAL** type.
+							return std::static_pointer_cast<InstanceKlass>(oop->get_klass());
+						} else {
+							// 3.6. if ObjectArrayOop, then recursive.
+							assert(oop->get_ooptype() == OopType::_ObjArrayOop);
+							auto ret_klass = get_ObjArray_real_element_klass_recursive((ObjArrayOop *)oop);
+							if (ret_klass != nullptr) {		// if the recursive get an answer:
+								return ret_klass;
+							} else							// if return nullptr, continue.
+								continue;
+						}
+					}
+				}
+				// 4. all ObjArrayOop[0~length] are null.
+				return nullptr;
+			}
+		};
+
+		// an outer aux function.
+		function<shared_ptr<InstanceKlass>(ObjArrayOop *)> get_ObjArray_real_element_klass = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> shared_ptr<InstanceKlass> {
+			auto real_element_klass = get_ObjArray_real_element_klass_recursive(objarr);
+			if (real_element_klass == nullptr) {
+				// if it is nullptr after recursive, we can only consider it as the `alloc array`'s `objarr->element_type()`......
+				return std::static_pointer_cast<ObjArrayKlass>(objarr->get_klass())->get_element_klass();
+			} else {
+				return real_element_klass;
+			}
+		};
+
 		assert(objarr1->get_dimension() == objarr2->get_dimension());
 		assert(src_pos + length <= objarr1->get_length() && dst_pos + length <= objarr2->get_length());	// TODO: ArrayIndexOutofBound
 		// 1. src has same element of dst, 2. or is sub_type of dst, 3. all the copy part are null.
-		auto src_klass = std::static_pointer_cast<ObjArrayKlass>(objarr1->get_klass())->get_element_klass();
-		auto dst_klass = std::static_pointer_cast<ObjArrayKlass>(objarr2->get_klass())->get_element_klass();
+		// bug report！！这样，只能得到 alloc 的数组的数组类的 klass！而不能得到真正的内部存放的数值的 klass！！打个比方...比如 ArrayList 类。因为泛型擦除，因此内部有个 Object[] 数组......如果要是使用 get_element，就只能得到 inner 的类型是 Object...但是人家可能向内存放 String...... 唉。考虑不周...
+		// 4. [x] 所以打算如果 src 是 java/lang/Object 的话，就改为检查数组内部的类型，并且加以钦定...
+		// [√] 最终的方案改成了：一上来就得到真正的 element type 类型。
+//		auto src_klass = std::static_pointer_cast<ObjArrayKlass>(objarr1->get_klass())->get_element_klass();
+//		auto dst_klass = std::static_pointer_cast<ObjArrayKlass>(objarr2->get_klass())->get_element_klass();
+		auto src_klass = get_ObjArray_real_element_klass(objarr1);
+		auto dst_klass = get_ObjArray_real_element_klass(objarr1);
+
 		if (src_klass == dst_klass || src_klass->check_parent(dst_klass) || src_klass->check_interfaces(dst_klass)) {		// 1 or 2
 			// directly copy
 			for (int i = 0; i < length; i ++) {
@@ -104,7 +164,36 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 					(*objarr2)[dst_pos + i] = nullptr;
 				}
 			} else {
-				assert(false);
+				// [√] 下边的想法还是并不是很安全。所以改成了一上来就 get 到 real element type.
+//				// 4. 走到这一步，也有可能是因为泛型擦除的关系。即 objarr1 的容器是 [Object，通过 get_element_klass 只能得到默认的“数组类型” Object，
+//				// 却得不到内部存放的真实类型了。因此在这里，会判断内部的元素真实类型！而且由于 splice_all_null，我们知道 null 元素不存在！
+//				// 给予最后一次机会：
+//
+//				if (src_klass->get_name() == L"java/lang/Object") {
+//					// get `the most inner` element type!!
+//					shared_ptr<InstanceKlass> real_src_klass;
+//					if (objarr1->get_dimension() == 1) {
+//						// 如果一维 Object[]，且内部全不是 null，那么取出第一个就好～
+//						if (length == 0) {
+//							assert(false);	// I think it will be false...
+//						} else {
+//							real_src_klass = std::static_pointer_cast<InstanceKlass>((*objarr1)[src_pos]->get_klass());
+//							if (real_src_klass == dst_klass || real_src_klass->check_parent(dst_klass) || real_src_klass->check_interfaces(dst_klass)) {
+//								// directly copy
+//								for (int i = 0; i < length; i ++) {
+//									(*objarr2)[dst_pos + i] = (*objarr1)[src_pos + i];
+//								}
+//							} else {
+//								assert(false);
+//							}
+//						}
+//					} else {		// ...?
+//						// 整理一下代码结构...写出一个可以判断真实类型的函数把...这样递归太恶心了...先 assert(false)了...
+//						assert(false);
+//
+//					}
+//				} else
+					assert(false);
 			}
 		}
 	} else {

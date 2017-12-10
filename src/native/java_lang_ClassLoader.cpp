@@ -15,6 +15,7 @@
 #include "system_directory.hpp"
 #include "classloader.hpp"
 #include "utils/synchronize_wcout.hpp"
+#include <regex>
 
 static unordered_map<wstring, void*> methods = {
     {L"findLoadedClass0:(" STR ")" CLS,				(void *)&JVM_FindLoadedClass},
@@ -27,7 +28,8 @@ void JVM_FindLoadedClass(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
-	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name。因此可以在 map 中直接查找～
+	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name，即 java.lang.invoke.MethodType。因此[不]可以在 map 中直接查找！！
+	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/") + L".class";	// 变成 java/lang/invoke/MethodType.class
 
 	LockGuard lg(system_classmap_lock);
 
@@ -45,9 +47,9 @@ void JVM_FindLoadedClass(list<Oop *> & _stack){
 
 #ifdef DEBUG
 	if (_stack.back() == nullptr) {
-		sync_wcout{} << "(DEBUG) didn't find [" << klass_name << "] in system_map. return null." << std::endl;
+		sync_wcout{} << "(DEBUG) didn't find [" << klass_name << "] in system_map and myclass_map. return null." << std::endl;
 	} else {
-		sync_wcout{} << "(DEBUG) finded [" << klass_name << "] in system_map. return its mirror." << std::endl;
+		sync_wcout{} << "(DEBUG) finded [" << klass_name << "] in system_map and myclass_map. return its mirror." << std::endl;
 	}
 #endif
 
@@ -58,11 +60,12 @@ void JVM_FindBootStrapClass(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
-	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name。因此可以在 map 中直接查找～
+	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name，即 java.lang.invoke.MethodType。因此[不]可以在 map 中直接查找！！
+	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/");	// 变成 java/lang/invoke/MethodType.
 
 	LockGuard lg(system_classmap_lock);
 
-	auto klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);
+	auto klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);	// 如果是系统类，直接 load 了。
 	if (klass == nullptr) {
 		_stack.push_back(nullptr);
 	} else {

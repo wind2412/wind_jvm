@@ -12,7 +12,7 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
-shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *)	// TODO: ... 如果我恶意删掉 java.lang.Object 会怎样......
+shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
 {
 	// TODO: add lock simply... because it will cause code very ugly...
 //	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
@@ -57,9 +57,9 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 			bool is_basic_type = (classname[pos] == L'L') ? false : true;
 			if (!is_basic_type) {
 				// a. load the spliced class
-				wstring temp = classname.substr(layer + 1);		// "Ljava.lang.Object;" --> "java.lang.Object;"
-				wstring _true = temp.substr(0, temp.size()-1);	// "java.lang.Object;" --> "java.lang.Object"
-				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
+				wstring temp = classname.substr(layer + 1);		// "Ljava/lang/Object;" --> "java/lang/Object;"
+				wstring _true = temp.substr(0, temp.size()-1);	// "java/lang/Object;" --> "java/lang/Object"
+				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
@@ -140,7 +140,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 #endif
 	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
-	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom.zxl.Haha'.
+	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom/zxl/Haha'.
 		// TODO: 可以加上 classpath。
 		wstring target = classname + L".class";
 		if (classmap.find(target) != classmap.end()) {
@@ -179,7 +179,7 @@ MyClassLoader::get_loader().print();
 #endif
 			return newklass;
 		}
-	} else {	// e.g. '[[Lcom.zxl.Haha.   because if it is '[[Ljava.lang.Object', BootStrapClassLoader will load it already at the beginning of this method.
+	} else {	// e.g. '[[Lcom/zxl/Haha.   because if it is '[[Ljava/lang/Object', BootStrapClassLoader will load it already at the beginning of this method.
 		wstring target = classname + L".class";
 		if (classmap.find(target) != classmap.end()) {	// 已经 load 过
 			return classmap[target];
@@ -192,9 +192,9 @@ MyClassLoader::get_loader().print();
 			bool is_basic_type = (classname[pos] == L'L') ? false : true;
 			if (!is_basic_type) {
 				// a. load the spliced class
-				wstring temp = classname.substr(layer+1);		// java.lang.Object;
+				wstring temp = classname.substr(layer+1);		// java/lang/Object;
 				wstring _true = temp.substr(0, temp.size()-1);
-				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava.lang.Object'.
+				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.

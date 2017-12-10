@@ -306,6 +306,8 @@ void vm_thread::init_and_do_main()
 	{
 		auto methodtype_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
 		BytecodeEngine::initial_clinit(methodtype_klass, *this);
+		auto methodhandle_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandle"));
+		BytecodeEngine::initial_clinit(methodhandle_klass, *this);
 
 	}
 
