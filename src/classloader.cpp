@@ -4,6 +4,7 @@
 #include "runtime/klass.hpp"
 #include "utils/utils.hpp"
 #include "utils/synchronize_wcout.hpp"
+#include "runtime/oop.hpp"
 
 using std::ifstream;
 using std::shared_ptr;
@@ -12,7 +13,8 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
-shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
+shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *,
+												  bool, shared_ptr<InstanceKlass>, ObjArrayOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
 {
 	// TODO: add lock simply... because it will cause code very ugly...
 //	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
@@ -131,14 +133,74 @@ void BootStrapClassLoader::print()
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
-shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
+shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror,
+										   bool is_anonymous, shared_ptr<InstanceKlass> hostklass, ObjArrayOop *cp_patch)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
 {
 //	LockGuard lg(this->lock);
 	shared_ptr<InstanceKlass> result;
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
 #endif
-	if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
+//	if (classname == L"<unknown>") {		// Anonymous Klass 由 MyClassLoader 加载吧。
+	if (is_anonymous) {		// Anonymous Klass 由 MyClassLoader 加载吧。
+		assert(byte_buf != nullptr);
+		std::istream *stream;
+		shared_ptr<ClassFile> cf(new ClassFile);
+		std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
+#ifdef DEBUG
+		sync_wcout{} << "===----------------- begin parsing (" << classname << ") 's ClassFile in MyClassLoader ..." << std::endl;
+#endif
+		s >> *cf;
+#ifdef DEBUG
+		sync_wcout{} << "===----------------- parsing (" << classname << ") 's ClassFile end." << std::endl;
+#endif
+		// make patches first!
+		if (cp_patch != nullptr) {
+			auto pool = cf->constant_pool;
+			for (int i = 1; i < cp_patch->get_length(); i ++) {	// for cp_patch: 0 is not used.
+				if ((*cp_patch)[i] == nullptr) {
+					continue;		// this rt_pool[i] do not need patch
+				} else {		// patch.
+					auto patch_type = (*cp_patch)[i]->get_klass();
+//					std::wcout << pool[i-1]->tag << std::endl;		// delete
+					switch (pool[i-1]->tag) {
+						case CONSTANT_Class:{
+							if (patch_type->get_name() == L"java/lang/Class") {		// Class patch.
+								assert(false);
+							} else {
+								assert(false);	// didn't support yet.
+							}
+							break;
+						}
+						case CONSTANT_String:{	// return is okay OWO.
+							break;
+						}
+						default:{
+							assert(false);
+						}
+					}
+
+				}
+			}
+		}
+
+		// convert to a MetaClass (link)
+		shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, /*this*/ nullptr, loader_mirror);	// I think nullptr maybe good choice?? 反正是对所有 loader 都不可见...
+		// reset the Anonymous Klass's name.
+		std::wstringstream ss;
+		ss << newklass->get_name() << L"/" << newklass;			// 这里的 bug，在于看到注释了解到 Anonymous Klass 不属于任何一个 classloader......于是就没放进 classloader 中......结果 shared_ptr 由于引用计数变成0 自动析构了 .... 各种ub...
+		newklass->set_name(ss.str());
+//		std::wcout << newklass->get_name() << std::endl;		// delete
+		// set the hostklass.
+		newklass->set_hostklass(hostklass);		// set hostklass...
+#ifdef KLASS_DEBUG
+BootStrapClassLoader::get_bootstrap().print();
+MyClassLoader::get_loader().print();
+#endif
+//		classmap.insert(make_pair(classname, newklass));			// 不插入！！！Anonymous 对于各种 loader 不可见！
+		anonymous_klassmap.push_back(newklass);					// bug report: 然而不插入的话...... shared_ptr 的特性...... 引用计数会消失......然后 ub... 所以只能强行插入一波了... 反正我也不会对 klass GC（逃
+		return newklass;
+	} else if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
 	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom/zxl/Haha'.
 		// TODO: 可以加上 classpath。

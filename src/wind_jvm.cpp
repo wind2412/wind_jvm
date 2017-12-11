@@ -371,18 +371,72 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":fileName:" STR,       file_name);
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
-#ifdef DEBUG
-	sync_wcout{} << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
-#endif
+//#ifdef DEBUG
+	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+	int j = 1;
+	for (Oop * value : it->localVariableTable) {
+		if (value == nullptr) {
+			ss << "    the "<< j-1 << " argument is [null]" << std::endl;
+		} else if (value->get_ooptype() == OopType::_BasicTypeOop) {
+			switch(((BasicTypeOop *)value)->get_type()) {
+				case Type::BOOLEAN:
+					ss << "    the "<< j-1 << " argument is [Z]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					break;
+				case Type::BYTE:
+					ss << "    the "<< j-1 << " argument is [B]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					break;
+				case Type::SHORT:
+					ss << "    the "<< j-1 << " argument is [S]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					break;
+				case Type::INT:
+					ss << "    the "<< j-1 << " argument is [I]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					break;
+				case Type::CHAR:
+					ss << "    the "<< j-1 << " argument is [C]: ['" << (wchar_t)((IntOop *)value)->value << "']" << std::endl;
+					break;
+				case Type::FLOAT:
+					ss << "    the "<< j-1 << " argument is [F]: ['" << ((FloatOop *)value)->value << "']" << std::endl;
+					break;
+				case Type::LONG:
+					ss << "    the "<< j-1 << " argument is [L]: ['" << ((LongOop *)value)->value << "']" << std::endl;
+					break;
+				case Type::DOUBLE:
+					ss << "    the "<< j-1 << " argument is [D]: ['" << ((DoubleOop *)value)->value << "']" << std::endl;
+					break;
+				default:
+					assert(false);
+			}
+		} else if (value->get_ooptype() == OopType::_TypeArrayOop) {
+			ss << "    the "<< j-1 << " argument is TypeArrayOop." << std::endl;
+		} else if (value->get_ooptype() == OopType::_ObjArrayOop) {
+			ss << "    the "<< j-1 << " argument is ObjArrayOop." << std::endl;
+		} else {		// InstanceOop
+			if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
+				ss << "    the "<< j-1 << " argument is java/lang/String: [\"" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "\"]" << std::endl;
+			} else if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
+				wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
+				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]" << std::endl;
+			} else {
+				auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
+//				auto toString = real_klass->get_this_class_method(L"toString:()Ljava/lang/String;");
+//				assert(toString != nullptr);
+//				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]" << std::endl;
+//				this->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
+				ss << "    the "<< j-1 << " argument is " << real_klass->get_name() << ": [unknown value]" << std::endl;
+			}
+		}
+		j ++;
+	}
+//#endif
 
 		i ++;
 	}
 
-#ifdef DEBUG
-	sync_wcout{} << "===------------------- printStackTrace() ------------------===" << std::endl;
+//#ifdef DEBUG
+	sync_wcout{} << "===-------------------------------------- printStackTrace() -----------------------------------------===" << std::endl;
 	sync_wcout{} << ss.str();
-	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
-#endif
+	sync_wcout{} << "===--------------------------------------------------------------------------------------------------===" << std::endl;
+//#endif
 
 	return arr;
 }

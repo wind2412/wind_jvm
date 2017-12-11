@@ -102,7 +102,7 @@ void JVM_DefineClass1(list<Oop *> & _stack){
 
 	ByteStream byte_buf(buf, len);
 
-	auto klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf);
+	auto klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_java_loader());
 	assert(klass != nullptr);
 	_stack.push_back(klass->get_mirror());
 

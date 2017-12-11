@@ -13,6 +13,7 @@
 #include "native/java_lang_String.hpp"
 #include "utils/os.hpp"
 #include "classloader.hpp"
+#include "wind_jvm.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"getConstant:(I)I",							(void *)&JVM_GetConstant},
@@ -65,7 +66,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
 	int flags = ((IntOop *)oop)->value;
 
-	std::wcout << clazz->get_mirrored_who()->get_name() << " " << java_lang_string::stringOop_to_wstring(name) << std::endl;		// delete
+//	std::wcout << clazz->get_mirrored_who()->get_name() << " " << java_lang_string::stringOop_to_wstring(name) << std::endl;		// delete
 
 	auto klass = clazz->get_mirrored_who();
 
@@ -115,9 +116,9 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 				|| real_name == L"linkToInterface"))  {		// 悲伤。由于历史原因（，我的查找是通过字符串比对来做的......简直无脑啊......这样这里效率好低吧QAQ。不过毕竟只是个玩具，跑通就好......
 		descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";
 	} else {
-		descriptor += L"(";
 		// 1. should parse the `Object type;` member first.
 		if (type->get_klass()->get_name() == L"java/lang/invoke/MethodType") {
+			descriptor += L"(";
 			Oop *oop;
 			// 1-a-1: get the args type.
 			type->get_field_value(METHODTYPE L":ptypes:[" CLS, &oop);
@@ -132,23 +133,37 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 			assert(oop != nullptr);
 			descriptor += get_full_name((MirrorOop *)oop);
 		} else if (type->get_klass()->get_name() == L"java/lang/Class") {
-			assert(false);
+			auto real_klass = ((MirrorOop *)type)->get_mirrored_who();
+			if (real_klass == nullptr) {
+				descriptor += ((MirrorOop *)type)->get_extra();
+			} else {
+				if (real_klass->get_type() == ClassType::InstanceClass) {
+					descriptor += (L"L" + real_klass->get_name() + L";");
+				} else if (real_klass->get_type() == ClassType::TypeArrayClass || real_klass->get_type() == ClassType::ObjArrayClass) {
+					descriptor += real_klass->get_name();
+				} else {
+					assert(false);
+				}
+			}
 		} else if (type->get_klass()->get_name() == L"java/lang/String") {
-			assert(false);
+			assert(false);		// not support yet...
 		} else {
 			assert(false);
 		}
 	}
 
-	wstring signature = real_name + L":" + descriptor;
 
 	if (flags & 0x10000) {		// Method:
+		wstring signature = real_name + L":" + descriptor;
 		shared_ptr<Method> target_method;
 		if (ref_kind == 6)	{	// invokeStatic
 			std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 			target_method = real_klass->get_this_class_method(signature);
 			assert(target_method != nullptr);
 		} else {
+			std::wcout << ".....signature: [" << real_klass->get_name() << " " << real_name << " " << descriptor << std::endl;	// delete
+			vm_thread *thread = (vm_thread *)_stack.back();		// delete
+			thread->get_stack_trace();			// delete
 			assert(false);		// not support yet...
 		}
 
@@ -159,9 +174,9 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 			new_flag |= 0x100000;
 		}
 		if (ref_kind == 6) {
-			new_flag |= 0x10000 | (6 << 24);
+			new_flag |= 0x10000 | (6 << 24);		// invokeStatic
 		} else {
-			assert(false);
+			assert(false);		// not support yet...
 		}
 
 		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
@@ -170,8 +185,38 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_method->get_klass()->get_mirror());
 		_stack.push_back(member_name2);
 		return;
-	} else {
+	} else if (flags & 0x20000){		// Constructor
 		assert(false);			// not support yet...
+	} else if (flags & 0x40000) {	// Field
+		wstring signature = real_name + L":" + descriptor;
+		auto _pair = real_klass->get_field(signature);
+		assert(_pair.second != nullptr);
+		auto target_field = _pair.second;
+
+		// very **IMPORTANT**!! used for the `target_field->get_type_klass()` after!
+		target_field->if_didnt_parse_then_parse();
+
+		// build the return MemberName obj.
+		auto member_name2 = std::static_pointer_cast<InstanceKlass>(member_name_obj->get_klass())->new_instance();
+		int new_flag = (target_field->get_flag() & (~ACC_ANNOTATION));
+		if (target_field->is_static()) {
+			new_flag |= 0x40000 | (2 << 24);		// getStatic(2)
+		} else {
+			new_flag |= 0x40000 | (1 << 24);		// getField(1)
+		}
+
+		if (ref_kind > 2) {		// putField(3) / putStatic(2)
+			new_flag += ((3 - 1) << 24);
+		}
+
+		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);
+		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));
+		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_type_klass()->get_mirror());
+		_stack.push_back(member_name2);
+		return;
+	} else {
+		assert(false);
 	}
 
 

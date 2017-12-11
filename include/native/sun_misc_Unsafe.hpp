@@ -27,6 +27,8 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack);
 void JVM_CompareAndSwapObject(list<Oop *> & _stack);
 void JVM_CompareAndSwapLong(list<Oop *> & _stack);
 void JVM_ShouldBeInitialized(list<Oop *> & _stack);
+void JVM_DefineAnonymousClass(list<Oop *> & _stack);
+void JVM_EnsureClassInitialized(list<Oop *> & _stack);
 
 
 void *sun_misc_unsafe_search_method(const wstring & str);

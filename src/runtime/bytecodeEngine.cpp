@@ -2471,9 +2471,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						if (native_method == nullptr) {
 							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
 							if (new_method->is_static()) {
-								std::wcout << "[static]";
+								std::wcout << "[static] ";
 							}
-							std::wcout << " method!" << std::endl;
+							std::wcout << "method!" << std::endl;
 						}
 						assert(native_method != nullptr);
 #ifdef DEBUG
@@ -2652,9 +2652,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						if (native_method == nullptr) {
 							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
 							if (new_method->is_static()) {
-								std::wcout << "[static]";
+								std::wcout << "[static] ";
 							}
-							std::wcout << " method!" << std::endl;
+							std::wcout << "method!" << std::endl;
 						}
 						assert(native_method != nullptr);
 						if (*pc == 0xb7)

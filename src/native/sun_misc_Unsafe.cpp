@@ -12,6 +12,8 @@
 #include "native/native.hpp"
 #include "native/java_lang_String.hpp"
 #include "utils/os.hpp"
+#include "classloader.hpp"
+#include "wind_jvm.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"arrayBaseOffset:(" CLS ")I",							(void *)&JVM_ArrayBaseOffset},
@@ -28,7 +30,8 @@ static unordered_map<wstring, void*> methods = {
     {L"compareAndSwapObject:(" OBJ "J" OBJ OBJ ")Z",			(void *)&JVM_CompareAndSwapObject},
     {L"compareAndSwapLong:(" OBJ "JJJ)Z",						(void *)&JVM_CompareAndSwapLong},
     {L"shouldBeInitialized:(" CLS ")Z",						(void *)&JVM_ShouldBeInitialized},
-    {L"defineAnonymousClass:(" CLS "[B[" OBJ ")" CLS,			(void *)&JVM_ShouldBeInitialized},
+    {L"defineAnonymousClass:(" CLS "[B[" OBJ ")" CLS,			(void *)&JVM_DefineAnonymousClass},
+    {L"ensureClassInitialized:(" CLS ")V",					(void *)&JVM_EnsureClassInitialized},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -319,21 +322,61 @@ void JVM_ShouldBeInitialized(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(klass->get_mirrored_who()->get_state() == Klass::KlassState::NotInitialized));
 }
 
-void defineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp:Unsafe_DefineAnonymousClass_impl().
+void JVM_DefineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp:Unsafe_DefineAnonymousClass_impl().
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
-	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();			// hostclass. see java sourcecode backtrace can see, It can get from: @CallerSensitive: getCallerClass.
-	TypeArrayOop *array = (TypeArrayOop *)_stack.front();	_stack.pop_front();		// bytecodes.
-	ObjArrayOop *obj_arr = (ObjArrayOop *)_stack.front();	_stack.pop_front();		// cp_patch array, maybe null.
+	MirrorOop *host_klass_mirror = (MirrorOop *)_stack.front();	_stack.pop_front();			// hostclass. see java sourcecode backtrace can see, It can get from: @CallerSensitive: getCallerClass.
+	TypeArrayOop *bytes = (TypeArrayOop *)_stack.front();	_stack.pop_front();		// bytecodes.
+	ObjArrayOop *cp_patch = (ObjArrayOop *)_stack.front();	_stack.pop_front();		// cp_patch array, maybe null.
+
+//	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
+
+	int len = bytes->get_length();
+
+	// delete all:	( 调试信息还是留着吧. )
+//	vm_thread *thread = (vm_thread *)_stack.back();		// 输出堆栈信息
+//	thread->get_stack_trace();			// delete
+//	// delete:
+//	for (int i = 0; i < bytes->get_length(); i ++) {		// 输出全部字节码
+//		std::wcout << std::hex << ((IntOop *)(*bytes)[i])->value << " " << std::dec;
+//	}
+//	std::wcout << std::endl;
+//	std::wcout << host_klass_mirror->get_mirrored_who()->get_name() << " " << len << " " << cp_patch->get_length() << std::endl;	// delete
 
 
+	wstring klass_name = L"<unknown>";
 
+	char *buf = new char[len];
 
+	for (int i = 0; i < len; i ++) {
+		buf[i] = (char)((IntOop *)(*bytes)[i])->value;
+	}
 
+	ByteStream byte_buf(buf, len);
 
-	assert(false);
+	// host_klass
+	shared_ptr<InstanceKlass> host_klass = std::static_pointer_cast<InstanceKlass>(host_klass_mirror->get_mirrored_who());
+	// host_klass's java loader.
+	MirrorOop *host_klass_loader = (host_klass == nullptr) ? nullptr : std::static_pointer_cast<InstanceKlass>(host_klass)->get_java_loader();
+
+	auto anonymous_klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, host_klass_loader,
+																 true, host_klass, cp_patch);
+	assert(anonymous_klass != nullptr);
+	_stack.push_back(anonymous_klass->get_mirror());
+
+	delete[] buf;
 
 }
 
+void JVM_EnsureClassInitialized(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
+
+	assert(klass->get_mirrored_who()->get_type() == ClassType::InstanceClass);
+	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass->get_mirrored_who());
+	assert(real_klass != nullptr);
+	BytecodeEngine::initial_clinit(real_klass, *thread);
+}
 
 // 返回 fnPtr.
 void *sun_misc_unsafe_search_method(const wstring & signature)

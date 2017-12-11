@@ -90,7 +90,8 @@ public:
 	void set_child(shared_ptr<Klass> child) { this->child = child; }
 	int get_access_flags() { return access_flags; }
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
-	wstring get_name() { return name; }
+	wstring get_name() { return this->name; }
+	void set_name(const wstring & name) { this->name = name; }
 	ClassType get_type() { return classtype; }
 	MirrorOop *get_mirror() { return java_mirror; }
 	void set_mirror(MirrorOop *mirror) { java_mirror = mirror; }
@@ -168,6 +169,9 @@ private:
 	u2 num_RuntimeVisibleTypeAnnotations = 0;
 	TypeAnnotation *rvta = nullptr;
 
+	// for Anonymous Klass only:
+	shared_ptr<InstanceKlass> host_klass;		// if this klass is not Anonymous Klass, will be nullptr.
+
 private:
 	void parse_methods(shared_ptr<ClassFile> cf);
 	void parse_fields(shared_ptr<ClassFile> cf);
@@ -188,6 +192,8 @@ public:
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
+	shared_ptr<InstanceKlass> get_hostklass() { return host_klass; }
+	void set_hostklass(shared_ptr<InstanceKlass> hostklass) { host_klass = hostklass; }
 	MirrorOop *get_java_loader() { return this->java_loader; }
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & BIG_signature);	// [classname + ':' + name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
