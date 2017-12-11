@@ -3020,14 +3020,34 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(dimensions > 0);		// 维度肯定要 > 0 ! 至少是 1！！
 				vector<int> counts;			// 所以这里才能保证至少有 1 个元素！！
 				for (int i = 0; i < dimensions; i ++) {
-					Oop *count = op_stack.top();
+					Oop *count = op_stack.top();	op_stack.pop();
 					assert(count->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)count)->get_type() == Type::INT);
-					if (((IntOop *)op_stack.top())->value < 0) {
+					if (((IntOop *)count)->value < 0) {
 						std::wcerr << "array length can't be negative!!" << std::endl;
 						assert(false);
 					}
 					counts.push_back(((IntOop *)count)->value);
 				}
+
+				// lambda to recursively create a multianewarray::
+				function<Oop *(shared_ptr<ArrayKlass>, int)> recursive_create_multianewarray = [&counts, &recursive_create_multianewarray](shared_ptr<ArrayKlass> arr_klass, int index) -> Oop *{
+					// 1. new an multianewarray, which length is counts[index]!! ( counts[0] first )
+					auto arr_obj = arr_klass->new_instance(counts[index]);
+					// 2-a. if this is the last dimension(1), then return.
+					if (index == counts.size() - 1) {
+						assert(arr_klass->get_dimension() == 1);		// or judge with this is okay.
+						return arr_obj;		// create over.
+					}
+					// 2-b. else, get the inner multianewarray type.
+					auto inner_arr_klass = std::static_pointer_cast<ArrayKlass>(arr_klass->get_lower_dimension());
+					assert(inner_arr_klass != nullptr);
+					// 3. fill in every element in this `fake multiarray`, which is really one dimension... (java 的多维数组是伪的，众人皆知)
+					for (int i = 0; i < arr_obj->get_length(); i ++) {
+						(*arr_obj)[i] = recursive_create_multianewarray(inner_arr_klass, index + 1);
+					}
+					return arr_obj;
+				};
+
 
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
 				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
@@ -3044,44 +3064,21 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 //					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 //					op_stack.push(arr_klass->new_instance(length));
 				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// e.g.: [[[Ljava/lang/Class	// 注意：这回不用再加上一维了！编译器给出的是真·数组 klass name！直接拿来用就好！
-					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
-					// 创建数组的数组。不过也和 if 中的逻辑相同。
-					// 不过由于数组类没有设置 classloader，需要从 element 中去找。
-					shared_ptr<ObjArrayKlass> arr_klass;
-					if (real_klass->get_element_klass()->get_classloader() == nullptr) {
-						arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(real_klass->get_name()));
-					} else {
-						arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_klass()->get_classloader()->loadClass(real_klass->get_name()));
-					}
+					auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
 					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 					assert(arr_klass->get_dimension() == dimensions);	// I think must be equal here!
-
-					// lambda:
-					function<Oop *(shared_ptr<ObjArrayKlass>, int)> recursive_create_multianewarray = [&counts, &recursive_create_multianewarray](shared_ptr<ObjArrayKlass> arr_klass, int index) -> Oop *{
-						// 1. new an multianewarray, which length is counts[index]!! ( counts[0] first )
-						auto arr_obj = arr_klass->new_instance(counts[index]);
-						// 2-a. if this is the last dimension(1), then return.
-						if (index == counts.size() - 1) {
-							assert(arr_klass->get_dimension() == 1);		// or judge with this is okay.
-							return arr_obj;		// create over.
-						}
-						// 2-b. else, get the inner multianewarray type.
-						auto inner_arr_klass = std::static_pointer_cast<ObjArrayKlass>(arr_klass->get_lower_dimension());
-						assert(inner_arr_klass != nullptr);
-						// 3. fill in every element in this `fake multiarray`, which is really one dimension... (java 的多维数组是伪的，众人皆知)
-						for (int i = 0; i < arr_obj->get_length(); i ++) {
-							(*arr_obj)[i] = recursive_create_multianewarray(inner_arr_klass, index + 1);
-						}
-						return arr_obj;
-					};
 
 					op_stack.push(recursive_create_multianewarray(arr_klass, 0));
 
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) new an multianewarray: [" << arr_klass->get_name() << "]." << std::endl;
 #endif
+				} else if (klass->get_type() == ClassType::TypeArrayClass) {		// int [3][4][5][6][7][8][9]
+					auto arr_klass = std::static_pointer_cast<TypeArrayKlass>(klass);
+					assert(arr_klass->get_type() == ClassType::TypeArrayClass);
+					assert(arr_klass->get_dimension() == dimensions);	// I think must be equal here!
 
-
+					op_stack.push(recursive_create_multianewarray(arr_klass, 0));
 				} else {
 					assert(false);
 				}

@@ -229,7 +229,7 @@ void JVM_GetClassName(list<Oop *> & _stack){
 				assert(false);
 		}
 	} else {
-		Oop *str = java_lang_string::intern(_this->get_mirrored_who()->get_name());
+		Oop *str = java_lang_string::intern(std::regex_replace(_this->get_mirrored_who()->get_name(), std::wregex(L"/"), L"."));
 		_stack.push_back(str);
 	}
 #ifdef DEBUG

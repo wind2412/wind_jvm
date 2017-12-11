@@ -210,11 +210,13 @@ public:
 	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
 	bool check_interfaces(shared_ptr<InstanceKlass> klass);
 	bool check_parent(const wstring & signature) {
+		if (this->parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
 		bool success1 = this->parent->get_name() == signature;
 		bool success2 = (this->parent == nullptr) ? false : std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(signature);
 		return success1 || success2;
 	}
 	bool check_parent(shared_ptr<InstanceKlass> klass) {
+		if (this->parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
 		bool success1 = this->parent == klass;
 		bool success2 = (this->parent == nullptr) ? false : std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(klass);
 		return success1 || success2;

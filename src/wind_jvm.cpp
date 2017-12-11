@@ -117,8 +117,9 @@ MirrorOop *vm_thread::get_caller_class_CallerSensitive()
 	// back-trace. this method is called from: sun_reflect_Reflection.cpp:JVM_GetCallerClass()
 	int level = 0;
 	int total_levelnum = this->vm_stack.size();
+	shared_ptr<Method> m;
 	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it, ++level) {
-		shared_ptr<Method> m = it->method;
+		m = it->method;
 		if (level == 0 || level == 1) {
 			// if level == 0, this method must be `getCallerClass`.
 			if (level == 0) {
@@ -133,16 +134,21 @@ MirrorOop *vm_thread::get_caller_class_CallerSensitive()
 			// TODO: openjdk: is_ignored_by_security_stack_walk(), but didn't implement the third switch because I didn't understand it...
 			if (m->get_name() == L"invoke:(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;") {
 				continue;	// java/lang/Reflection/Method.invoke(), ignore.
-			}
-			if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
+			} else if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
 				continue;
+			} if (m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {	// 自己加的。详见：http://blog.csdn.net/hel_wor/article/details/50199797
+				continue;
+			} else {
+				break;
 			}
-			// TODO: 第三点名没有明白......有待研究...
+			// TODO: 第三点名没有明白......有待研究... is_Compiled_lambda_form...
 		}
-		m->print_all_attribute_name();		// delete
-		return m->get_klass()->get_mirror();
 	}
-	assert(false);
+	if (level == total_levelnum) {		// no stackframe any more...
+		assert(false);
+	}
+	m->print_all_attribute_name();		// delete
+	return m->get_klass()->get_mirror();
 }
 
 void vm_thread::init_and_do_main()
@@ -376,53 +382,53 @@ ArrayOop * vm_thread::get_stack_trace()
 	int j = 1;
 	for (Oop * value : it->localVariableTable) {
 		if (value == nullptr) {
-			ss << "    the "<< j-1 << " argument is [null]" << std::endl;
+			ss << "    the localVariableTable[" << j-1 << "] is [null]" << std::endl;
 		} else if (value->get_ooptype() == OopType::_BasicTypeOop) {
 			switch(((BasicTypeOop *)value)->get_type()) {
 				case Type::BOOLEAN:
-					ss << "    the "<< j-1 << " argument is [Z]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [Z]: [" << ((IntOop *)value)->value << "]" << std::endl;
 					break;
 				case Type::BYTE:
-					ss << "    the "<< j-1 << " argument is [B]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [B]: [" << ((IntOop *)value)->value << "]" << std::endl;
 					break;
 				case Type::SHORT:
-					ss << "    the "<< j-1 << " argument is [S]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [S]: [" << ((IntOop *)value)->value << "]" << std::endl;
 					break;
 				case Type::INT:
-					ss << "    the "<< j-1 << " argument is [I]: [" << ((IntOop *)value)->value << "]" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [I]: [" << ((IntOop *)value)->value << "]" << std::endl;
 					break;
 				case Type::CHAR:
-					ss << "    the "<< j-1 << " argument is [C]: ['" << (wchar_t)((IntOop *)value)->value << "']" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [C]: ['" << (wchar_t)((IntOop *)value)->value << "']" << std::endl;
 					break;
 				case Type::FLOAT:
-					ss << "    the "<< j-1 << " argument is [F]: ['" << ((FloatOop *)value)->value << "']" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [F]: ['" << ((FloatOop *)value)->value << "']" << std::endl;
 					break;
 				case Type::LONG:
-					ss << "    the "<< j-1 << " argument is [L]: ['" << ((LongOop *)value)->value << "']" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [L]: ['" << ((LongOop *)value)->value << "']" << std::endl;
 					break;
 				case Type::DOUBLE:
-					ss << "    the "<< j-1 << " argument is [D]: ['" << ((DoubleOop *)value)->value << "']" << std::endl;
+					ss << "    the localVariableTable[" << j-1 << "] is [D]: ['" << ((DoubleOop *)value)->value << "']" << std::endl;
 					break;
 				default:
 					assert(false);
 			}
 		} else if (value->get_ooptype() == OopType::_TypeArrayOop) {
-			ss << "    the "<< j-1 << " argument is TypeArrayOop." << std::endl;
+			ss << "    the localVariableTable[" << j-1 << "] is TypeArrayOop." << std::endl;
 		} else if (value->get_ooptype() == OopType::_ObjArrayOop) {
-			ss << "    the "<< j-1 << " argument is ObjArrayOop." << std::endl;
+			ss << "    the localVariableTable[" << j-1 << "] is ObjArrayOop." << std::endl;
 		} else {		// InstanceOop
 			if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
-				ss << "    the "<< j-1 << " argument is java/lang/String: [\"" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "\"]" << std::endl;
+				ss << "    the localVariableTable[" << j-1 << "] is java/lang/String: [\"" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "\"]" << std::endl;
 			} else if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
 				wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
-				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]" << std::endl;
+				ss << "    the localVariableTable[" << j-1 << "] is java/lang/Class: [\"" << type << "\"]" << std::endl;
 			} else {
 				auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
 //				auto toString = real_klass->get_this_class_method(L"toString:()Ljava/lang/String;");
 //				assert(toString != nullptr);
 //				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]" << std::endl;
 //				this->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
-				ss << "    the "<< j-1 << " argument is " << real_klass->get_name() << ": [unknown value]" << std::endl;
+				ss << "    the localVariableTable[" << j-1 << "] is " << real_klass->get_name() << ": [unknown value]" << std::endl;
 			}
 		}
 		j ++;
