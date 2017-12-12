@@ -195,7 +195,7 @@ public:
 	shared_ptr<InstanceKlass> get_hostklass() { return host_klass; }
 	void set_hostklass(shared_ptr<InstanceKlass> hostklass) { host_klass = hostklass; }
 	MirrorOop *get_java_loader() { return this->java_loader; }
-	pair<int, shared_ptr<Field_info>> get_field(const wstring & BIG_signature);	// [classname + ':' + name + ':' + descriptor]
+	pair<int, shared_ptr<Field_info>> get_field(const wstring & descriptor);	// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
 	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
 	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
@@ -234,6 +234,8 @@ public:		// for reflection.
 	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
 public:		// for invokedynamic.
 	bool is_in_vtable(shared_ptr<Method> m) { return std::find(vtable.begin(), vtable.end(), m) != vtable.end(); }
+	const auto & get_field_layout() { return this->fields_layout; }
+	const auto & get_static_field_layout() { return this->static_fields_layout; }
 private:
 	InstanceKlass(const InstanceKlass &);
 public:

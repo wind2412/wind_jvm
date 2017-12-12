@@ -1028,8 +1028,38 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
-
+			case 0x43:{		// fstore_0
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				localVariableTable[0] = new FloatOop(((FloatOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) pop stack top float: "<< ((FloatOop *)localVariableTable[0])->value << " to localVariableTable[0] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x44:{		// fstore_1
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				localVariableTable[1] = new FloatOop(((FloatOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) pop stack top float: "<< ((FloatOop *)localVariableTable[1])->value << " to localVariableTable[1] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x45:{		// fstore_2
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				localVariableTable[2] = new FloatOop(((FloatOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) pop stack top float: "<< ((FloatOop *)localVariableTable[2])->value << " to localVariableTable[2] and rewrite." << std::endl;
+#endif
+				break;
+			}
+			case 0x46:{		// fstore_3
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				localVariableTable[3] = new FloatOop(((FloatOop *)op_stack.top())->value);	op_stack.pop();
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) pop stack top float: "<< ((FloatOop *)localVariableTable[3])->value << " to localVariableTable[3] and rewrite." << std::endl;
+#endif
+				break;
+			}
 			case 0x47:{		// dstore_0
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
 				localVariableTable[0] = new DoubleOop(((DoubleOop *)op_stack.top())->value);	op_stack.pop();
@@ -2021,8 +2051,37 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x97:		// dcmpl
+			case 0x98:{		// dcmpg
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val1 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
 
-
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) ";
+#endif
+				if (val1 == DOUBLE_NAN || val2 == DOUBLE_NAN) {
+					if (*pc == 0x97) {
+						op_stack.push(new IntOop(-1));
+					} else {
+						op_stack.push(new IntOop(1));
+					}
+#ifdef DEBUG
+	sync_wcout{} << "meet DOUBLE_NAN. then ";
+#endif
+				} else if (val1 < val2) {
+					op_stack.push(new IntOop(-1));
+				} else if (val1 > val2) {
+					op_stack.push(new IntOop(1));
+				} else {
+					op_stack.push(new IntOop(0));
+				}
+#ifdef DEBUG
+	sync_wcout{} << "push [" << ((IntOop *)op_stack.top())->value << "] onto the stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x99:		// ifeq
 			case 0x9a:		// ifne
 			case 0x9b:		// iflt

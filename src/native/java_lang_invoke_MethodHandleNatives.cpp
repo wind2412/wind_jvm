@@ -16,11 +16,12 @@
 #include "wind_jvm.hpp"
 
 static unordered_map<wstring, void*> methods = {
-    {L"getConstant:(I)I",							(void *)&JVM_GetConstant},
-    {L"resolve:(" MN CLS ")" MN,						(void *)&JVM_Resolve},
-    {L"expand:(" MN ")V",							(void *)&JVM_Expand},
-    {L"init:(" MN OBJ ")V",							(void *)&JVM_Init},
-    {L"objectFieldOffset:(" MN ")J",					(void *)&JVM_MH_ObjectFieldOffset},
+    {L"getConstant:(I)I",												(void *)&JVM_GetConstant},
+    {L"resolve:(" MN CLS ")" MN,											(void *)&JVM_Resolve},
+    {L"expand:(" MN ")V",												(void *)&JVM_Expand},
+    {L"init:(" MN OBJ ")V",												(void *)&JVM_Init},
+    {L"objectFieldOffset:(" MN ")J",										(void *)&JVM_MH_ObjectFieldOffset},
+    {L"getMembers:(" CLS STR STR "I" CLS "I" "[" MN ")I",					(void *)&JVM_GetMembers},
 };
 
 void JVM_GetConstant(list<Oop *> & _stack){		// static
@@ -43,6 +44,50 @@ wstring get_full_name(MirrorOop *mirror)
 			assert(false);
 		}
 	}
+}
+
+InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type)
+{
+	auto member_name2 = std::static_pointer_cast<InstanceKlass>(origin_member_name_obj->get_klass())->new_instance();
+	int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
+	if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
+		new_flag |= 0x100000;
+	}
+
+	assert(ref_kind >= 5 && ref_kind <= 9);
+	new_flag |= 0x10000 | (ref_kind << 24);		// invokeStatic
+
+	member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+	member_name2->set_field_value(MEMBERNAME L":name:" STR, java_lang_string::intern(target_method->get_name()));
+	member_name2->set_field_value(MEMBERNAME L":type:" OBJ, type);
+	member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_method->get_klass()->get_mirror());
+	return member_name2;
+}
+
+InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_field, InstanceOop *origin_member_name_obj, int ref_kind)
+{
+	// for target_field->get_type_klass:
+	target_field->if_didnt_parse_then_parse();
+
+	// build the return MemberName obj.
+	auto member_name2 = std::static_pointer_cast<InstanceKlass>(origin_member_name_obj->get_klass())->new_instance();
+	int new_flag = (target_field->get_flag() & (~ACC_ANNOTATION));
+	if (target_field->is_static()) {
+		new_flag |= 0x40000 | (2 << 24);		// getStatic(2)
+	} else {
+		new_flag |= 0x40000 | (1 << 24);		// getField(1)
+	}
+
+	if (ref_kind > 2) {		// putField(3) / putStatic(2)
+		new_flag += ((3 - 1) << 24);
+	}
+
+	member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
+	member_name2->set_field_value(MEMBERNAME L":name:" STR, java_lang_string::intern(target_field->get_name()));		// will not be settled by Java JDK!! // 必须要设置......
+	member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));		// 必须要设置......
+//		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, target_field->get_type_klass()->get_mirror());
+	member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_klass()->get_mirror());		// set the field's inner klass!!! not the Type!!
+	return member_name2;
 }
 
 void JVM_Resolve(list<Oop *> & _stack){		// static
@@ -179,19 +224,8 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		}
 
 		// build the return MemberName obj.
-		auto member_name2 = std::static_pointer_cast<InstanceKlass>(member_name_obj->get_klass())->new_instance();
-		int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
-		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
-			new_flag |= 0x100000;
-		}
+		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type);
 
-		assert(ref_kind >= 5 && ref_kind <= 9);
-		new_flag |= 0x10000 | (ref_kind << 24);		// invokeStatic
-
-		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
-		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);
-		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, type);
-		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_method->get_klass()->get_mirror());
 		_stack.push_back(member_name2);
 		return;
 	} else if (flags & 0x20000){		// Constructor
@@ -202,27 +236,8 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		assert(_pair.second != nullptr);
 		auto target_field = _pair.second;
 
-		// for target_field->get_type_klass:
-		target_field->if_didnt_parse_then_parse();
+		auto member_name2 = fill_in_MemberName_with_Fieldinfo(target_field, member_name_obj, ref_kind);
 
-		// build the return MemberName obj.
-		auto member_name2 = std::static_pointer_cast<InstanceKlass>(member_name_obj->get_klass())->new_instance();
-		int new_flag = (target_field->get_flag() & (~ACC_ANNOTATION));
-		if (target_field->is_static()) {
-			new_flag |= 0x40000 | (2 << 24);		// getStatic(2)
-		} else {
-			new_flag |= 0x40000 | (1 << 24);		// getField(1)
-		}
-
-		if (ref_kind > 2) {		// putField(3) / putStatic(2)
-			new_flag += ((3 - 1) << 24);
-		}
-
-		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
-		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);		// will not be settled by Java JDK!! // 必须要设置......
-		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));		// 必须要设置......
-//		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, target_field->get_type_klass()->get_mirror());
-		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_klass()->get_mirror());		// set the field's inner klass!!! not the Type!!
 		_stack.push_back(member_name2);
 		return;
 	} else {
@@ -233,6 +248,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 
 	assert(false);
 }
+
 
 void JVM_Expand(list<Oop *> & _stack) {
 	// 这个方法无法使用。因为我的实现没有 itable...而且我也并不知道 vmindex 应该被放到哪里。
@@ -347,9 +363,70 @@ void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN
 		fake_descriptor = (L"L" + fake_descriptor + L";");
 	}
 	int offset = real_klass->get_all_field_offset(real_klass->get_name() + L":" + real_name + L":" + fake_descriptor);
-	std::wcout << real_klass->get_name() << ":" << real_name << ":" << fake_descriptor << " " << offset << std::endl;
+//	std::wcout << real_klass->get_name() << ":" << real_name << ":" << fake_descriptor << " " << offset << std::endl;
 
 	_stack.push_back(new LongOop(offset));
+}
+
+void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一处：getMembers 用到了 MethodHandleNatives.getMembers。
+	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *match_name = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *match_sig = (InstanceOop *)_stack.front();	_stack.pop_front();
+	int match_flag = ((IntOop *)_stack.front())->value;	_stack.pop_front();			// the **REAL** flag!! no encode!!
+	MirrorOop *caller_mirror = (MirrorOop *)_stack.front();	_stack.pop_front();		// of no use.
+	int skip = ((IntOop *)_stack.front())->value;	_stack.pop_front();					// of no use.
+	ObjArrayOop *member_name_arr = (ObjArrayOop *)_stack.front();	_stack.pop_front();	// this array is initialized in Java8, fully by dummy structures.
+
+	assert(klass != nullptr && member_name_arr != nullptr);
+	for (int i = 0; i < member_name_arr->get_length(); i ++) {
+		assert((*member_name_arr)[i] != nullptr);		// 因为只有一处使用，而那里是直接 fully initialized by `new` dummy structures 的，所以我直接这么判定了。
+	}
+	assert(klass->get_mirrored_who() != nullptr);
+
+	bool search_super_klass = ((match_flag & 0x100000) != 0);
+	bool search_interfaces  = ((match_flag & 0x200000)   != 0);
+
+	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass->get_mirrored_who());
+	auto caller_klass = caller_mirror != nullptr ? caller_mirror->get_mirrored_who() : nullptr;
+	wstring real_name = match_name == nullptr ? L"" : java_lang_string::stringOop_to_wstring(match_name);
+	wstring real_signature = match_sig == nullptr ? L"" : java_lang_string::stringOop_to_wstring(match_sig);
+
+	if (match_flag & 0x10000) {				// Field
+		if (real_name != L"" && real_signature != L"") {	// 指定了某个固定的 name 和 signature。这样直接查找即可。
+			wstring descriptor = real_name + L":" + real_signature;		// TODO: 就是不知道这个 signature 到底是 Ljava/lang/Object; 还是 java/lang/Object...
+			auto _pair = real_klass->get_field(descriptor);
+			assert(_pair.second != nullptr);
+			fill_in_MemberName_with_Fieldinfo(_pair.second, (InstanceOop*)(*member_name_arr)[0], 0);	// 第三个参数只要小于 2 即可。即定义为 getField / getStatic，而不是 put。
+		} else {
+			vector<shared_ptr<Field_info>> v;
+			if (!search_super_klass && !search_interfaces) {
+				for (auto field : real_klass->get_field_layout()) {
+					v.push_back(field.second.second);
+				}
+				for (auto field : real_klass->get_static_field_layout()) {
+					v.push_back(field.second.second);
+				}
+			} else {
+				assert(false);		// not support yet...
+			}
+
+			// fill in:
+			int len = std::min((int)v.size(), member_name_arr->get_length());
+			for (int i = 0; i < len; i ++) {
+				fill_in_MemberName_with_Fieldinfo(v[i], (InstanceOop*)(*member_name_arr)[i], 0);
+			}
+			_stack.push_back(new IntOop(v.size()));		// 总共应该填进去的 nums 数量。Jdk 接到这个数字，判断之后会看数组是不是分配太小，会重新分配之后引发此函数重新进行。
+		}
+	} else if (match_flag & 0x20000) {		// Constructor
+		assert(false);		// not support yet...
+
+	} else if (match_flag & 0x40000) {		// Method
+		assert(false);		// not support yet...
+
+	} else {
+		assert(false);
+	}
+
 }
 
 

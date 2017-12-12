@@ -18,6 +18,7 @@ void JVM_Resolve(list<Oop *> & _stack);
 void JVM_Expand(list<Oop *> & _stack);
 void JVM_Init(list<Oop *> & _stack);
 void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack);
+void JVM_GetMembers(list<Oop *> & _stack);
 
 
 void *java_lang_invoke_methodHandleNatives_search_method(const wstring & str);
