@@ -2420,7 +2420,11 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					}
 				}
 
+
 				// 2. get ref.
+				if (ref == nullptr) {
+				thread.get_stack_trace();			// delete
+				}
 				assert(ref != nullptr);			// `this` must not be nullptr!!!!
 #ifdef DEBUG
 				sync_wcout{} << "(DEBUG)";

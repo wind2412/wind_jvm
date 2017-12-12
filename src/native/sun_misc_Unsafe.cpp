@@ -65,7 +65,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 		assert(false);		// TODO: 暂不支持 static...
 	}
 
-	// 需要 new 一个对象... 实测...				// TODO: 还要支持 static 的！这时不用 new 对象了。
+	// TODO: 还要支持 static 的！这时不用 new 对象了。(其实也没 new)
 	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
@@ -99,8 +99,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 
 	wstring BIG_signature = outer_klass->get_name() + L":" + descriptor;
 
-	// try to new a obj
-	int offset = outer_klass->new_instance()->get_all_field_offset(BIG_signature);			// TODO: GC!!
+	int offset = outer_klass->get_all_field_offset(BIG_signature);
 
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) the field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;

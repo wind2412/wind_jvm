@@ -223,6 +223,10 @@ public:
 	}
 	InstanceOop* new_instance();
 	shared_ptr<Method> search_method_in_slot(int slot);
+private:		// for Unsafe
+	int get_static_field_offset(const wstring & signature);
+public:		// for Unsafe
+	int get_all_field_offset(const wstring & BIG_signature);
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 public:		// for reflection.

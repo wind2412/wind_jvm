@@ -20,6 +20,7 @@ static unordered_map<wstring, void*> methods = {
     {L"resolve:(" MN CLS ")" MN,						(void *)&JVM_Resolve},
     {L"expand:(" MN ")V",							(void *)&JVM_Expand},
     {L"init:(" MN OBJ ")V",							(void *)&JVM_Init},
+    {L"objectFieldOffset:(" MN ")J",					(void *)&JVM_MH_ObjectFieldOffset},
 };
 
 void JVM_GetConstant(list<Oop *> & _stack){		// static
@@ -152,19 +153,29 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		}
 	}
 
+//			std::wcout << ".....signature: [" << real_klass->get_name() << " " << real_name << " " << descriptor << std::endl;	// delete
+//			vm_thread *thread = (vm_thread *)_stack.back();		// delete
+//			thread->get_stack_trace();			// delete
 
 	if (flags & 0x10000) {		// Method:
 		wstring signature = real_name + L":" + descriptor;
 		shared_ptr<Method> target_method;
-		if (ref_kind == 6)	{	// invokeStatic
+		if (ref_kind == 6)	{			// invokeStatic
 			std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 			target_method = real_klass->get_this_class_method(signature);
 			assert(target_method != nullptr);
-		} else {
-			std::wcout << ".....signature: [" << real_klass->get_name() << " " << real_name << " " << descriptor << std::endl;	// delete
-			vm_thread *thread = (vm_thread *)_stack.back();		// delete
-			thread->get_stack_trace();			// delete
+		} else if (ref_kind == 5) { 		// invokeVirtual
+			target_method = real_klass->search_vtable(signature);
+			assert(target_method != nullptr);
+
+		} else if (ref_kind == 7) {		// invokeSpecial
 			assert(false);		// not support yet...
+
+		} else if (ref_kind == 9) {		// invokeInterface
+			assert(false);		// not support yet...
+
+		} else {
+			assert(false);
 		}
 
 		// build the return MemberName obj.
@@ -173,11 +184,9 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
 			new_flag |= 0x100000;
 		}
-		if (ref_kind == 6) {
-			new_flag |= 0x10000 | (6 << 24);		// invokeStatic
-		} else {
-			assert(false);		// not support yet...
-		}
+
+		assert(ref_kind >= 5 && ref_kind <= 9);
+		new_flag |= 0x10000 | (ref_kind << 24);		// invokeStatic
 
 		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
 		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);
@@ -193,7 +202,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		assert(_pair.second != nullptr);
 		auto target_field = _pair.second;
 
-		// very **IMPORTANT**!! used for the `target_field->get_type_klass()` after!
+		// for target_field->get_type_klass:
 		target_field->if_didnt_parse_then_parse();
 
 		// build the return MemberName obj.
@@ -210,9 +219,10 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		}
 
 		member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
-		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);
-		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));
-		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_type_klass()->get_mirror());
+		member_name2->set_field_value(MEMBERNAME L":name:" STR, name);		// will not be settled by Java JDK!! // 必须要设置......
+		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));		// 必须要设置......
+//		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, target_field->get_type_klass()->get_mirror());
+		member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_klass()->get_mirror());		// set the field's inner klass!!! not the Type!!
 		_stack.push_back(member_name2);
 		return;
 	} else {
@@ -306,7 +316,40 @@ void JVM_Init(list<Oop *> & _stack){		// static
 		assert(false);
 	}
 
+}
 
+void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN (field) 得到 field 在 klass 中的偏移量。
+	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	assert(member_name_obj != nullptr);
+	// for check:
+	Oop *oop;
+	member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+	int flags = ((IntOop *)oop)->value;
+	assert((flags & 0x40000) != 0);		// is a field.
+	member_name_obj->get_field_value(MEMBERNAME L":clazz:" CLS, &oop);
+	MirrorOop *clazz = (MirrorOop *)oop;		// the fields
+	assert(clazz != nullptr);
+	member_name_obj->get_field_value(MEMBERNAME L":name:" STR, &oop);
+	InstanceOop *name = (InstanceOop *)oop;
+	assert(name != nullptr);
+	member_name_obj->get_field_value(MEMBERNAME L":type:" OBJ, &oop);
+	InstanceOop *type = (InstanceOop *)oop;	// type 这个变量的类型可能是 String, Class, MethodType!	// 如果此 MN 表示 Field 的话，按照上边 JVM_Resolve 中对 Field 的设置，type 是字符串.... 不过实测确实 Class...... 看来是 Java 给替换掉了...
+	assert(type != nullptr);
+
+	assert(type->get_klass()->get_name() == L"java/lang/Class");		// 后边被 Java 设置成了 Class。
+
+	assert(clazz->get_mirrored_who() != nullptr);
+	auto real_klass = std::static_pointer_cast<InstanceKlass>(clazz->get_mirrored_who());		// klass
+	wstring real_name = java_lang_string::stringOop_to_wstring(name);							// name
+	wstring fake_descriptor = ((MirrorOop *)type)->get_mirrored_who()->get_name();					// [x] descriptor
+	if (fake_descriptor[0] != L'[') {		// InstanceKlass
+		fake_descriptor = (L"L" + fake_descriptor + L";");
+	}
+	int offset = real_klass->get_all_field_offset(real_klass->get_name() + L":" + real_name + L":" + fake_descriptor);
+	std::wcout << real_klass->get_name() << ":" << real_name << ":" << fake_descriptor << " " << offset << std::endl;
+
+	_stack.push_back(new LongOop(offset));
 }
 
 
