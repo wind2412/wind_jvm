@@ -34,6 +34,7 @@ static unordered_map<wstring, void*> methods = {
     {L"ensureClassInitialized:(" CLS ")V",					(void *)&JVM_EnsureClassInitialized},
     {L"defineClass:(" STR "[BII" JCL PD ")" CLS,				(void *)&JVM_DefineClass},
     {L"putObjectVolatile:(" OBJ "J" OBJ ")V",					(void *)&JVM_PutObjectVolatile},
+    {L"staticFieldOffset:(" FLD ")J",						(void *)&JVM_StaticFieldOffset},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -44,6 +45,7 @@ void JVM_ArrayBaseOffset(list<Oop *> & _stack){
 #endif
 	_stack.push_back(new IntOop(_array->get_buf_offset()));
 }
+
 void JVM_ArrayIndexScale(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	ArrayOop *_array = (ArrayOop *)_stack.front();	_stack.pop_front();
@@ -52,9 +54,11 @@ void JVM_ArrayIndexScale(list<Oop *> & _stack){
 #endif
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
+
 void JVM_AddressSize(list<Oop *> & _stack){
 	_stack.push_back(new IntOop(sizeof(intptr_t)));
 }
+
 // see: http://hllvm.group.iteye.com/group/topic/37940
 void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -64,10 +68,10 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	assert(field->get_field_value(FIELD L":modifiers:I", &oop));
 	int modifier = ((IntOop *)oop)->value;
 	if ((modifier & ACC_STATIC) == ACC_STATIC) {
-		assert(false);		// TODO: 暂不支持 static...
+		assert(false);		// should be in: JVM_StaticFieldOffset.
 	}
 
-	// TODO: 还要支持 static 的！这时不用 new 对象了。(其实也没 new)
+	// static 的方面，在 JVM_StaticFieldOffset 中支持！
 	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
@@ -107,7 +111,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	sync_wcout{} << "(DEBUG) the field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
 #endif
 
-	_stack.push_back(new LongOop(offset));		// 这时候万一有了 GC，我的内存布局就全都变了...
+	_stack.push_back(new LongOop(offset));
 }
 
 void JVM_GetIntVolatile(list<Oop *> & _stack){
@@ -431,12 +435,66 @@ void JVM_PutObjectVolatile(list<Oop *> & _stack){		// put `target` at obj[offset
 	fence();
 
 
-//#ifdef DEBUG
+#ifdef DEBUG
 	wstring target_name = (target != nullptr) ? target->get_klass()->get_name() : L"null";
 	wstring addr_name = (temp != nullptr) ? temp->get_klass()->get_name() : L"null";
 	sync_wcout{} << "(DEBUG) put an Oop, which is [" << target_name << "], to address: [" << std::hex << *(Oop **)addr << "], which is the type [" << addr_name << "]." << std::endl;
+#endif
+
+}
+
+// totally same as: JVM_ObjectFieldOffset
+void JVM_StaticFieldOffset(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();	// java/lang/reflect/Field obj.
+
+	Oop *oop;
+	assert(field->get_field_value(FIELD L":modifiers:I", &oop));
+	int modifier = ((IntOop *)oop)->value;
+	if ((modifier & ACC_STATIC) != ACC_STATIC) {
+		assert(false);
+	}
+
+	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
+	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
+
+	assert(field->get_field_value(FIELD L":type:Ljava/lang/Class;", &oop));
+	MirrorOop *mirror = (MirrorOop *)oop;
+
+	wstring descriptor = name + L":";
+
+	// get the Type of this member variable.	// maybe: BasicType, InstanceType, ArrayType{ObjArrayType, BasicArrayType}.
+	shared_ptr<Klass> mirrored_who = mirror->get_mirrored_who();
+	if (mirrored_who) {	// not primitive type
+		if (mirrored_who->get_type() == ClassType::InstanceClass) {
+			descriptor += (L"L" + mirrored_who->get_name() + L";");
+		} else if (mirrored_who->get_type() == ClassType::ObjArrayClass) {
+			descriptor += mirrored_who->get_name();
+		} else if (mirrored_who->get_type() == ClassType::TypeArrayClass) {
+			descriptor += mirrored_who->get_name();
+		} else {
+			assert(false);
+		}
+	} else {
+		assert(mirror->get_extra() != L"");
+		descriptor += mirror->get_extra();
+	}
+
+	// get the class which has the member variable.
+	assert(field->get_field_value(FIELD L":clazz:Ljava/lang/Class;", &oop));
+	MirrorOop *outer_klass_mirror = (MirrorOop *)oop;
+	assert(outer_klass_mirror->get_mirrored_who()->get_type() == ClassType::InstanceClass);	// outer must be InstanceType.
+	shared_ptr<InstanceKlass> outer_klass = std::static_pointer_cast<InstanceKlass>(outer_klass_mirror->get_mirrored_who());
+
+	wstring BIG_signature = outer_klass->get_name() + L":" + descriptor;
+
+	int offset = outer_klass->get_all_field_offset(BIG_signature);
+
+//#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) the static field which names [ " << BIG_signature << " ], inside the [" << outer_klass->get_name() << "], has the offset [" << offset << "] of its FIELDS." << std::endl;
 //#endif
 
+	_stack.push_back(new LongOop(offset));
 }
 
 // 返回 fnPtr.

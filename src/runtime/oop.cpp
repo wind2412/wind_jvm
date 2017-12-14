@@ -33,51 +33,14 @@ InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.f
 
 bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。由于 namespace 不同，因此会用多级父类的名字在 field_layout 中进行查找。
 {
-	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	wstring descriptor = field->get_name() + L":" + field->get_descriptor();
-	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
-	while (instance_klass != nullptr) {
-		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
-		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
-		if (iter == instance_klass->fields_layout.end()) {
-			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
-			continue;
-		}
-		int offset = iter->second.first;
-		iter->second.second->if_didnt_parse_then_parse();		// important !!
-		*result = this->fields[offset];
-		return true;
-	}
-
-	std::wcerr << "didn't find field [" << descriptor << "] in InstanceKlass " << this->klass->get_name() << " and its parents!" << std::endl;
-	assert(false);
-
-//	return get_field_value(signature, result);
+	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();
+	return this->get_field_value(BIG_signature, result);
 }
 
 void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。
 {
-	shared_ptr<InstanceKlass> instance_klass = std::static_pointer_cast<InstanceKlass>(this->klass);
-	wstring descriptor = field->get_name() + L":" + field->get_descriptor();
-
-	// for `this klass` and its parents: (except interfaces. because interfaces' values are `public static final`. It will be get by `iconst_` or `bipush`... and so on.
-	while (instance_klass != nullptr) {
-		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
-		auto iter = instance_klass->fields_layout.find(BIG_signature);		// non-static field 由于复制了父类中的所有 field (继承)，所以只在 this_klass 中查找！
-		if (iter == instance_klass->fields_layout.end()) {
-			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());
-			continue;
-		}
-		int offset = iter->second.first;
-		iter->second.second->if_didnt_parse_then_parse();		// important!!
-		this->fields[offset] = value;
-		return;
-	}
-
-	std::wcerr << "didn't find field [" << descriptor << "] in InstanceKlass " << this->klass->get_name() << " and its parents!" << std::endl;
-	assert(false);
-
-//	set_field_value(signature, value);
+	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();
+	this->set_field_value(BIG_signature, value);
 }
 
 bool InstanceOop::get_field_value(const wstring & BIG_signature, Oop **result) 				// use for forging String Oop at parsing constant_pool.

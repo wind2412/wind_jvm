@@ -1372,8 +1372,61 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x62:{		// fadd
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
+				float val1 = ((FloatOop*)op_stack.top())->value; op_stack.pop();
 
+#ifdef DEBUG
+	auto print_float = [](float val) {
+		if (val == FLOAT_NAN)						sync_wcout{} << "NAN";
+		else if (val == FLOAT_INFINITY)				sync_wcout{} << "FLOAT_INFINITY";
+		else if (val == FLOAT_NEGATIVE_INFINITY)		sync_wcout{} << "FLOAT_NEGATIVE_INFINITY";
+		else sync_wcout{} << val << "f";
+	};
+	sync_wcout{} << "(DEBUG) fadd of val2: [";
+	print_float(val2);
+	sync_wcout{} << "] and val1: [";
+	print_float(val1);
+	sync_wcout{} << "], result is: [";
+#endif
+				if (val2 == FLOAT_NAN || val1 == FLOAT_NAN) {
+					op_stack.push(new FloatOop(NAN));
+				} else if ((val2 == FLOAT_INFINITY && val1 == FLOAT_NEGATIVE_INFINITY) || (val1 == FLOAT_INFINITY && val2 == FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(NAN));
+				} else if (val2 == FLOAT_INFINITY && val1 == FLOAT_INFINITY) {
+					op_stack.push(new FloatOop(FLOAT_INFINITY));
+				} else if (val2 == FLOAT_NEGATIVE_INFINITY && val1 == FLOAT_NEGATIVE_INFINITY) {
+					op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+				} else if (val2 == FLOAT_INFINITY && (val1 != FLOAT_INFINITY && val1 != FLOAT_NAN && val1 != FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(FLOAT_INFINITY));
+				} else if (val2 == FLOAT_NEGATIVE_INFINITY && (val1 != FLOAT_INFINITY && val1 != FLOAT_NAN && val1 != FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+				} else if (val1 == FLOAT_INFINITY && (val2 != FLOAT_INFINITY && val2 != FLOAT_NAN && val2 != FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(FLOAT_INFINITY));
+				} else if (val1 == FLOAT_NEGATIVE_INFINITY && (val2 != FLOAT_INFINITY && val2 != FLOAT_NAN && val2 != FLOAT_NEGATIVE_INFINITY)) {
+					op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+				} else {	// TODO: ???? 相同符号的零值？？？ 不同符号的零值？？？？
+					float result = val2 + val1;
+					op_stack.push(new FloatOop(result));
 
+//					if (val2 > 0 && val1 > 0 && result < 0) {				// judge overflow:		// TODO: wrong algorithm......除了用汇编直接读取，如何判断是否溢出 ????
+//						op_stack.push(new FloatOop(FLOAT_INFINITY));
+//					} else if (val2 < 0 && val1 < 0 && result > 0) {		// judge underflow:
+//						op_stack.push(new FloatOop(FLOAT_NEGATIVE_INFINITY));
+//					} else {												// else: no flow.
+//						op_stack.push(new FloatOop(result));
+//					}
+				}
+
+#ifdef DEBUG
+	print_float(((FloatOop *)op_stack.top())->value);
+	sync_wcout{} << "]." << std::endl;
+#endif
+
+				break;
+			}
 			case 0x63:{		// dadd
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
 				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
@@ -2450,7 +2503,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 //				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
 				((InstanceOop *)ref)->set_field_value(new_field, new_value);
 #ifdef DEBUG
-	sync_wcout{} << "(DEBUG) put a non-static value (unknown value type): " << get_real_value(new_value) << " from stack, to <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
+	sync_wcout{} << "(DEBUG) put a non-static value (unknown value type): " << get_real_value(new_value) << " from stack, to <class>: " << new_field->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
 #endif
 				break;
 			}
