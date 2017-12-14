@@ -72,7 +72,7 @@ wstring get_full_name(MirrorOop *mirror)
 	}
 }
 
-InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type)
+InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type, vm_thread *thread = nullptr)	// vm_thread: for debug
 {
 	auto member_name2 = std::static_pointer_cast<InstanceKlass>(origin_member_name_obj->get_klass())->new_instance();
 	int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
@@ -83,6 +83,16 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 	assert(ref_kind >= 5 && ref_kind <= 9);
 	new_flag |= 0x10000 | (ref_kind << 24);		// invokeStatic
 
+//	// delete all for debug
+//	std::wcout << target_method->get_name() << " " << type << std::endl;
+//	if (thread != nullptr) {
+//		auto toString = std::static_pointer_cast<InstanceKlass>(type->get_klass())->get_this_class_method(L"toString:()" STR);
+//		assert(toString != nullptr);
+//		InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {type});
+//		std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
+//		std::wcout << type << std::endl;
+//	}
+
 	member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
 	member_name2->set_field_value(MEMBERNAME L":name:" STR, java_lang_string::intern(target_method->get_name()));
 	member_name2->set_field_value(MEMBERNAME L":type:" OBJ, type);
@@ -90,6 +100,7 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 
 	LockGuard lg(member_name_table_lock);
 	member_name_table.insert(member_name2);		// save to the Table
+	member_name_table.insert(origin_member_name_obj);		// save to the Table
 
 	return member_name2;
 }
@@ -120,6 +131,7 @@ InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_fie
 
 	LockGuard lg(member_name_table_lock);
 	member_name_table.insert(member_name2);		// save to the Table
+	member_name_table.insert(origin_member_name_obj);		// save to the Table
 
 	return member_name2;
 }
@@ -203,6 +215,7 @@ shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_
 void JVM_Resolve(list<Oop *> & _stack){		// static
 	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
 	MirrorOop *caller_mirror = (MirrorOop *)_stack.front();	_stack.pop_front();		// I ignored it.
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 
 	if (member_name_obj == nullptr) {
 		assert(false);		// TODO: throw InternalError
@@ -271,7 +284,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
 
 		// build the return MemberName obj.
-		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type);
+		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type, thread);
 		_stack.push_back(member_name2);
 
 	} else if (flags & 0x20000){		// Constructor
@@ -300,6 +313,7 @@ void JVM_Expand(list<Oop *> & _stack) {
 void JVM_Init(list<Oop *> & _stack){		// static
 	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *target = (InstanceOop *)_stack.front();	_stack.pop_front();			// java/lang/Object
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 
 	/**
 	 * in fact, `target` will be one of the three:
@@ -372,6 +386,47 @@ void JVM_Init(list<Oop *> & _stack){		// static
 //		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, type);
 		member_name_obj->set_field_value(MEMBERNAME L":clazz:" CLS, klass->get_mirror());
 
+
+		// 这里要进行魔改一下。由于在 invokeBasic 那里碰到了问题，导致搜索 MethodType 搜索不到————原因有可能是：因为这里没有设置 type，因此 jdk 设置了。在 Method 那里，
+		// 有几率会被设置成 Object[]...... 而不是 MethodType。现在很好奇是不是这个原因......于是，在这里测试一发。
+		// 唉...... 看来是失败了。不过代码还是留下吧。
+
+/*
+		auto method_type_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
+		assert(method_type_klass != nullptr);
+		auto init_method_type = method_type_klass->get_this_class_method(L"methodType:(" CLS "[" CLS ")" MT);		// static method!!!
+		assert(init_method_type != nullptr);
+
+		auto arg_list_vector = target_method->parse_argument_list();		// vector<MirrorOop *>
+		auto return_mirror = target_method->parse_return_type();			// MirrorOop *
+		if (return_mirror->get_extra() == L"V") {			// 卧槽！！设置 MethodType.type 的时候，返回值如果是 void，也要强行变成 java/lang/Void!!!
+			return_mirror = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();
+		}
+
+		auto klass_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" CLS));
+		assert(klass_arr_klass != nullptr);
+		auto klass_arr_obj = klass_arr_klass->new_instance(arg_list_vector.size());		// alloc a [Ljava/lang/Class; for arg list's length.
+
+		// fill in
+		for (int i = 0; i < arg_list_vector.size(); i ++) {
+			(*klass_arr_obj)[i] = arg_list_vector[i];
+		}
+
+		// run <init>!
+		InstanceOop *method_type_obj = (InstanceOop *)thread->add_frame_and_execute(init_method_type, {return_mirror, klass_arr_obj});
+
+//		// delete all for debug
+//		std::wcout << target_method->get_name() << " " << method_type_obj << std::endl;
+//		if (thread != nullptr) {
+//			auto toString = std::static_pointer_cast<InstanceKlass>(method_type_obj->get_klass())->get_this_class_method(L"toString:()" STR);
+//			assert(toString != nullptr);
+//			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {method_type_obj});
+//			std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
+//			std::wcout << method_type_obj << std::endl;
+//		}
+
+		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, method_type_obj);
+*/
 	} else {
 		assert(false);
 	}
@@ -415,6 +470,9 @@ void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN
 //	std::wcout << real_klass->get_name() << ":" << real_name << ":" << fake_descriptor << " " << offset << std::endl;
 
 	_stack.push_back(new LongOop(offset));
+
+	LockGuard lg(member_name_table_lock);
+	member_name_table.insert(member_name_obj);		// save to the Table
 }
 
 void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一处：getMembers 用到了 MethodHandleNatives.getMembers。

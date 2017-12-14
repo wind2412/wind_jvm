@@ -1,5 +1,5 @@
 class Person {
-	int i;
+	static int i;
 }
 
 interface Haha{
@@ -8,16 +8,18 @@ interface Haha{
 
 class Test1 extends Person implements Haha{
 	
-	int i;
-	
 	public void hh() {
-		super.i = 4;
+		i = 4;
+		super.i = 2;
+		System.out.println(Person.i);
 	}
 	
 	public static void main(String[] args) {
 		Test1 u = new Test1();
 		u.i = 3;
 		u.hh();
+		Person.i = 10;
 		System.out.println(u.i);
+		System.out.println(Person.i);
 	}
 }

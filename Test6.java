@@ -14,7 +14,8 @@ class Test6 {
 	public static void main(String[] args) throws Throwable {
 		Object obj = System.currentTimeMillis() % 2 == 0 ? System.out : new ClassA();
 		// 无论obj最终是哪个实现类，下面这句都能正确调用到println方法。 
-		getPrintlnMH(obj).invokeExact("icyfenix");
+		MethodHandle mh = getPrintlnMH(obj);
+		mh.invokeExact("icyfenix");
 	}
 	private static MethodHandle getPrintlnMH(Object receiver) throws Throwable {
 		// MethodType：代表“方法类型”，包含了方法的返回值（methodType()的第一个参数）和具体参数（methodType()第二个及以后的参数）。 

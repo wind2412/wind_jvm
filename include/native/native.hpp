@@ -45,6 +45,7 @@ using std::function;
 #define VOD L"Ljava/lang/Void;"
 #define BA  "[B"
 #define MN  L"Ljava/lang/invoke/MemberName;"
+#define MT  L"Ljava/lang/invoke/MethodType;"
 
 #define STRING				L"java/lang/String"
 #define FIELD				L"java/lang/reflect/Field"

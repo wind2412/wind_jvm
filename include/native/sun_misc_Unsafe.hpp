@@ -32,6 +32,8 @@ void JVM_EnsureClassInitialized(list<Oop *> & _stack);
 void JVM_DefineClass(list<Oop *> & _stack);
 void JVM_PutObjectVolatile(list<Oop *> & _stack);
 void JVM_StaticFieldOffset(list<Oop *> & _stack);
+void JVM_StaticFieldBase(list<Oop *> & _stack);
+void JVM_PutObject(list<Oop *> & _stack);
 
 
 void *sun_misc_unsafe_search_method(const wstring & str);

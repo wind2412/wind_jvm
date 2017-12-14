@@ -18,6 +18,7 @@
 
 static unordered_map<wstring, void*> methods = {
     {L"invoke:([" OBJ ")" OBJ,								(void *)&JVM_Invoke},
+    {L"invokeBasic:([" OBJ ")" OBJ,							(void *)&JVM_InvokeBasic},
 };
 
 void argument_unboxing(list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, etc.
@@ -63,9 +64,13 @@ void argument_unboxing(list<Oop *> & args)		// Unboxing args for Integer, Double
 	temp.swap(args);
 }
 
-InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread)
+InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wstring & return_type)	// $3 is prevent from returning `void`. I think it should be boxed to `Void`.
 {
 	if (basic_type_oop->get_ooptype() != OopType::_BasicTypeOop)	return nullptr;
+
+	if (return_type == L"V") {		// TODO: 并不确保正确......应当试验一番......
+		return std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void"))->new_instance();
+	}
 
 	shared_ptr<Method> target_method;
 	switch (((BasicTypeOop *)basic_type_oop)->get_type()) {
@@ -221,11 +226,42 @@ void JVM_Invoke(list<Oop *> & _stack){
 	Oop *result = thread->add_frame_and_execute(target_method, _stack);		// TODO: 如果抛了异常。
 
 	// 把返回值所有能自动装箱的自动装箱......因为要返回一个 Object。
-	Oop *real_result = return_val_boxing(result, thread);
+	Oop *real_result = return_val_boxing(result, thread, target_method->return_type());
 
 	_stack.push_back(real_result);
 }
 
+void JVM_InvokeBasic(list<Oop *> & _stack){
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();		// pop 出 [0] 的 _this
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();			// pop 出 [length-1] 的 vm_thread
+	_stack.pop_back();															// pop 出 [length-2] 的 CallerKlassMirror *.
+	// 现在 _stack 剩下的全是参数～。
+
+	std::wcout << _stack.size() << std::endl;
+	std::wcout << _stack.front()->get_klass()->get_name() << std::endl;
+
+	Oop *oop;
+	_this->get_field_value(METHODHANDLE L":type:Ljava/lang/invoke/MethodType;", &oop);
+	InstanceOop *methodType = (InstanceOop *)oop;
+
+//	// delete all for debug (toString())
+//	auto toString = std::static_pointer_cast<InstanceKlass>(methodType->get_klass())->get_this_class_method(L"toString:()" STR);
+//	assert(toString != nullptr);
+//	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {methodType});
+//	std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
+//	std::wcout << methodType << std::endl;
+
+	methodType->get_field_value(METHODTYPE L":methodDescriptor:" STR, &oop);
+	if (oop != nullptr)
+		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)oop) << std::endl;
+
+//	// get the **REAL MemberName** from Table through methodType...
+//	InstanceOop *member_name_obj = find_table_if_match_methodType(methodType);	// 根本就没有被传进来.....需要另想办法了......
+
+	// 这也就是说明，调用到这里，虽然有 MethodType，但是却并找不到对应的 MemberName ???!!! 怎么回事到底是？？？？
+
+	assert(false);
+}
 
 // 返回 fnPtr.
 void *java_lang_invoke_methodHandle_search_method(const wstring & signature)

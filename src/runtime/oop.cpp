@@ -39,7 +39,7 @@ bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		/
 
 void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。
 {
-	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();
+	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();		// bug report: 本来就应该这么调才对...原先写得是什么玩意啊.....搞什么递归... 直接通过 BIG_signature 查不就得了....
 	this->set_field_value(BIG_signature, value);
 }
 
