@@ -83,7 +83,7 @@ public:		// 以下 8 个方法全部用来赋值。
 	void set_static_field_value(const wstring & signature, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
 public:
 	int get_all_field_offset(const wstring & BIG_signature);			// for Unsafe.
-	const vector<Oop *> & get_fields_addr() { return fields; }		// for Unsafe.
+	vector<Oop *> & get_fields_addr() { return fields; }				// for Unsafe.
 private:
 	int get_static_field_offset(const wstring & signature);			// for Unsafe
 //public:	// deprecated.

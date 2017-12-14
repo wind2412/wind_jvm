@@ -140,14 +140,14 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 
 }
 
-Oop *get_inner_oop_from_instance_oop_of_static_or_non_static_fields(InstanceOop *obj, long offset)
+Oop **get_inner_oop_from_instance_oop_of_static_or_non_static_fields(InstanceOop *obj, long offset)
 {
-	Oop *target;
+	Oop **target;
 	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
 		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
-		target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+		target = &std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
 	} else {		// it's in non-static field.
-		target = obj->get_fields_addr()[offset];
+		target = &obj->get_fields_addr()[offset];
 	}
 	return target;
 }
@@ -159,12 +159,12 @@ void JVM_CompareAndSwapInt(list<Oop *> & _stack){
 	int expected = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	int x = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 
-	Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
+	Oop **target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
 
-	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
+	assert((*target)->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)*target)->get_type() == Type::INT);
 
 	// CAS, from x86 assembly, and openjdk.
-	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)target)->value, expected) == expected));
+	_stack.push_back(new IntOop(cmpxchg(x, &((IntOop *)*target)->value, expected) == expected));
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
@@ -242,9 +242,9 @@ void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)		// obj 可能是
 	} else if (obj->get_ooptype() == OopType::_InstanceOop) {
 		// 也是通过 vector 相对偏移来取值～
 		assert(false);		// 先关闭这个功能...等到用的时候再开启。
-		Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields((InstanceOop *)obj, offset);
+		Oop **target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields((InstanceOop *)obj, offset);
 		// 非常危险...
-		assert(target->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
+		assert((*target)->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
 		addr = (void *)target;
 	} else {
 		assert(false);
@@ -296,12 +296,12 @@ void JVM_CompareAndSwapLong(list<Oop *> & _stack){
 	long expected = ((LongOop *)_stack.front())->value;	_stack.pop_front();
 	long x = ((LongOop *)_stack.front())->value;	_stack.pop_front();
 
-	Oop *target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
+	Oop **target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields(obj, offset);
 
-	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::LONG);
+	assert((*target)->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)*target)->get_type() == Type::LONG);
 
 	// CAS, from x86 assembly, and openjdk.
-	_stack.push_back(new IntOop(cmpxchg(x, &((LongOop *)target)->value, expected) == expected));
+	_stack.push_back(new IntOop(cmpxchg(x, &((LongOop *)*target)->value, expected) == expected));
 
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
