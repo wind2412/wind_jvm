@@ -14,6 +14,32 @@
 #include "utils/os.hpp"
 #include "classloader.hpp"
 #include "wind_jvm.hpp"
+#include <algorithm>
+
+Lock member_name_table_lock;
+set<InstanceOop *> member_name_table;
+
+InstanceOop *find_table_if_match_methodType(InstanceOop *methodType)		// find in the `member_name_table` to match for the `methodType`, for `invoke()`...
+{
+	LockGuard lg(member_name_table_lock);
+
+	auto predicate = [&methodType](InstanceOop *member_name_obj) -> bool {
+		assert(member_name_obj != nullptr);
+		Oop *oop;
+		member_name_obj->get_field_value(MEMBERNAME L":type:" OBJ, &oop);		// get inner `methodType` in `member_name_obj`.
+		if (oop == methodType) {
+			return true;
+		}
+		return false;
+	};
+
+	// become O(N)...
+	auto iter = std::find_if(member_name_table.begin(), member_name_table.end(), predicate);
+	if (iter == member_name_table.end()) {
+		assert(false);		// can't be `didn't find`.
+	}
+	return *iter;
+}
 
 static unordered_map<wstring, void*> methods = {
     {L"getConstant:(I)I",												(void *)&JVM_GetConstant},
@@ -61,6 +87,10 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 	member_name2->set_field_value(MEMBERNAME L":name:" STR, java_lang_string::intern(target_method->get_name()));
 	member_name2->set_field_value(MEMBERNAME L":type:" OBJ, type);
 	member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_method->get_klass()->get_mirror());
+
+	LockGuard lg(member_name_table_lock);
+	member_name_table.insert(member_name2);		// save to the Table
+
 	return member_name2;
 }
 
@@ -87,7 +117,87 @@ InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_fie
 	member_name2->set_field_value(MEMBERNAME L":type:" OBJ, java_lang_string::intern(target_field->get_descriptor()));		// 必须要设置......
 //		member_name2->set_field_value(MEMBERNAME L":type:" OBJ, target_field->get_type_klass()->get_mirror());
 	member_name2->set_field_value(MEMBERNAME L":clazz:" CLS, target_field->get_klass()->get_mirror());		// set the field's inner klass!!! not the Type!!
+
+	LockGuard lg(member_name_table_lock);
+	member_name_table.insert(member_name2);		// save to the Table
+
 	return member_name2;
+}
+
+wstring get_member_name_descriptor(shared_ptr<InstanceKlass> real_klass, const wstring & real_name, InstanceOop *type)
+{
+	wstring descriptor;
+	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
+	if (real_klass->get_name() == L"java/lang/invoke/MethodHandle" &&
+				(real_name == L"invoke"
+				|| real_name == L"invokeBasic"				// 钦定这些。因为 else 中都是通过把 ptypes 加起来做到的。但是 MethodHandle 中的变长参数是一个例外。其他类中的变长参数没问题，因为最后编译器会全部转为 Object[]。只有 MethodHandle 是例外～
+				|| real_name == L"invokeExact"
+				|| real_name == L"invokeWithArauments"
+				|| real_name == L"linkToSpecial"
+				|| real_name == L"linkToStatic"
+				|| real_name == L"linkToVirtual"
+				|| real_name == L"linkToInterface"))  {		// 悲伤。由于历史原因（，我的查找是通过字符串比对来做的......简直无脑啊......这样这里效率好低吧QAQ。不过毕竟只是个玩具，跑通就好......
+		descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";
+	} else {
+		// 1. should parse the `Object type;` member first.
+		if (type->get_klass()->get_name() == L"java/lang/invoke/MethodType") {
+			descriptor += L"(";
+			Oop *oop;
+			// 1-a-1: get the args type.
+			type->get_field_value(METHODTYPE L":ptypes:[" CLS, &oop);
+			assert(oop != nullptr);
+			auto class_arr_obj = (ArrayOop *)oop;
+			for (int i = 0; i < class_arr_obj->get_length(); i ++) {
+				descriptor += get_full_name((MirrorOop *)(*class_arr_obj)[i]);
+			}
+			descriptor += L")";
+			// 1-a-2: get the return type.
+			type->get_field_value(METHODTYPE L":rtype:" CLS, &oop);
+			assert(oop != nullptr);
+			descriptor += get_full_name((MirrorOop *)oop);
+		} else if (type->get_klass()->get_name() == L"java/lang/Class") {
+			auto real_klass = ((MirrorOop *)type)->get_mirrored_who();
+			if (real_klass == nullptr) {
+				descriptor += ((MirrorOop *)type)->get_extra();
+			} else {
+				if (real_klass->get_type() == ClassType::InstanceClass) {
+					descriptor += (L"L" + real_klass->get_name() + L";");
+				} else if (real_klass->get_type() == ClassType::TypeArrayClass || real_klass->get_type() == ClassType::ObjArrayClass) {
+					descriptor += real_klass->get_name();
+				} else {
+					assert(false);
+				}
+			}
+		} else if (type->get_klass()->get_name() == L"java/lang/String") {
+			assert(false);		// not support yet...
+		} else {
+			assert(false);
+		}
+	}
+	return descriptor;
+}
+
+shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_klass, const wstring & signature, int ref_kind)
+{
+	shared_ptr<Method> target_method;
+	if (ref_kind == 6)	{			// invokeStatic
+		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
+		target_method = real_klass->get_this_class_method(signature);
+		assert(target_method != nullptr);
+	} else if (ref_kind == 5) { 		// invokeVirtual
+		target_method = real_klass->search_vtable(signature);
+		assert(target_method != nullptr);
+
+	} else if (ref_kind == 7) {		// invokeSpecial
+		assert(false);		// not support yet...
+
+	} else if (ref_kind == 9) {		// invokeInterface
+		assert(false);		// not support yet...
+
+	} else {
+		assert(false);
+	}
+	return target_method;
 }
 
 void JVM_Resolve(list<Oop *> & _stack){		// static
@@ -149,85 +259,21 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	}
 
 	// 0. create a empty wstring: descriptor
-	wstring descriptor;
-	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
-	if (real_klass->get_name() == L"java/lang/invoke/MethodHandle" &&
-				(real_name == L"invoke"
-				|| real_name == L"invokeBasic"				// 钦定这些。因为 else 中都是通过把 ptypes 加起来做到的。但是 MethodHandle 中的变长参数是一个例外。其他类中的变长参数没问题，因为最后编译器会全部转为 Object[]。只有 MethodHandle 是例外～
-				|| real_name == L"invokeExact"
-				|| real_name == L"invokeWithArauments"
-				|| real_name == L"linkToSpecial"
-				|| real_name == L"linkToStatic"
-				|| real_name == L"linkToVirtual"
-				|| real_name == L"linkToInterface"))  {		// 悲伤。由于历史原因（，我的查找是通过字符串比对来做的......简直无脑啊......这样这里效率好低吧QAQ。不过毕竟只是个玩具，跑通就好......
-		descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";
-	} else {
-		// 1. should parse the `Object type;` member first.
-		if (type->get_klass()->get_name() == L"java/lang/invoke/MethodType") {
-			descriptor += L"(";
-			Oop *oop;
-			// 1-a-1: get the args type.
-			type->get_field_value(METHODTYPE L":ptypes:[" CLS, &oop);
-			assert(oop != nullptr);
-			auto class_arr_obj = (ArrayOop *)oop;
-			for (int i = 0; i < class_arr_obj->get_length(); i ++) {
-				descriptor += get_full_name((MirrorOop *)(*class_arr_obj)[i]);
-			}
-			descriptor += L")";
-			// 1-a-2: get the return type.
-			type->get_field_value(METHODTYPE L":rtype:" CLS, &oop);
-			assert(oop != nullptr);
-			descriptor += get_full_name((MirrorOop *)oop);
-		} else if (type->get_klass()->get_name() == L"java/lang/Class") {
-			auto real_klass = ((MirrorOop *)type)->get_mirrored_who();
-			if (real_klass == nullptr) {
-				descriptor += ((MirrorOop *)type)->get_extra();
-			} else {
-				if (real_klass->get_type() == ClassType::InstanceClass) {
-					descriptor += (L"L" + real_klass->get_name() + L";");
-				} else if (real_klass->get_type() == ClassType::TypeArrayClass || real_klass->get_type() == ClassType::ObjArrayClass) {
-					descriptor += real_klass->get_name();
-				} else {
-					assert(false);
-				}
-			}
-		} else if (type->get_klass()->get_name() == L"java/lang/String") {
-			assert(false);		// not support yet...
-		} else {
-			assert(false);
-		}
-	}
+	wstring descriptor = get_member_name_descriptor(real_klass, real_name, type);
 
-//			std::wcout << ".....signature: [" << real_klass->get_name() << " " << real_name << " " << descriptor << std::endl;	// delete
-//			vm_thread *thread = (vm_thread *)_stack.back();		// delete
-//			thread->get_stack_trace();			// delete
+//	std::wcout << ".....signature: [" << real_klass->get_name() << " " << real_name << " " << descriptor << std::endl;	// delete
+//	vm_thread *thread = (vm_thread *)_stack.back();		// delete
+//	thread->get_stack_trace();			// delete
 
 	if (flags & 0x10000) {		// Method:
+
 		wstring signature = real_name + L":" + descriptor;
-		shared_ptr<Method> target_method;
-		if (ref_kind == 6)	{			// invokeStatic
-			std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
-			target_method = real_klass->get_this_class_method(signature);
-			assert(target_method != nullptr);
-		} else if (ref_kind == 5) { 		// invokeVirtual
-			target_method = real_klass->search_vtable(signature);
-			assert(target_method != nullptr);
-
-		} else if (ref_kind == 7) {		// invokeSpecial
-			assert(false);		// not support yet...
-
-		} else if (ref_kind == 9) {		// invokeInterface
-			assert(false);		// not support yet...
-
-		} else {
-			assert(false);
-		}
+		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
 
 		// build the return MemberName obj.
 		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type);
-
 		_stack.push_back(member_name2);
-		return;
+
 	} else if (flags & 0x20000){		// Constructor
 		assert(false);			// not support yet...
 	} else if (flags & 0x40000) {	// Field
@@ -244,9 +290,6 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		assert(false);
 	}
 
-
-
-	assert(false);
 }
 
 
@@ -267,6 +310,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 	assert(member_name_obj != nullptr);
 	assert(target != nullptr);
 	auto klass = std::static_pointer_cast<InstanceKlass>(target->get_klass());
+
 
 	if (klass->get_name() == L"java/lang/reflect/Constructor") {
 		Oop *oop;
@@ -332,10 +376,15 @@ void JVM_Init(list<Oop *> & _stack){		// static
 		assert(false);
 	}
 
+	LockGuard lg(member_name_table_lock);
+	member_name_table.insert(member_name_obj);		// save to the Table
+
 }
 
 void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN (field) 得到 field 在 klass 中的偏移量。
 	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	assert(member_name_table.find(member_name_obj) != member_name_table.end());		// simple check...
 
 	assert(member_name_obj != nullptr);
 	// for check:

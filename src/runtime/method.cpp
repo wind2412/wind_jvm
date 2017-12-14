@@ -168,7 +168,11 @@ vector<MirrorOop *> Method::if_didnt_parse_exceptions_then_parse()
 vector<MirrorOop *> Method::parse_argument_list()
 {
 	vector<MirrorOop *> v;
-	vector<wstring> args = BytecodeEngine::parse_arg_list(this->descriptor);
+	vector<wstring> args;
+	if (real_descriptor == L"")
+		args = BytecodeEngine::parse_arg_list(this->descriptor);
+	else
+		args = BytecodeEngine::parse_arg_list(this->real_descriptor);		// patch for MethodHandle.invoke***(Object...)
 	for (int i = 0; i < args.size(); i ++) {
 		if (args[i].size() == 1) {		// primitive type
 			switch (args[i][0]) {

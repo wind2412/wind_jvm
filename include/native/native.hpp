@@ -60,6 +60,16 @@ using std::function;
 #define STACKTRACEELEMENT	L"java/lang/StackTraceElement"
 #define MEMBERNAME			L"java/lang/invoke/MemberName"
 #define METHODTYPE			L"java/lang/invoke/MethodType"
+#define METHODHANDLE			L"java/lang/invoke/MethodHandle"
+#define BOOLEAN0				L"java/lang/Boolean"
+#define BYTE0				L"java/lang/Byte"
+#define SHORT0				L"java/lang/Short"
+#define CHARACTER0			L"java/lang/Character"
+#define INTEGER0				L"java/lang/Integer"
+#define FLOAT0				L"java/lang/Float"
+#define LONG0				L"java/lang/Long"
+#define DOUBLE0				L"java/lang/Double"
+
 
 void init_native();
 

@@ -103,6 +103,25 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				sync_wcout{} << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
 				shared_ptr<Method> target;
+				// 这里要 hack 一下...... 要对 MethodHandle 的 invoke... 各种进行特化一下。
+				// 因为常量池中的 NameAndType attribute 是真的类型，而 invoke... 的参数和返回值标记分别是 Object[] 和 Object. (@PolymorphicSignature)
+				// 不过肯定会产生信息的丢失......也就是真实的参数会被丢弃......我没有其他的地方去存放真实的 Args 和 Return type...
+				// 可以按照参数为 Object[] 来进行 get_class_method 查找，然后查找到了之后，把 Method 中设置一个新的 real_descriptor......
+				wstring real_descriptor;
+				if (class_name == L"java/lang/invoke/MethodHandle" &&
+								(name == L"invoke"
+								|| name == L"invokeBasic"
+								|| name == L"invokeExact"
+								|| name == L"invokeWithArauments"
+								|| name == L"linkToSpecial"
+								|| name == L"linkToStatic"
+								|| name == L"linkToVirtual"
+								|| name == L"linkToInterface"))
+				{
+					real_descriptor = descriptor;		// make a backup
+					descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";		// make a substitute...
+				}
+
 				if (new_class->get_type() == ClassType::ObjArrayClass || new_class->get_type() == ClassType::TypeArrayClass) {
 					target = std::static_pointer_cast<ArrayKlass>(new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。
 				} else if (new_class->get_type() == ClassType::InstanceClass){
@@ -113,6 +132,11 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				}
 				assert(target != nullptr);
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
+
+				if (real_descriptor != L"") {	// MethodHandle.invoke(...), the `real_descriptor` now holds the **REAL** descriptor!!
+					target->set_real_descriptor(real_descriptor);
+				}
+
 			} else {	// InterfaceMethodref
 #ifdef DEBUG
 				sync_wcout{} << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;

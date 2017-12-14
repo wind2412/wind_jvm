@@ -27,6 +27,9 @@ private:
 	// method basic
 	wstring name;
 	wstring descriptor;
+
+	wstring real_descriptor;		// a special patch: for MethodHandle.invoke***(Object...). these methods' descritpor must be [[Ljava/lang/Object;]. the real args are here.
+
 	u2 access_flags;
 
 	// constant pool ** use for <code> and so on
@@ -79,6 +82,7 @@ public:
 	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
 	u2 get_flag() { return access_flags; }
 public:
+	void set_real_descriptor (const wstring & real_descriptor) { this->real_descriptor = real_descriptor; }	// for MethodHandle.invoke**(...) only.
 	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();
 	vector<MirrorOop *> parse_argument_list();
 	MirrorOop *parse_return_type();
