@@ -32,6 +32,8 @@ static unordered_map<wstring, void*> methods = {
     {L"shouldBeInitialized:(" CLS ")Z",						(void *)&JVM_ShouldBeInitialized},
     {L"defineAnonymousClass:(" CLS "[B[" OBJ ")" CLS,			(void *)&JVM_DefineAnonymousClass},
     {L"ensureClassInitialized:(" CLS ")V",					(void *)&JVM_EnsureClassInitialized},
+    {L"defineClass:(" STR "[BII" JCL PD ")" CLS,				(void *)&JVM_DefineClass},
+    {L"putObjectVolatile:(" OBJ "J" OBJ ")V",					(void *)&JVM_PutObjectVolatile},
 };
 
 void JVM_ArrayBaseOffset(list<Oop *> & _stack){
@@ -234,9 +236,9 @@ void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)		// obj 可能是
 	if (obj->get_ooptype() == OopType::_TypeArrayOop || obj->get_ooptype() == OopType::_ObjArrayOop) {
 		// 通过 vector 相对偏移来取值。直接 volatile + barrier 取值就可以。
 		int i_element = offset / sizeof(intptr_t);
-		addr = (void *)((*(ArrayOop *)obj)[i_element]);
-		if ((Oop *)addr != nullptr)
-			assert(((Oop *)addr)->get_ooptype() == OopType::_BasicTypeOop || ((Oop *)addr)->get_ooptype() == OopType::_InstanceOop || ((Oop *)addr)->get_ooptype() == OopType::_TypeArrayOop || ((Oop *)addr)->get_ooptype() == OopType::_ObjArrayOop);
+		addr = (void *)&((*(ArrayOop *)obj)[i_element]);		// Oop ** to void *.
+		if (*(Oop **)addr != nullptr)
+			assert((*(Oop **)addr)->get_ooptype() == OopType::_BasicTypeOop || (*(Oop **)addr)->get_ooptype() == OopType::_InstanceOop || (*(Oop **)addr)->get_ooptype() == OopType::_TypeArrayOop || (*(Oop **)addr)->get_ooptype() == OopType::_ObjArrayOop);
 	} else if (obj->get_ooptype() == OopType::_InstanceOop) {
 		// 也是通过 vector 相对偏移来取值～
 		assert(false);		// 先关闭这个功能...等到用的时候再开启。
@@ -259,17 +261,9 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier
 	void *addr = get_inner_obj_from_obj_and_offset(obj, offset);
 
 	// the code's thought is from openjdk:
-	volatile Oop * v = *(volatile Oop **)&addr;		// TODO: 这里还有不理解的地方......等待高人解惑......
+	volatile Oop * v = *(volatile Oop **)addr;		// TODO: 这里还有不理解的地方......等待高人解惑......
 
-	// barrier. I use boost::atomic//ops_gcc_x86.hpp's method.	// TODO: 也有理解不上的地方。acquire 语义究竟是被用于什么地方？为什么用于 LoadLoad 和 LoadStore (x86下)？ 还有待学习啊......
-	__asm__ volatile (			// TODO: 这里同样。mfence 是屏障指令；lock;nop; 也是(虽然手册规范不让这么写，不过后边的语义就是nop)。不过为什么 openjdk AccessOrder 实现中 AMD64 要 addq？
-#ifdef __x86_64__
-			"mfence;"
-#else
-			"lock; addl $0, (%%esp);"
-#endif
-			:::"memory"
-	);
+	acquire();
 
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) get an Oop from address: [" << std::hex << addr << "]." << std::endl;
@@ -289,7 +283,7 @@ void JVM_CompareAndSwapObject(list<Oop *> & _stack){
 
 
 	// CAS, from x86 assembly, and openjdk.
-	_stack.push_back(new IntOop(cmpxchg((long)x, (volatile long *)&addr, (long)expected) == (long)expected));
+	_stack.push_back(new IntOop(cmpxchg((long)x, (volatile long *)addr, (long)expected) == (long)expected));
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) compare obj + offset with [" << expected << "] and swap to be [" << x << "], success: [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
@@ -375,6 +369,74 @@ void JVM_EnsureClassInitialized(list<Oop *> & _stack){
 	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass->get_mirrored_who());
 	assert(real_klass != nullptr);
 	BytecodeEngine::initial_clinit(real_klass, *thread);
+}
+
+void JVM_DefineClass(list<Oop *> & _stack){
+	// same as: java_lang_ClassLoader.hpp::JVM_DefineClass1().
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *name = (InstanceOop *)_stack.front();	_stack.pop_front();
+	TypeArrayOop *bytes = (TypeArrayOop *)_stack.front();	_stack.pop_front();
+	int offset = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	int len = ((IntOop *)_stack.front())->value;	_stack.pop_front();
+	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();		// 我忽略掉这东西了。安全机制就算了。
+
+	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
+
+	wstring klass_name = java_lang_string::stringOop_to_wstring(name);
+
+	char *buf = new char[len];
+
+	for (int i = offset, j = 0; i < offset + len; i ++, j ++) {
+		buf[j] = (char)((IntOop *)(*bytes)[i])->value;
+	}
+
+	ByteStream byte_buf(buf, len);
+
+	// 和 java_lang_ClassLoader.hpp::JVM_DefineClass1() 不同的是...... 这个 loader 是传进来的参数，可能是 null；而那个的 loader 是 _this，不可能是 null...
+//	assert(loader != nullptr);
+	// 嗯。看来唯一的不同就是，这里的 loader 可以是 nullptr....
+
+	shared_ptr<Klass> klass;
+	if (loader != nullptr) {
+		klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, std::static_pointer_cast<InstanceKlass>(loader->get_klass())->get_java_loader());
+	} else {
+		klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, nullptr);
+	}
+	assert(klass != nullptr);
+	_stack.push_back(klass->get_mirror());
+
+	delete[] buf;
+
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) DefineClass1(): [" << klass_name << "]." << std::endl;
+#endif
+}
+
+void JVM_PutObjectVolatile(list<Oop *> & _stack){		// put `target` at obj[offset].
+	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+	long offset = ((LongOop *)_stack.front())->value;	_stack.pop_front();
+	InstanceOop *target = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	assert(obj != nullptr);
+
+	void *addr = get_inner_obj_from_obj_and_offset(obj, offset);		// really Oop **.
+
+	release();
+
+	Oop *temp = *(Oop **)addr;
+	*(Oop **)addr = target;
+
+	fence();
+
+
+//#ifdef DEBUG
+	wstring target_name = (target != nullptr) ? target->get_klass()->get_name() : L"null";
+	wstring addr_name = (temp != nullptr) ? temp->get_klass()->get_name() : L"null";
+	sync_wcout{} << "(DEBUG) put an Oop, which is [" << target_name << "], to address: [" << std::hex << *(Oop **)addr << "], which is the type [" << addr_name << "]." << std::endl;
+//#endif
+
 }
 
 // 返回 fnPtr.

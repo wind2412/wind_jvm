@@ -311,9 +311,24 @@ void JVM_IsInterface(list<Oop *> & _stack){
 	sync_wcout{} << "(DEBUG) this klass: [" << name << "] is an interface ? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
-void JVM_IsInstance(list<Oop *> & _stack){
+void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
+
+	assert(obj != nullptr);
+	assert(_this->get_mirrored_who() != nullptr);
+
+	auto obj_klass = std::static_pointer_cast<InstanceKlass>(obj->get_klass());
+	auto this_klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+
+	if (obj_klass == this_klass || obj_klass->check_parent(this_klass))		// 千万别忘了判等啊！！QAQ......
+		_stack.push_back(new IntOop(true));
+	else
+		_stack.push_back(new IntOop(false));
+
+#ifdef DEBUG
+	sync_wcout{} << "is [" << obj_klass->get_name() << "]'s oop is also [" << this_klass->get_name() << "]'s instance? [" << std::boolalpha << (bool)(((IntOop *)_stack.back())->value) << "]." << std::endl;
+#endif
 }
 void JVM_IsAssignableFrom(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

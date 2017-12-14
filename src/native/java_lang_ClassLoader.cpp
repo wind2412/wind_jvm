@@ -20,7 +20,7 @@
 static unordered_map<wstring, void*> methods = {
     {L"findLoadedClass0:(" STR ")" CLS,				(void *)&JVM_FindLoadedClass},
     {L"findBootstrapClass:(" STR ")" CLS,				(void *)&JVM_FindBootStrapClass},
-    {L"defineClass1:(" STR "[BII" PD STR ")" CLS,	(void *)&JVM_DefineClass1},
+    {L"defineClass1:(" STR "[BII" PD STR ")" CLS,		(void *)&JVM_DefineClass1},
 };
 
 void JVM_FindLoadedClass(list<Oop *> & _stack){

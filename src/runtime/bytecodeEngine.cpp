@@ -1652,6 +1652,23 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x71:{		// lrem
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+
+				assert(val2 != 0);
+				assert((val1 / val2) * val2 + (val1 % val2) == val1);
+				assert(val1 % val2 == (val1 - (val1 / val2) * val2));
+
+				op_stack.push(new LongOop(val1 % val2));
+
+#ifdef DEBUG
+	sync_wcout{} << "(DEBUG) do [" << val1 << " % " << val2 << "], result is " << ((LongOop *)op_stack.top())->value << "." << std::endl;
+#endif
+				break;
+			}
 
 
 
@@ -2511,6 +2528,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					assert(ref->get_klass()->get_type() == ClassType::InstanceClass);	// 接口一定是 Instance。
 					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
 				}
+
+				if (target_method == nullptr) {
+					std::wcerr << "didn't find: [" << signature << "] in klass: [" << ref->get_klass()->get_name() << "]!" << std::endl;
+				}
 				assert(target_method != nullptr);
 
 
@@ -2803,7 +2824,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0xba:{		// invokeDynamic
-
+				assert(false);
 				break;
 			}
 			case 0xbb:{		// new // 仅仅分配了内存！
