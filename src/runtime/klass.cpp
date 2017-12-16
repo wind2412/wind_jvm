@@ -498,7 +498,7 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 			return iter.second.second;
 		}
 	}
-	return nullptr;
+	assert(false);
 }
 
 void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields)
@@ -686,7 +686,7 @@ int InstanceKlass::get_static_field_offset(const wstring & signature)
 	iter->second.second->if_didnt_parse_then_parse();		// important !!
 
 #ifdef DEBUG
-	sync_wcout{} << "this: [" << this << "], klass_name:[" << this->get_name() << "], (static)" << signature << ":[" << &this->fields[offset] << "(encoding: " << offset + this->non_static_field_num() << ")]" << std::endl;
+	sync_wcout{} << "this: [" << this << "], klass_name:[" << this->get_name() << "], (static)" << signature << ":[" << "(encoding: " << offset + this->non_static_field_num() << ")]" << std::endl;
 #endif
 	return offset + this->non_static_field_num();		// 这里需要注意。由于 static 和 non-static 我是分别存放的，而 unsafe 中指定的 offset 是唯一的。这就造成我不知道去 static 里边找还是 non-static 里边找。“两个都找，找到就ok” 的策略一定会引入软件漏洞。因此，采用编码，让 non-static 和 static 的编号永远不会重合。根据 non-static-field-size 来判断去哪里找。
 }
@@ -707,7 +707,7 @@ int InstanceKlass::get_all_field_offset(const wstring & BIG_signature)
 	// 这里存放的不是绝对距离，我会把语义完全改变，成为 “和此 oop 存放的 field 的起始地址的相对距离”，而不是 “和此 oop 的 this 指针的绝对距离”！！
 	// 这样，GC 也可以用多种算法了！！看来也可以支持复制算法了！开森～
 #ifdef DEBUG
-	sync_wcout{} << "this: [" << this << "], klass_name:[" << this->get_name() << "], " << BIG_signature << ":[" << &this->fields[offset] << "(offset: " << offset <<")]" << std::endl;
+	sync_wcout{} << "this: [" << this << "], klass_name:[" << this->get_name() << "], " << BIG_signature << ":[" << "(offset: " << offset <<")]" << std::endl;
 #endif
 //	return (char *)&this->fields[offset] - (char *)this;
 	return offset;	// vector 是连续内存。

@@ -381,55 +381,10 @@ ArrayOop * vm_thread::get_stack_trace()
 	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 	int j = 1;
 	for (Oop * value : it->localVariableTable) {
-		if (value == nullptr) {
-			ss << "    the localVariableTable[" << j-1 << "] is [null]" << std::endl;
-		} else if (value->get_ooptype() == OopType::_BasicTypeOop) {
-			switch(((BasicTypeOop *)value)->get_type()) {
-				case Type::BOOLEAN:
-					ss << "    the localVariableTable[" << j-1 << "] is [Z]: [" << ((IntOop *)value)->value << "]" << std::endl;
-					break;
-				case Type::BYTE:
-					ss << "    the localVariableTable[" << j-1 << "] is [B]: [" << ((IntOop *)value)->value << "]" << std::endl;
-					break;
-				case Type::SHORT:
-					ss << "    the localVariableTable[" << j-1 << "] is [S]: [" << ((IntOop *)value)->value << "]" << std::endl;
-					break;
-				case Type::INT:
-					ss << "    the localVariableTable[" << j-1 << "] is [I]: [" << ((IntOop *)value)->value << "]" << std::endl;
-					break;
-				case Type::CHAR:
-					ss << "    the localVariableTable[" << j-1 << "] is [C]: ['" << (wchar_t)((IntOop *)value)->value << "']" << std::endl;
-					break;
-				case Type::FLOAT:
-					ss << "    the localVariableTable[" << j-1 << "] is [F]: ['" << ((FloatOop *)value)->value << "']" << std::endl;
-					break;
-				case Type::LONG:
-					ss << "    the localVariableTable[" << j-1 << "] is [L]: ['" << ((LongOop *)value)->value << "']" << std::endl;
-					break;
-				case Type::DOUBLE:
-					ss << "    the localVariableTable[" << j-1 << "] is [D]: ['" << ((DoubleOop *)value)->value << "']" << std::endl;
-					break;
-				default:
-					assert(false);
-			}
-		} else if (value->get_ooptype() == OopType::_TypeArrayOop) {
-			ss << "    the localVariableTable[" << j-1 << "] is TypeArrayOop." << std::endl;
-		} else if (value->get_ooptype() == OopType::_ObjArrayOop) {
-			ss << "    the localVariableTable[" << j-1 << "] is ObjArrayOop." << std::endl;
-		} else {		// InstanceOop
-			if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
-				ss << "    the localVariableTable[" << j-1 << "] is java/lang/String: [\"" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "\"]" << std::endl;
-			} else if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
-				wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
-				ss << "    the localVariableTable[" << j-1 << "] is java/lang/Class: [\"" << type << "\"]" << std::endl;
-			} else {
-				auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
-//				auto toString = real_klass->get_this_class_method(L"toString:()Ljava/lang/String;");
-//				assert(toString != nullptr);
-//				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]" << std::endl;
-//				this->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
-				ss << "    the localVariableTable[" << j-1 << "] is " << real_klass->get_name() << ": [unknown value]" << std::endl;
-			}
+		ss << "    the localVariableTable[" << j-1 << "] is " << it->print_arg_msg(value) << std::endl;
+		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
+						&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
+			j ++;		// jump. because `long` and `double` take 2 places.
 		}
 		j ++;
 	}

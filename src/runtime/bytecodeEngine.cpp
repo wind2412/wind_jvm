@@ -66,25 +66,79 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 	}
 	localVariableTable.resize(method->get_code()->max_locals);
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
+#ifdef DEBUG
+	sync_wcout{} << "===-------------------------------------- localVariableTable of (" << method->get_name() << ") -----------------------------------------===" << std::endl;
+#endif
 	for (Oop * value : args) {
 		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
-		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
 #ifdef DEBUG
-			sync_wcout{} << "the "<< i-1 << " argument is java/lang/String: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "]" << std::endl;
+	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value) << std::endl;
 #endif
-		}
-		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
-			wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
-#ifdef DEBUG
-			sync_wcout{} << "the "<< i-1 << " argument is java/lang/Class: [" << type << "]" << std::endl;
-#endif
-		}
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
 			localVariableTable.at(i++) = nullptr;
 		}
 	}
+#ifdef DEBUG
+	sync_wcout{} << "===------------------------------------------------------------------------------------------------------------------------===" << std::endl;
+#endif
+}
+
+wstring StackFrame::print_arg_msg(Oop *value)
+{
+	std::wstringstream ss;
+	if (value == nullptr) {
+		ss << "[null]";
+	} else if (value->get_ooptype() == OopType::_BasicTypeOop) {
+		switch(((BasicTypeOop *)value)->get_type()) {
+			case Type::BOOLEAN:
+				ss << "[Z]: [" << ((IntOop *)value)->value << "]";
+				break;
+			case Type::BYTE:
+				ss << "[B]: [" << ((IntOop *)value)->value << "]";
+				break;
+			case Type::SHORT:
+				ss << "[S]: [" << ((IntOop *)value)->value << "]";
+				break;
+			case Type::INT:
+				ss << "[I]: [" << ((IntOop *)value)->value << "]";
+				break;
+			case Type::CHAR:
+				ss << "[C]: ['" << (wchar_t)((IntOop *)value)->value << "']";
+				break;
+			case Type::FLOAT:
+				ss << "[F]: ['" << ((FloatOop *)value)->value << "']";
+				break;
+			case Type::LONG:
+				ss << "[L]: ['" << ((LongOop *)value)->value << "']";
+				break;
+			case Type::DOUBLE:
+				ss << "[D]: ['" << ((DoubleOop *)value)->value << "']";
+				break;
+			default:
+				assert(false);
+		}
+	} else if (value->get_ooptype() == OopType::_TypeArrayOop) {
+		ss << "[TypeArrayOop]";
+	} else if (value->get_ooptype() == OopType::_ObjArrayOop) {
+		ss << "[ObjArrayOop]";
+	} else {		// InstanceOop
+		if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/String") {		// 特例：如果是 String，就打出来～
+			ss << "[java/lang/String]: [\"" << java_lang_string::stringOop_to_wstring((InstanceOop *)value) << "\"]";
+		} else if (value != nullptr && value->get_klass() != nullptr && value->get_klass()->get_name() == L"java/lang/Class") {			// 特例：如果是 Class，就打出来～
+			wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
+			ss << "[java/lang/Class]: [\"" << type << "\"]";
+		} else {
+			auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
+//				auto toString = real_klass->get_this_class_method(L"toString:()Ljava/lang/String;");
+//				assert(toString != nullptr);
+//				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]";
+//				this->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
+			ss << "[" << real_klass->get_name() << "]: [unknown value]";
+		}
+	}
+	return ss.str();
 }
 
 void StackFrame::clear_all() {					// used with `is_valid()`. if invalid, clear all to reuse this frame.
@@ -2478,6 +2532,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				// TODO: $2.8.3 的 FP_strict 浮点数转换！
 				new_field->if_didnt_parse_then_parse();		// **important!!!**
 				Oop *ref = op_stack.top();	op_stack.pop();
+//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_name() << " " << new_field->get_descriptor() << std::endl;		// delete
 				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
 //				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
 //				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。

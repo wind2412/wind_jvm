@@ -48,6 +48,7 @@ public:
 	void clear_all();
 	void reset_method(shared_ptr<Method> new_method) { this->method = new_method; }
 	void reset_return_pc(uint8_t *return_pc) { this->return_pc = return_pc; }
+	wstring print_arg_msg(Oop *value);
 };
 
 class vm_thread;
