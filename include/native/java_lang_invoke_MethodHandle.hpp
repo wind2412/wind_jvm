@@ -15,6 +15,7 @@ using std::list;
 
 void JVM_Invoke(list<Oop *> & _stack);
 void JVM_InvokeBasic(list<Oop *> & _stack);
+void JVM_InvokeExact(list<Oop *> & _stack);
 
 
 void *java_lang_invoke_methodHandle_search_method(const wstring & str);
