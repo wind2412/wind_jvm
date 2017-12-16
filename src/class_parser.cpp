@@ -2148,7 +2148,15 @@ void print_attributes(attribute_info *ptr, cp_info **constant_pool) {
 						break;
 					}
 
-					case 0xb8:{		// invokestatic
+					case 0xb6:		// invokevirtual
+					case 0xb7:		// invokespecial
+					case 0xb8:		// invokestatic
+					case 0xb9:{		// invokeinterface
+						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
+						break;
+					}
+
+					case 0xbb:{		// new
 						printf("%3d: %-15s #%d", bc_num, bccode_map[code[bc_num]].first.c_str(), ((code[bc_num+1] << 8) | code[bc_num+2]));
 						break;
 					}

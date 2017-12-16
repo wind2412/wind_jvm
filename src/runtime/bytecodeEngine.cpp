@@ -98,7 +98,7 @@ void StackFrame::clear_all() {					// used with `is_valid()`. if invalid, clear 
 
 /*===------------ BytecodeEngine ---------------===*/
 
-vector<wstring> BytecodeEngine::parse_arg_list(const wstring & descriptor)
+vector<wstring> BytecodeEngine::parse_arg_list(const wstring & descriptor)		// 由于历史原因被安置在了这里。其实应该是个 private 方法，仅仅被 Method->parse_arguments 调用。因为涉及了 invoke(Object...) 方法，因此直接调用此方法是不安全的！！
 {
 	vector<wstring> arg_list;
 	for (int i = 1; i < descriptor.size(); i ++) {		// ignore the first L'('.
@@ -393,7 +393,6 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	uint8_t *code_begin = method->get_code()->code;
 	shared_ptr<InstanceKlass> klass = method->get_klass();
 	rt_constant_pool & rt_pool = *klass->get_rtpool();
-
 	uint8_t *backup_pc = thread.pc;
 	uint8_t * & pc = thread.pc;
 	pc = code_begin;
@@ -2520,7 +2519,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
 				// TODO: 可以 verify 一下。按照 Spec
 				// 1. 先 parse 参数。因为 ref 在最下边。
-				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size() + 1;		// don't forget `this`!!!
+				int size = new_method->parse_argument_list().size() + 1;		// don't forget `this`!!!
 #ifdef DEBUG
 				sync_wcout{} << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
 #endif
@@ -2713,7 +2712,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				sync_wcout{} << " " << new_klass->get_name() << "::" << signature << std::endl;
 #endif
 				// parse arg list and push args into stack: arg_list !
-				int size = BytecodeEngine::parse_arg_list(new_method->get_descriptor()).size();
+				int size = new_method->parse_argument_list().size();
 				if (*pc == 0xb7) {
 					size ++;		// invokeSpecial 必须加入一个 this 指针！除了 invokeStatic 之外的所有指令都要加上 this 指针！！！ ********* important ！！！！！
 								// this 指针会被自动放到 op_stack 上！所以，从 op_stack 上多读一个就 ok ！！

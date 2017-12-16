@@ -9,6 +9,7 @@
 #include "jarLister.hpp"
 #include "system_directory.hpp"
 #include "utils/lock.hpp"
+#include <iomanip>
 
 using std::map;
 
@@ -58,6 +59,16 @@ protected:
 public:
 	ByteStream(char *buf, int length) : buf(buf), length(length) {
 		setg(buf, buf, buf + length);
+	}
+	void print(char splitter = ' ', bool showbase = false) {		// pretty print (useful)
+		if (showbase)
+			std::wcout << std::showbase;		// print with `0x`.
+		for (int i = 0; i < length; i ++) {
+			// [x] cout 的 hex 输出 char 也是字符，必须强转为 int，不过这样的话如果 char 值是负的，那么输出就是 0xFFF.. 这种太丑了...
+			std::wcout << std::hex << +(unsigned char)buf[i] << splitter;		// [√] 这里转为 unsigned char，再加上一个正负号，就可以完美输出！！见：https://stackoverflow.com/a/28355222/7093297
+		}
+		// set back and print `\n`.
+		std::wcout << std::noshowbase << std::dec << std::endl;
 	}
 };
 

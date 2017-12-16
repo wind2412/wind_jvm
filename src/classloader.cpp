@@ -150,7 +150,9 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 #ifdef DEBUG
 		sync_wcout{} << "===----------------- begin parsing (" << classname << ") 's ClassFile in MyClassLoader ..." << std::endl;
 #endif
+
 		s >> *cf;
+
 #ifdef DEBUG
 		sync_wcout{} << "===----------------- parsing (" << classname << ") 's ClassFile end." << std::endl;
 #endif
@@ -186,10 +188,16 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 
 		// convert to a MetaClass (link)
 		shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, /*this*/ nullptr, loader_mirror);	// I think nullptr maybe good choice?? 反正是对所有 loader 都不可见...
+		// 拦截：在这里可以拦截一些 VM Anonymous Klass，截获字节码。
+//		if (newklass->get_name() == L"xxxxx") {
+//			std::wcout << "success!!" << std::endl;
+//		}
 		// reset the Anonymous Klass's name.
 		std::wstringstream ss;
 		ss << newklass->get_name() << L"/" << newklass;			// 这里的 bug，在于看到注释了解到 Anonymous Klass 不属于任何一个 classloader......于是就没放进 classloader 中......结果 shared_ptr 由于引用计数变成0 自动析构了 .... 各种ub...
 		newklass->set_name(ss.str());
+
+
 //		std::wcout << newklass->get_name() << std::endl;		// delete
 		// set the hostklass.
 		newklass->set_hostklass(hostklass);		// set hostklass...
@@ -222,6 +230,12 @@ MyClassLoader::get_loader().print();
 				f >> *cf;
 			} else {		// use ByteBuffer:
 				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
+
+				// 拦截：
+//				if (classname == L"java/lang/invoke/BoundMethodHandle$Species_LL") {
+//					byte_buf->print(',', true);		// 输出某一个特定类的字节码。此类是直接注入的，因此没有 .class 文件。
+//				}
+
 #ifdef DEBUG
 				sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
 #endif

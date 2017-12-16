@@ -66,11 +66,13 @@ void argument_unboxing(list<Oop *> & args)		// Unboxing args for Integer, Double
 
 InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wstring & return_type)	// $3 is prevent from returning `void`. I think it should be boxed to `Void`.
 {
-	if (basic_type_oop->get_ooptype() != OopType::_BasicTypeOop)	return nullptr;
-
 	if (return_type == L"V") {		// TODO: 并不确保正确......应当试验一番......
 		return std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void"))->new_instance();
 	}
+
+	if (basic_type_oop == nullptr)	return nullptr;
+	if (basic_type_oop->get_ooptype() != OopType::_BasicTypeOop)	return (InstanceOop *)basic_type_oop;		// it is an InstanceOop......	// bug report... 我是白痴......
+
 
 	shared_ptr<Method> target_method;
 	switch (((BasicTypeOop *)basic_type_oop)->get_type()) {
@@ -151,7 +153,7 @@ void JVM_Invoke(list<Oop *> & _stack){
 	InstanceOop *methodType = (InstanceOop *)oop;
 
 	// get the **REAL MemberName** from Table through methodType...
-	InstanceOop *member_name_obj = find_table_if_match_methodType(methodType);
+	InstanceOop *member_name_obj = find_table_if_match_methodType(methodType);		// TODO: 其实如果是 DirectMethodHandle，可以直接查找......貌似不用 find_table...
 
 	// 非常悲伤。因为研究了好长时间也没有研究出来那个 vmindex 和 vmtarget 到底放在哪。感觉应该是 jvm 对 MemberName 这个类钦定的吧......
 	// 所以这里只能重新查找了......QAQ
@@ -203,20 +205,23 @@ void JVM_Invoke(list<Oop *> & _stack){
 	// 2. get the target method
 	shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
 
-	//	if (ref_kind == 6)	{			// invokeStatic
-//
-//	} else if (ref_kind == 5) { 		// invokeVirtual
-//
-//	} else if (ref_kind == 7) {		// invokeSpecial
-//		assert(false);		// not support yet...
-//	} else if (ref_kind == 9) {		// invokeInterface
-//		assert(false);		// not support yet...
-//	} else {
-//		assert(false);
-//	}
-
 	// simple check
-	int size = BytecodeEngine::parse_arg_list(target_method->get_descriptor()).size();
+	int size = target_method->parse_argument_list().size();
+	// add `this` obj!
+	if (ref_kind == 6)	{			// invokeStatic
+
+	} else if (ref_kind == 5) { 		// invokeVirtual
+		size ++;
+	} else if (ref_kind == 7) {		// invokeSpecial
+		size ++;
+		assert(false);		// not support yet...
+	} else if (ref_kind == 9) {		// invokeInterface
+		size ++;
+		assert(false);		// not support yet...
+	} else {
+		size ++;
+		assert(false);
+	}
 	assert(size == _stack.size());		// 参数一定要相等......
 
 	// 把参数所有的自动装箱类解除装箱...... 因为 invoke 的参数全是 Object，而真实的参数可能是 int。
@@ -237,9 +242,6 @@ void JVM_InvokeBasic(list<Oop *> & _stack){
 	_stack.pop_back();															// pop 出 [length-2] 的 CallerKlassMirror *.
 	// 现在 _stack 剩下的全是参数～。
 
-	std::wcout << _stack.size() << std::endl;
-	std::wcout << _stack.front()->get_klass()->get_name() << std::endl;
-
 	Oop *oop;
 	_this->get_field_value(METHODHANDLE L":type:Ljava/lang/invoke/MethodType;", &oop);
 	InstanceOop *methodType = (InstanceOop *)oop;
@@ -251,16 +253,98 @@ void JVM_InvokeBasic(list<Oop *> & _stack){
 //	std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
 //	std::wcout << methodType << std::endl;
 
-	methodType->get_field_value(METHODTYPE L":methodDescriptor:" STR, &oop);
-	if (oop != nullptr)
-		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)oop) << std::endl;
+//	methodType->get_field_value(METHODTYPE L":methodDescriptor:" STR, &oop);
+//	if (oop != nullptr)
+//		std::wcout << java_lang_string::stringOop_to_wstring((InstanceOop *)oop) << std::endl;
 
 //	// get the **REAL MemberName** from Table through methodType...
 //	InstanceOop *member_name_obj = find_table_if_match_methodType(methodType);	// 根本就没有被传进来.....需要另想办法了......
 
 	// 这也就是说明，调用到这里，虽然有 MethodType，但是却并找不到对应的 MemberName ???!!! 怎么回事到底是？？？？
 
-	assert(false);
+	assert(_this->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");		// DirectMethodHandle 中直接包含了一个 MemberName 项！！
+
+	_this->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
+	InstanceOop *member_name_obj = (InstanceOop *)oop;
+
+	// copy...
+	member_name_obj->get_field_value(MEMBERNAME L":clazz:" CLS, &oop);
+	MirrorOop *clazz = (MirrorOop *)oop;		// e.g.: Test8
+	assert(clazz != nullptr);
+	member_name_obj->get_field_value(MEMBERNAME L":name:" STR, &oop);
+	InstanceOop *name = (InstanceOop *)oop;	// e.g.: doubleVal
+	assert(name != nullptr);
+	member_name_obj->get_field_value(MEMBERNAME L":type:" OBJ, &oop);
+	InstanceOop *type = (InstanceOop *)oop;	// maybe a String, or maybe an Object[]...
+	assert(type != nullptr);
+	member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+	int flags = ((IntOop *)oop)->value;
+
+	auto klass = clazz->get_mirrored_who();
+
+	// decode is from openjdk:
+
+	int ref_kind = ((flags & 0xF000000) >> 24);
+	/**
+	 * from 1 ~ 9:
+	 * 1: getField
+	 * 2: getStatic
+	 * 3: putField
+	 * 4: putStatic
+	 * 5: invokeVirtual
+	 * 6: invokeStatic
+	 * 7: invokeSpecial
+	 * 8: newInvokeSpecial
+	 * 9: invokeInterface
+	 */
+	assert(ref_kind >= 5 && ref_kind <= 9);		// must be method call...
+
+	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+	wstring real_name = java_lang_string::stringOop_to_wstring(name);
+	if (real_name == L"<clinit>" || real_name == L"<init>") {
+		assert(false);		// can't be the two names.
+	}
+
+	// 0. create a empty wstring: descriptor
+	wstring descriptor = get_member_name_descriptor(real_klass, real_name, type);
+	// 1. get the signature
+	wstring signature = real_name + L":" + descriptor;
+	// 2. get the target method
+	shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
+
+//	std::wcout << _stack.size() << " " << klass->get_name() << " " << target_method->get_name() << std::endl;		// delete
+	thread->get_stack_trace();		// delete
+
+	// simple check
+	int size = target_method->parse_argument_list().size();
+	// add `this` obj!
+	if (ref_kind == 6)	{			// invokeStatic
+
+	} else if (ref_kind == 5) { 		// invokeVirtual
+		size ++;
+	} else if (ref_kind == 7) {		// invokeSpecial
+		size ++;
+		assert(false);		// not support yet...
+	} else if (ref_kind == 9) {		// invokeInterface
+		size ++;
+		assert(false);		// not support yet...
+	} else {
+		size ++;
+		assert(false);
+	}
+	assert(size == _stack.size());		// 参数一定要相等......
+
+	// 把参数所有的自动装箱类解除装箱...... 因为 invoke 的参数全是 Object，而真实的参数可能是 int。
+	argument_unboxing(_stack);
+
+	// 3. call it!		// return maybe: BasicTypeOop, ArrayOop, InstanceOop... all.
+	Oop *result = thread->add_frame_and_execute(target_method, _stack);		// TODO: 如果抛了异常。
+
+	// 把返回值所有能自动装箱的自动装箱......因为要返回一个 Object。
+	Oop *real_result = return_val_boxing(result, thread, target_method->return_type());
+
+	_stack.push_back(real_result);
+
 }
 
 // 返回 fnPtr.

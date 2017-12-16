@@ -62,6 +62,7 @@ using std::function;
 #define MEMBERNAME			L"java/lang/invoke/MemberName"
 #define METHODTYPE			L"java/lang/invoke/MethodType"
 #define METHODHANDLE			L"java/lang/invoke/MethodHandle"
+#define DIRECTMETHODHANDLE	L"java/lang/invoke/DirectMethodHandle"
 #define BOOLEAN0				L"java/lang/Boolean"
 #define BYTE0				L"java/lang/Byte"
 #define SHORT0				L"java/lang/Short"
