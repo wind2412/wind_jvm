@@ -53,6 +53,24 @@ public:
 
 class vm_thread;
 
+struct DebugTool {		// the debug tool can only display the target method's bytecode execution.
+	static bool & is_open();
+	static unordered_map<wstring, pair<wstring, wstring>> & get_config_map ();
+	static bool match(const wstring & name, const wstring & descriptor, const wstring & klass_name) {
+		auto & map = get_config_map();
+		auto iter = map.find(name);
+		if (iter == map.end()) {
+			return false;
+		} else {
+			if (iter->second.first == descriptor && iter->second.second == klass_name) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+};
+
 struct BytecodeEngine {
 public:
 	static Oop * execute(vm_thread & thread, StackFrame & cur_frame, int thread_no);

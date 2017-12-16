@@ -11,6 +11,10 @@
 
 int main(int argc, char *argv[])
 {
+#ifdef DEBUG
+	sync_wcout::set_switch(true);
+#endif
+
 	std::ios::sync_with_stdio(true);		// keep thread safe?
 	std::wcout.imbue(std::locale(""));
 	std::vector<std::wstring> v{ L"wind_jvm", L"1", L"2" };

@@ -10,6 +10,9 @@
 
 sync_wcout::~sync_wcout() {
 	std::lock_guard<std::mutex> guard(mutex());
+	if (!_switch()) {
+		return;
+	}
 	switch (ThreadTable::get_threadno(pthread_self()) % 7) {
 		case 0:
 			std::wcout << RESET << this->str();		// 在对象销毁的时候，自动输出～ 虽然我也想过，但是没有想到这种实现方法。虽然加锁是万恶之源......

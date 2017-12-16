@@ -378,7 +378,7 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
 //#ifdef DEBUG
-	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
+	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << ":" << m->get_descriptor() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 	int j = 1;
 	for (Oop * value : it->localVariableTable) {
 		ss << "    the localVariableTable[" << j-1 << "] is " << it->print_arg_msg(value) << std::endl;
@@ -394,9 +394,12 @@ ArrayOop * vm_thread::get_stack_trace()
 	}
 
 //#ifdef DEBUG
+	bool _switch_ = sync_wcout::_switch();
+	sync_wcout::set_switch(true);
 	sync_wcout{} << "===-------------------------------------- printStackTrace() -----------------------------------------===" << std::endl;
 	sync_wcout{} << ss.str();
 	sync_wcout{} << "===--------------------------------------------------------------------------------------------------===" << std::endl;
+	sync_wcout::set_switch(_switch_);
 //#endif
 
 	return arr;

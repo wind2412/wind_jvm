@@ -34,6 +34,15 @@ private:
 		return mutex;
 	}
 public:
+	static bool & _switch() {
+		static bool _switch = false;
+		return _switch;
+	}
+	static void set_switch(bool open) {
+		std::lock_guard<std::mutex> guard(mutex());
+		_switch() = open;
+	}
+public:
 	sync_wcout () = default;
 	~sync_wcout();
 };
