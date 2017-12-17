@@ -451,18 +451,340 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thre
 	}
 }
 
+void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
+{
+	// 因此，得到此方法的目的只有一个，得到方法签名。
+	wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
+	// TODO: 可以 verify 一下。按照 Spec
+	// 1. 先 parse 参数。因为 ref 在最下边。
+	int size = new_method->parse_argument_list().size() + 1;		// don't forget `this`!!!
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
+#endif
+	Oop *ref;		// get ref. (this)	// same as invokespecial. but invokespecial didn't use `this` ref to get Klass.
+	list<Oop *> arg_list;
+	assert(op_stack.size() >= size);
+	while (size > 0) {
+		if (size == 1) {
+			ref = op_stack.top();
+		}
+		arg_list.push_front(op_stack.top());
+		op_stack.pop();
+		size --;
+	}
+
+	// 这里用作魔改。比如，禁用 Perf 类。
+	if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
+		if (new_method->is_void()) {
+			return;
+		} else if (new_method->is_return_primitive()){
+			op_stack.push(new IntOop(0));
+			return;
+		} else {
+			op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
+			return;
+		}
+	}
+
+
+	// 2. get ref.
+	if (ref == nullptr) {
+		thread.get_stack_trace();			// delete
+	}
+	assert(ref != nullptr);			// `this` must not be nullptr!!!!
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG)";
+	if (new_method->is_private()) {
+		sync_wcout{} << " [private]";
+	}
+	if (new_method->is_static()) {
+		sync_wcout{} << " [static]";
+	}
+	if (new_method->is_synchronized()) {
+		sync_wcout{} << " [synchronized]";
+	}
+	sync_wcout{} << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
+#endif
+	shared_ptr<Method> target_method;
+	if (*pc == 0xb6){
+		if (ref->get_klass()->get_type() == ClassType::InstanceClass) {
+			target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+		} else if (ref->get_klass()->get_type() == ClassType::TypeArrayClass || ref->get_klass()->get_type() == ClassType::ObjArrayClass) {
+			target_method = new_method;		// 那么 new_method 就是那个 target_method。因为数组没有 InstanceKlass，编译器会自动把 Object 的 Method 放上来。直接调用就可以～
+		} else {
+			assert(false);
+		}
+	} else {
+		assert(ref->get_klass()->get_type() == ClassType::InstanceClass);	// 接口一定是 Instance。
+		target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
+	}
+
+	if (target_method == nullptr) {
+		std::wcerr << "didn't find: [" << signature << "] in klass: [" << ref->get_klass()->get_name() << "]!" << std::endl;
+	}
+	assert(target_method != nullptr);
+
+
+	// synchronize
+	if (target_method->is_synchronized()) {
+		ref->enter_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) synchronize obj: [" << ref << "]." << std::endl;
+#endif
+	}
+	if (target_method->is_native()) {
+		if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
+#ifdef BYTECODE_DEBUG
+			sync_wcout{} << "jump off `registerNatives`." << std::endl;
+#endif
+			// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
+		} else {
+			shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+			void *native_method = find_native(new_klass->get_name(), signature);
+			// no need to add a stack frame!
+			if (native_method == nullptr) {
+				std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
+				if (new_method->is_static()) {
+					std::wcout << "[static] ";
+				}
+				std::wcout << "method!" << std::endl;
+			}
+			assert(native_method != nullptr);
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+#endif
+			arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeVirtual 和 invokeInterface，所以应该 ref 指向的是真的。
+			arg_list.push_back((Oop *)&thread);
+			// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
+			uint8_t *backup_pc = pc;
+			thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
+			pc = 0;
+			// execute !!
+			((void (*)(list<Oop *> &))native_method)(arg_list);
+			// 然后弹出并恢复 pc......
+			thread.vm_stack.pop_back();
+			pc = backup_pc;
+
+			if (cur_frame.has_exception) {
+				assert(arg_list.size() >= 1);
+				op_stack.push(arg_list.back());
+			} else if (!new_method->is_void()) {	// return value.
+				assert(arg_list.size() >= 1);
+				op_stack.push(arg_list.back());
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+			}
+		}
+	} else {
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+#endif
+		Oop *result = thread.add_frame_and_execute(target_method, arg_list);
+
+		if (cur_frame.has_exception) {
+			op_stack.push(result);
+		} else if (!target_method->is_void()) {
+			op_stack.push(result);
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+		}
+	}
+
+	// unsynchronize
+	if (target_method->is_synchronized()) {
+		ref->leave_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) unsynchronize obj: [" << ref << "]." << std::endl;
+#endif
+	}
+
+}
+
+void BytecodeEngine::invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
+{
+	wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
+	if (*pc == 0xb8) {
+		assert(new_method->is_static() && !new_method->is_abstract());
+	} else if (*pc == 0xb7) {
+		// TODO: 可以有限制条件。
+	}
+	// initialize the new_class... <clinit>
+	shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+	initial_clinit(new_klass, thread);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG)";
+	if (new_method->is_private()) {
+		sync_wcout{} << " [private]";
+	}
+	if (new_method->is_static()) {
+		sync_wcout{} << " [static]";
+	}
+	if (new_method->is_synchronized()) {
+		sync_wcout{} << " [synchronized]";
+	}
+	sync_wcout{} << " " << new_klass->get_name() << "::" << signature << std::endl;
+#endif
+	// parse arg list and push args into stack: arg_list !
+	int size = new_method->parse_argument_list().size();
+	if (*pc == 0xb7) {
+		size ++;		// invokeSpecial 必须加入一个 this 指针！除了 invokeStatic 之外的所有指令都要加上 this 指针！！！ ********* important ！！！！！
+					// this 指针会被自动放到 op_stack 上！所以，从 op_stack 上多读一个就 ok ！！
+	}
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
+#endif
+	list<Oop *> arg_list;
+	assert(op_stack.size() >= size);
+	Oop *ref = nullptr;
+	while (size > 0) {
+		if (size == 1 && *pc == 0xb7) {
+			ref = op_stack.top();
+		}
+		arg_list.push_front(op_stack.top());
+		op_stack.pop();
+		size --;
+	}
+
+	// 这里用作魔改。比如，禁用 System.loadLibrary 方法。
+	if (new_method->get_klass()->get_name() == L"java/lang/System" && new_method->get_name() == L"loadLibrary")
+		return;
+	// 这里用作魔改。比如，禁用 Perf 类。		// TODO: 这里的魔改可以去掉。是程序分支走错才走到这里的。不过留着亦可。
+	if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
+		if (new_method->is_void()) {
+			return;
+		} else if (new_method->is_return_primitive()){
+			op_stack.push(new IntOop(0));
+			return;
+		} else {
+			op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
+			return;
+		}
+	}
+
+	// synchronized:
+	Oop *this_obj;
+	if (new_method->is_synchronized()) {
+		if (new_method->is_static()) {	// if static, lock the `mirror` of this klass.	// for 0xb8: invokeStatic
+			new_method->get_klass()->get_mirror()->enter_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) synchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
+#endif
+		} else {							// if not-static, lock this obj.					// for 0xb7: invokeSpecial
+			// get the `obj` from op_stack!
+			this_obj = arg_list.front();
+			this_obj->enter_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) synchronize obj: [" << this_obj << "]." << std::endl;
+#endif
+		}
+	}
+	if (new_method->is_native()) {
+		// TODO: 这里应该有一个 “纸上和现实中” 的问题。因为这里记录的到时候会返回函数指针，而这个指针的类型已经被完全擦除了。我们根本不知道参数的个数是多少。虽然我们能够得到
+		// argument list，但是这个 argument list 又要怎么传给参数呢？这是个非常有难度的问题。
+		// 好的解法，就像这里，把所有参数全都去掉，换成局部变量表和栈式虚拟机。这样的话能够避免这个问题——毕竟机器是虚拟出来的。
+		// 而函数调用还是基于别人的语言基础上进行，所以根本无法在纸上进行操作了。
+		// 因此，必须使用栈来解决，把所有 native 方法的参数全都换成栈。而这样，由于每个 native 方法自己知道自己有几个参数，出栈即可。
+		// 返回值也一并压到栈中。
+		if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
+#ifdef BYTECODE_DEBUG
+			sync_wcout{} << "jump off `registerNatives`." << std::endl;
+#endif
+			// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
+		} else {
+#ifdef BYTECODE_DEBUG
+if (*pc == 0xb7)
+sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+else if (*pc == 0xb8)
+sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+#endif
+			void *native_method = find_native(new_klass->get_name(), signature);
+			// no need to add a stack frame!
+			if (native_method == nullptr) {
+				std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
+				if (new_method->is_static()) {
+					std::wcout << "[static] ";
+				}
+				std::wcout << "method!" << std::endl;
+			}
+			assert(native_method != nullptr);
+			if (*pc == 0xb7)
+				arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
+			else
+				arg_list.push_back(new_method->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
+			arg_list.push_back((Oop *)&thread);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。	--- 后来由于加上了 Thread，所以名字改成了 thread 而已。
+
+			// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
+			uint8_t *backup_pc = pc;
+			thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
+			pc = nullptr;
+			// execute !!
+			((void (*)(list<Oop *> &))native_method)(arg_list);
+			// 然后弹出并恢复 pc......
+			thread.vm_stack.pop_back();
+			pc = backup_pc;
+
+			if (cur_frame.has_exception) {
+				assert(arg_list.size() >= 1);
+				op_stack.push(arg_list.back());
+			} else if (!new_method->is_void()) {	// return value.
+				assert(arg_list.size() >= 1);
+				op_stack.push(arg_list.back());
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+			}
+		}
+	} else {
+#ifdef BYTECODE_DEBUG
+if (*pc == 0xb7)
+sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
+else if (*pc == 0xb8)
+sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
+#endif
+		Oop *result = thread.add_frame_and_execute(new_method, arg_list);
+
+		if (cur_frame.has_exception) {
+			op_stack.push(result);
+		} else if (!new_method->is_void()) {
+			op_stack.push(result);
+#ifdef BYTECODE_DEBUG
+sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
+#endif
+		}
+	}
+	// unsynchronize
+	if (new_method->is_synchronized()) {
+		if (new_method->is_static()) {
+			new_method->get_klass()->get_mirror()->leave_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) unsynchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
+#endif
+		} else {
+			this_obj->leave_monitor();
+#ifdef BYTECODE_DEBUG
+		sync_wcout{} << "(DEBUG) unsynchronize obj: [" << this_obj << "]." << std::endl;
+#endif
+		}
+	}
+}
+
+
+
+
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
 // TODO: 注意！！以下，所有代码，不应该出现 ByteOop、BooleanOop、ShortOop ！！ 取而代之的应当是 IntOop ！！
 Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int thread_no) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
 	assert(&cur_frame == &thread.vm_stack.back());
-	shared_ptr<Method> method = cur_frame.method;
-	uint32_t code_length = method->get_code()->code_length;
+	shared_ptr<Method> code_method = cur_frame.method;
+	uint32_t code_length = code_method->get_code()->code_length;
 	stack<Oop *> & op_stack = cur_frame.op_stack;
 	vector<Oop *> & localVariableTable = cur_frame.localVariableTable;
-	uint8_t *code_begin = method->get_code()->code;
-	shared_ptr<InstanceKlass> klass = method->get_klass();
-	rt_constant_pool & rt_pool = *klass->get_rtpool();
+	uint8_t *code_begin = code_method->get_code()->code;
+	shared_ptr<InstanceKlass> code_klass = code_method->get_klass();
+	rt_constant_pool & rt_pool = *code_klass->get_rtpool();
 	uint8_t *backup_pc = thread.pc;
 	uint8_t * & pc = thread.pc;
 	pc = code_begin;
@@ -470,7 +792,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	bool backup_switch = sync_wcout::_switch();
 
 	// filter debug tool:
-	if (DebugTool::is_open() && DebugTool::match(method->get_name(), method->get_descriptor(), klass->get_name())) {
+	if (DebugTool::is_open() && DebugTool::match(code_method->get_name(), code_method->get_descriptor(), code_klass->get_name())) {
 		sync_wcout::set_switch(true);
 	} else {
 		// 注：以下是：由于 DEBUG 模式会输出所有信息。因此这里设置如果开启 DEBUG 宏，那么不会关闭 sync_wcout。即，只有没定义 DEBUG 时，才会关闭掉。
@@ -2657,152 +2979,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					assert(rt_pool[rtpool_index-1].first == CONSTANT_InterfaceMethodref);
 				}
 				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);		// 这个方法，在我的常量池中解析的时候是按照子类同名方法优先的原则。也就是，如果最子类有同样签名的方法，父类的不会被 parse。这在 invokeStatic 和 invokeSpecial 是成立的，不过在 invokeVirtual 和 invokeInterface 中是不准的。因为后两者是动态绑定。
-				// 因此，得到此方法的目的只有一个，得到方法签名。
-				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
-				// TODO: 可以 verify 一下。按照 Spec
-				// 1. 先 parse 参数。因为 ref 在最下边。
-				int size = new_method->parse_argument_list().size() + 1;		// don't forget `this`!!!
-#ifdef BYTECODE_DEBUG
-				sync_wcout{} << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
-#endif
-				Oop *ref;		// get ref. (this)	// same as invokespecial. but invokespecial didn't use `this` ref to get Klass.
-				list<Oop *> arg_list;
-				assert(op_stack.size() >= size);
-				while (size > 0) {
-					if (size == 1) {
-						ref = op_stack.top();
-					}
-					arg_list.push_front(op_stack.top());
-					op_stack.pop();
-					size --;
-				}
 
-				// 这里用作魔改。比如，禁用 Perf 类。
-				if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
-					if (new_method->is_void()) {
-						break;
-					} else if (new_method->is_return_primitive()){
-						op_stack.push(new IntOop(0));
-						break;
-					} else {
-						op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
-						break;
-					}
-				}
-
-
-				// 2. get ref.
-				if (ref == nullptr) {
-					thread.get_stack_trace();			// delete
-				}
-				assert(ref != nullptr);			// `this` must not be nullptr!!!!
-#ifdef BYTECODE_DEBUG
-				sync_wcout{} << "(DEBUG)";
-				if (new_method->is_private()) {
-					sync_wcout{} << " [private]";
-				}
-				if (new_method->is_static()) {
-					sync_wcout{} << " [static]";
-				}
-				if (new_method->is_synchronized()) {
-					sync_wcout{} << " [synchronized]";
-				}
-				sync_wcout{} << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
-#endif
-				shared_ptr<Method> target_method;
-				if (*pc == 0xb6){
-					if (ref->get_klass()->get_type() == ClassType::InstanceClass) {
-						target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
-					} else if (ref->get_klass()->get_type() == ClassType::TypeArrayClass || ref->get_klass()->get_type() == ClassType::ObjArrayClass) {
-						target_method = new_method;		// 那么 new_method 就是那个 target_method。因为数组没有 InstanceKlass，编译器会自动把 Object 的 Method 放上来。直接调用就可以～
-					} else {
-						assert(false);
-					}
-				} else {
-					assert(ref->get_klass()->get_type() == ClassType::InstanceClass);	// 接口一定是 Instance。
-					target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
-				}
-
-				if (target_method == nullptr) {
-					std::wcerr << "didn't find: [" << signature << "] in klass: [" << ref->get_klass()->get_name() << "]!" << std::endl;
-				}
-				assert(target_method != nullptr);
-
-
-				// synchronize
-				if (target_method->is_synchronized()) {
-					ref->enter_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) synchronize obj: [" << ref << "]." << std::endl;
-#endif
-				}
-				if (target_method->is_native()) {
-					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
-#ifdef BYTECODE_DEBUG
-						sync_wcout{} << "jump off `registerNatives`." << std::endl;
-#endif
-						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
-					} else {
-						shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
-						void *native_method = find_native(new_klass->get_name(), signature);
-						// no need to add a stack frame!
-						if (native_method == nullptr) {
-							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
-							if (new_method->is_static()) {
-								std::wcout << "[static] ";
-							}
-							std::wcout << "method!" << std::endl;
-						}
-						assert(native_method != nullptr);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
-#endif
-						arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeVirtual 和 invokeInterface，所以应该 ref 指向的是真的。
-						arg_list.push_back((Oop *)&thread);
-						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
-						uint8_t *backup_pc = pc;
-						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
-						pc = 0;
-						// execute !!
-						((void (*)(list<Oop *> &))native_method)(arg_list);
-						// 然后弹出并恢复 pc......
-						thread.vm_stack.pop_back();
-						pc = backup_pc;
-
-						if (cur_frame.has_exception) {
-							assert(arg_list.size() >= 1);
-							op_stack.push(arg_list.back());
-						} else if (!new_method->is_void()) {	// return value.
-							assert(arg_list.size() >= 1);
-							op_stack.push(arg_list.back());
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
-#endif
-						}
-					}
-				} else {
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) invoke a method: <class>: " << ref->get_klass()->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
-#endif
-					Oop *result = thread.add_frame_and_execute(target_method, arg_list);
-
-					if (cur_frame.has_exception) {
-						op_stack.push(result);
-					} else if (!target_method->is_void()) {
-						op_stack.push(result);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
-#endif
-					}
-				}
-
-				// unsynchronize
-				if (target_method->is_synchronized()) {
-					ref->leave_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) unsynchronize obj: [" << ref << "]." << std::endl;
-#endif
-				}
+				invokeVirtual(new_method, op_stack, thread, cur_frame, pc);
 
 				// **IMPORTANT** judge whether returns an Exception!!!
 				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
@@ -2813,7 +2991,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						if (klass == throwable_klass || klass->check_parent(throwable_klass)) {		// 千万别忘了判断此 klass 是不是 throwable !!!!!
 							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
 #ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
+sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;
 #endif
 							goto exception_handler;
 						} else {
@@ -2823,7 +3001,6 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						assert(false);
 					}
 				}
-
 				break;
 			}
 			case 0xb7:		// invokeSpecial
@@ -2831,169 +3008,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
 				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);
-				wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
-				if (*pc == 0xb8) {
-					assert(new_method->is_static() && !new_method->is_abstract());
-				} else if (*pc == 0xb7) {
-					// TODO: 可以有限制条件。
-				}
-				// initialize the new_class... <clinit>
-				shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
-				initial_clinit(new_klass, thread);
-#ifdef BYTECODE_DEBUG
-				sync_wcout{} << "(DEBUG)";
-				if (new_method->is_private()) {
-					sync_wcout{} << " [private]";
-				}
-				if (new_method->is_static()) {
-					sync_wcout{} << " [static]";
-				}
-				if (new_method->is_synchronized()) {
-					sync_wcout{} << " [synchronized]";
-				}
-				sync_wcout{} << " " << new_klass->get_name() << "::" << signature << std::endl;
-#endif
-				// parse arg list and push args into stack: arg_list !
-				int size = new_method->parse_argument_list().size();
-				if (*pc == 0xb7) {
-					size ++;		// invokeSpecial 必须加入一个 this 指针！除了 invokeStatic 之外的所有指令都要加上 this 指针！！！ ********* important ！！！！！
-								// this 指针会被自动放到 op_stack 上！所以，从 op_stack 上多读一个就 ok ！！
-				}
-#ifdef BYTECODE_DEBUG
-				sync_wcout{} << "arg size: " << size << "; op_stack size: " << op_stack.size() << std::endl;	// delete
-#endif
-				list<Oop *> arg_list;
-				assert(op_stack.size() >= size);
-				Oop *ref = nullptr;
-				while (size > 0) {
-					if (size == 1 && *pc == 0xb7) {
-						ref = op_stack.top();
-					}
-					arg_list.push_front(op_stack.top());
-					op_stack.pop();
-					size --;
-				}
 
-				// 这里用作魔改。比如，禁用 System.loadLibrary 方法。
-				if (new_method->get_klass()->get_name() == L"java/lang/System" && new_method->get_name() == L"loadLibrary") break;
-				// 这里用作魔改。比如，禁用 Perf 类。		// TODO: 这里的魔改可以去掉。是程序分支走错才走到这里的。不过留着亦可。
-				if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
-					if (new_method->is_void()) {
-						break;
-					} else if (new_method->is_return_primitive()){
-						op_stack.push(new IntOop(0));
-						break;
-					} else {
-						op_stack.push(nullptr);		// 返回值是 ByteBuffer.	// getParentDelegationTime() 返回值是 Lsun/misc/PerfCounter;
-						break;
-					}
-				}
-
-				// synchronized:
-				Oop *this_obj;
-				if (new_method->is_synchronized()) {
-					if (new_method->is_static()) {	// if static, lock the `mirror` of this klass.	// for 0xb8: invokeStatic
-						new_method->get_klass()->get_mirror()->enter_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) synchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
-#endif
-					} else {							// if not-static, lock this obj.					// for 0xb7: invokeSpecial
-						// get the `obj` from op_stack!
-						this_obj = arg_list.front();
-						this_obj->enter_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) synchronize obj: [" << this_obj << "]." << std::endl;
-#endif
-					}
-				}
-				if (new_method->is_native()) {
-					// TODO: 这里应该有一个 “纸上和现实中” 的问题。因为这里记录的到时候会返回函数指针，而这个指针的类型已经被完全擦除了。我们根本不知道参数的个数是多少。虽然我们能够得到
-					// argument list，但是这个 argument list 又要怎么传给参数呢？这是个非常有难度的问题。
-					// 好的解法，就像这里，把所有参数全都去掉，换成局部变量表和栈式虚拟机。这样的话能够避免这个问题——毕竟机器是虚拟出来的。
-					// 而函数调用还是基于别人的语言基础上进行，所以根本无法在纸上进行操作了。
-					// 因此，必须使用栈来解决，把所有 native 方法的参数全都换成栈。而这样，由于每个 native 方法自己知道自己有几个参数，出栈即可。
-					// 返回值也一并压到栈中。
-					if (new_method->get_name() == L"registerNatives" && new_method->get_descriptor() == L"()V") {
-#ifdef BYTECODE_DEBUG
-						sync_wcout{} << "jump off `registerNatives`." << std::endl;
-#endif
-						// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
-					} else {
-#ifdef BYTECODE_DEBUG
-	if (*pc == 0xb7)
-		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
-	else if (*pc == 0xb8)
-		sync_wcout{} << "(DEBUG) invoke a [native] method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-#endif
-						void *native_method = find_native(new_klass->get_name(), signature);
-						// no need to add a stack frame!
-						if (native_method == nullptr) {
-							std::wcout << "You didn't write the [" << new_klass->get_name() << ":" << signature << "] native ";
-							if (new_method->is_static()) {
-								std::wcout << "[static] ";
-							}
-							std::wcout << "method!" << std::endl;
-						}
-						assert(native_method != nullptr);
-						if (*pc == 0xb7)
-							arg_list.push_back(ref->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
-						else
-							arg_list.push_back(new_method->get_klass()->get_mirror());		// 也要把 Klass 放进去!... 放得对不对有待考证......	// 因为是 invokeSpecial 可以调用父类的方法。因此从 Method 中得到 klass 应该是不安全的。而 static 应该相反。
-						arg_list.push_back((Oop *)&thread);			// 这里使用了一个小 hack。由于有的 native 方法需要使用 jvm，所以在最后边放入了一个 jvm 指针。这样就和 JNIEnv 是一样的效果了。如果要使用的话，那么直接在 native 方法中 pop_back 即可。并不影响其他的参数。	--- 后来由于加上了 Thread，所以名字改成了 thread 而已。
-
-						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
-						uint8_t *backup_pc = pc;
-						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
-						pc = nullptr;
-						// execute !!
-						((void (*)(list<Oop *> &))native_method)(arg_list);
-						// 然后弹出并恢复 pc......
-						thread.vm_stack.pop_back();
-						pc = backup_pc;
-
-						if (cur_frame.has_exception) {
-							assert(arg_list.size() >= 1);
-							op_stack.push(arg_list.back());
-						} else if (!new_method->is_void()) {	// return value.
-							assert(arg_list.size() >= 1);
-							op_stack.push(arg_list.back());
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "then push invoke [native] method's return value " << op_stack.top() << " on the stack~" << std::endl;
-#endif
-						}
-					}
-				} else {
-#ifdef BYTECODE_DEBUG
-	if (*pc == 0xb7)
-		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":(this)"<< new_method->get_descriptor() << std::endl;
-	else if (*pc == 0xb8)
-		sync_wcout{} << "(DEBUG) invoke a method: <class>: " << new_klass->get_name() << "-->" << new_method->get_name() << ":"<< new_method->get_descriptor() << std::endl;
-#endif
-					Oop *result = thread.add_frame_and_execute(new_method, arg_list);
-
-					if (cur_frame.has_exception) {
-						op_stack.push(result);
-					} else if (!new_method->is_void()) {
-						op_stack.push(result);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "then push invoke method's return value " << op_stack.top() << " on the stack~" << std::endl;
-#endif
-					}
-				}
-				// unsynchronize
-				if (new_method->is_synchronized()) {
-					if (new_method->is_static()) {
-						new_method->get_klass()->get_mirror()->leave_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) unsynchronize klass: [" << new_method->get_klass()->get_name() << "]." << std::endl;
-#endif
-					} else {
-						this_obj->leave_monitor();
-#ifdef BYTECODE_DEBUG
-					sync_wcout{} << "(DEBUG) unsynchronize obj: [" << this_obj << "]." << std::endl;
-#endif
-					}
-				}
+				invokeStatic(new_method, op_stack, thread, cur_frame, pc);
 
 				// **IMPORTANT** judge whether returns an Exception!!!
 				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
@@ -3018,6 +3034,104 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0xba:{		// invokeDynamic
+				int rtpool_index = ((pc[1] << 8) | pc[2]);
+				assert(pc[3] == 0 && pc[4] == 0);		// default.
+				assert(rt_pool[rtpool_index-1].first == CONSTANT_InvokeDynamic);
+				// get CONSTANT_InvokeDynamic_info:
+				pair<int, int> invokedynamic_pair = boost::any_cast<pair<int, int>>(rt_pool[rtpool_index-1].second);
+				// get BootStrapMethod table from `code_klass`!!
+				auto bm = code_klass->get_bm();
+				assert(bm != nullptr);		// in invokeDynamic already, `bm` must not be nullptr!!
+				// get target BootStrapMethod index and the struct:
+				int bootstrap_method_index = invokedynamic_pair.first;
+				assert(bootstrap_method_index >= 0 && bootstrap_method_index < bm->num_bootstrap_methods);
+				auto fake_method_struct = bm->bootstrap_methods[bootstrap_method_index];	// struct BootstrapMethods_attribute::bootstrap_methods_t
+				// get CONSTANT_MethodHandle_info and arguments from the struct above:
+				// [0] MethodHandle(fake)
+				assert(rt_pool[fake_method_struct.bootstrap_method_ref-1].first == CONSTANT_MethodHandle);
+				pair<int, int> fake_methodhandle_pair = boost::any_cast<pair<int, int>>(rt_pool[fake_method_struct.bootstrap_method_ref-1].second);
+				int ref_kind = fake_methodhandle_pair.first;	assert(ref_kind >= 1 && ref_kind <= 9);
+				int ref_index = fake_methodhandle_pair.second;
+				switch(ref_kind) {
+					case 1:{		// REF_getField
+						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+						break;
+					}
+					case 2:{		// REF_getStatic
+						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+						break;
+					}
+					case 3:{		// REF_puttField
+						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+						break;
+					}
+					case 4:{		// REF_putStatic
+						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+						break;
+					}
+					case 5:{		// REF_invokeVirtual
+						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
+						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+						break;
+					}
+					case 6:{		// REF_invokeStatic
+						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+						break;
+					}
+					case 7:{		// REF_invokeSpecial
+						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+						break;
+					}
+					case 8:{		// REF_newInvokeSpecial
+						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
+						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+						assert(method->get_name() == L"<init>");		// special inner klass!!
+						break;
+					}
+					case 9:{		// REF_invokeInterface
+						assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+						break;
+					}
+				}
+				assert(false);
+
+				// [1] Arguments
+				list<Oop *> arg;
+				for (int i = 0; i < fake_method_struct.num_bootstrap_arguments; i ++) {
+					int arg_index = fake_method_struct.bootstrap_arguments[i];
+					pair<int, boost::any> _pair = rt_pool[arg_index-1];
+					assert(_pair.first == CONSTANT_String || _pair.first == CONSTANT_Class || _pair.first == CONSTANT_Integer
+						   || _pair.first == CONSTANT_Float || _pair.first == CONSTANT_Long || _pair.first == CONSTANT_Double
+						   || _pair.first == CONSTANT_MethodHandle || _pair.first == CONSTANT_MethodType);
+
+
+
+				}
+
+				// get target NameAndType index and Name && Type
+				int name_and_type_index = invokedynamic_pair.second;
+				assert(rt_pool[name_and_type_index-1].first == CONSTANT_NameAndType);
+				pair<int, int> nameAndType_pair = boost::any_cast<pair<int, int>>(rt_pool[name_and_type_index-1].second);
+				assert(rt_pool[nameAndType_pair.first-1].first == CONSTANT_Utf8);
+				assert(rt_pool[nameAndType_pair.second-1].first == CONSTANT_Utf8);
+				wstring name = boost::any_cast<wstring>(rt_pool[nameAndType_pair.first-1].second);
+				wstring type = boost::any_cast<wstring>(rt_pool[nameAndType_pair.second-1].second);
+//				std::wcout << name << " " << type << std::endl;	// delete
+
+
+
+
 				assert(false);
 				break;
 			}

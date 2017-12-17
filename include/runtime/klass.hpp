@@ -236,6 +236,7 @@ public:		// for invokedynamic.
 	bool is_in_vtable(shared_ptr<Method> m) { return std::find(vtable.begin(), vtable.end(), m) != vtable.end(); }
 	const auto & get_field_layout() { return this->fields_layout; }
 	const auto & get_static_field_layout() { return this->static_fields_layout; }
+	BootstrapMethods_attribute *get_bm() { return this->bm; }
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
