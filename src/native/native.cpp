@@ -5,6 +5,8 @@
  *      Author: zhengxiaolin
  */
 
+#include "wind_jvm.hpp"
+
 #include "native/native.hpp"
 
 #include "native/java_lang_Object.hpp"
@@ -78,4 +80,14 @@ void *find_native(const wstring & klass_name, const wstring & signature)	// such
 		std::wcerr << "didn't find [" << klass_name << ":" << signature << "] in native !! it didn't do registerNatives() function!!" << std::endl;
 		assert(false);
 	}
+}
+
+void native_throw_Exception(shared_ptr<InstanceKlass> excp_klass, vm_thread *thread, list<Oop *> & _stack, const std::wstring & msg)
+{
+	auto excp_obj = excp_klass->new_instance();
+	thread->set_exception_at_last_second_frame();		// set exception.
+	auto init_method = excp_klass->get_this_class_method(L"<init>:(Ljava/lang/String;)V");
+	assert(init_method != nullptr);
+	thread->add_frame_and_execute(init_method, {excp_obj, java_lang_string::intern(msg)});
+	_stack.push_back(excp_obj);
 }

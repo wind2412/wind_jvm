@@ -195,11 +195,7 @@ shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_
 	if (ref_kind == 6)	{			// invokeStatic
 		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 		target_method = real_klass->get_this_class_method(signature);
-
-		if (target_method == nullptr && thread != nullptr) {
-			thread->get_stack_trace();
-		}
-		assert(target_method != nullptr);
+//		assert(target_method != nullptr);
 	} else if (ref_kind == 5) { 		// invokeVirtual
 		target_method = real_klass->search_vtable(signature);
 		assert(target_method != nullptr);
@@ -212,7 +208,7 @@ shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_
 	} else {
 		assert(false);
 	}
-	return target_method;
+	return target_method;		// 可以返回 nullptr ！！！这个千万注意！！像是 jdk 的 resolveOrNull 方法，就是这样，故意找不到然后抛一个 LinkageError，然后捕获！！
 }
 
 void JVM_Resolve(list<Oop *> & _stack){		// static
@@ -286,9 +282,23 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		wstring signature = real_name + L":" + descriptor;
 		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind, thread);
 
-		// build the return MemberName obj.
-		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type, thread);
-		_stack.push_back(member_name2);
+		if (target_method == nullptr) {		// throw LinkageError !!! Purposely!!!
+
+			// get the exception klass
+			auto excp_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/LinkageError"));
+			// make a message
+			std::wstring msg(L"didn't find the target_method: [" + signature + L"], by wind2412");
+			// go!
+			native_throw_Exception(excp_klass, thread, _stack, msg);	// the exception obj has been save into the `_stack`!
+
+			return;
+
+		} else {
+			// build the return MemberName obj.
+			auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type, thread);
+			_stack.push_back(member_name2);
+		}
+
 
 	} else if (flags & 0x20000){		// Constructor
 		assert(false);			// not support yet...

@@ -405,6 +405,13 @@ ArrayOop * vm_thread::get_stack_trace()
 	return arr;
 }
 
+void vm_thread::set_exception_at_last_second_frame() {
+	assert(this->vm_stack.size() >= 2);
+	auto iter = this->vm_stack.rbegin();
+	++iter;							// get cur_frame's prev...
+	iter->has_exception = true;
+}
+
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");

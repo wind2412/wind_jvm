@@ -57,12 +57,7 @@ public:
 	void init_and_do_main();
 	ArrayOop *get_stack_trace();
 	int get_stack_size() { return vm_stack.size(); }
-	void set_exception_at_last_second_frame() {
-		assert(this->vm_stack.size() >= 2);
-		auto iter = this->vm_stack.rbegin();
-		++iter;							// get cur_frame's prev...
-		iter->has_exception = true;
-	}
+	void set_exception_at_last_second_frame();
 };
 
 class wind_jvm {
