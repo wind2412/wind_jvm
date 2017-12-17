@@ -22,41 +22,64 @@ static unordered_map<wstring, void*> methods = {
     {L"invokeExact:([" OBJ ")" OBJ,							(void *)&JVM_InvokeExact},
 };
 
-void argument_unboxing(list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, etc.
+// args 是所有的参数，包括 this。而 method->parse_argument_list 是不包括 this 的。
+void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, [automatically] etc.
 {
+	vector<MirrorOop *> real_arg_mirrors = method->parse_argument_list();
+	// check
+	if (method->is_static()) {
+		assert(args.size() == real_arg_mirrors.size());
+	} else {
+		assert(args.size() == real_arg_mirrors.size() + 1);
+	}
 	list<Oop *> temp;
+	// first we should check `this`
+	if (!method->is_static()) {	// jump over `this`
+		Oop *oop = args.front();	args.pop_front();
+		assert(oop != nullptr && oop->get_ooptype() == OopType::_InstanceOop);
+		temp.push_back(oop);
+	}
+	// then other args.
+	int i = 0;
 	for (Oop *oop : args) {
-		if (oop == nullptr) {
+		MirrorOop *mirror = real_arg_mirrors.at(i++);
+		if (oop == nullptr) {		// this circumstance must be for InstanceKlass.
+			assert(mirror->get_mirrored_who() != nullptr);
 			temp.push_back(nullptr);
 			continue;
-		} else {
+		} else {						// can be all.
 			InstanceOop *real_oop = (InstanceOop *)oop;
 			wstring klass_name = oop->get_klass()->get_name();
 			Oop *ret;
-			if (klass_name == BYTE0) {
-				real_oop->get_field_value(BYTE0 L":value:B", &ret);
-				temp.push_back(new IntOop(((IntOop *)ret)->value));
-			} else if (klass_name == BOOLEAN0) {
-				real_oop->get_field_value(BOOLEAN0 L":value:Z", &ret);
-				temp.push_back(new IntOop(((IntOop *)ret)->value));
-			} else if (klass_name == SHORT0) {
-				real_oop->get_field_value(SHORT0 L":value:S", &ret);
-				temp.push_back(new IntOop(((IntOop *)ret)->value));
-			} else if (klass_name == CHARACTER0) {
-				real_oop->get_field_value(CHARACTER0 L":value:C", &ret);
-				temp.push_back(new IntOop(((IntOop *)ret)->value));
-			} else if (klass_name == INTEGER0) {
-				real_oop->get_field_value(INTEGER0 L":value:I", &ret);
-				temp.push_back(new IntOop(((IntOop *)ret)->value));
-			} else if (klass_name == FLOAT0) {
-				real_oop->get_field_value(FLOAT0 L":value:F", &ret);
-				temp.push_back(new FloatOop(((FloatOop *)ret)->value));
-			} else if (klass_name == DOUBLE0) {
-				real_oop->get_field_value(DOUBLE0 L":value:D", &ret);
-				temp.push_back(new DoubleOop(((DoubleOop *)ret)->value));
-			} else if (klass_name == LONG0) {
-				real_oop->get_field_value(LONG0 L":value:J", &ret);
-				temp.push_back(new LongOop(((LongOop *)ret)->value));
+			if (mirror->get_mirrored_who() == nullptr) {		// primitive type really. need to be unboxing.
+				if (klass_name == BYTE0) {
+					real_oop->get_field_value(BYTE0 L":value:B", &ret);
+					temp.push_back(new IntOop(((IntOop *)ret)->value));
+				} else if (klass_name == BOOLEAN0) {
+					real_oop->get_field_value(BOOLEAN0 L":value:Z", &ret);
+					temp.push_back(new IntOop(((IntOop *)ret)->value));
+				} else if (klass_name == SHORT0) {
+					real_oop->get_field_value(SHORT0 L":value:S", &ret);
+					temp.push_back(new IntOop(((IntOop *)ret)->value));
+				} else if (klass_name == CHARACTER0) {
+					real_oop->get_field_value(CHARACTER0 L":value:C", &ret);
+					temp.push_back(new IntOop(((IntOop *)ret)->value));
+				} else if (klass_name == INTEGER0) {
+					real_oop->get_field_value(INTEGER0 L":value:I", &ret);
+					temp.push_back(new IntOop(((IntOop *)ret)->value));
+				} else if (klass_name == FLOAT0) {
+					real_oop->get_field_value(FLOAT0 L":value:F", &ret);
+					temp.push_back(new FloatOop(((FloatOop *)ret)->value));
+				} else if (klass_name == DOUBLE0) {
+					real_oop->get_field_value(DOUBLE0 L":value:D", &ret);
+					temp.push_back(new DoubleOop(((DoubleOop *)ret)->value));
+				} else if (klass_name == LONG0) {
+					real_oop->get_field_value(LONG0 L":value:J", &ret);
+					temp.push_back(new LongOop(((LongOop *)ret)->value));
+				} else {
+					std::wcout << klass_name << std::endl;
+					assert(false);
+				}
 			} else {
 				temp.push_back(real_oop);
 			}
@@ -213,7 +236,7 @@ Oop *invoke(InstanceOop *member_name_obj, list<Oop *> & _stack, vm_thread *threa
 	}
 
 	// 把参数所有的自动装箱类解除装箱...... 因为 invoke 的参数全是 Object，而真实的参数可能是 int。
-	argument_unboxing(_stack);
+	argument_unboxing(target_method, _stack);		// ...... 万一参数真是 Integer 呢...... 我在这个方法里解决了。
 
 	// 3. call it!		// return maybe: BasicTypeOop, ArrayOop, InstanceOop... all.
 	Oop *result = thread->add_frame_and_execute(target_method, _stack);		// TODO: 如果抛了异常。

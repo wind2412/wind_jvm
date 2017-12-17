@@ -36,6 +36,7 @@
 #include "native/java_lang_invoke_MethodHandleNatives.hpp"
 #include "native/java_lang_reflect_Array.hpp"
 #include "native/java_lang_invoke_MethodHandle.hpp"
+#include "native/sun_reflect_NativeMethodAccessorImpl.hpp"
 
 static unordered_map<wstring, function<void*(const wstring &)>> native_map;		// such as: {L"java/lang/Object", search [native method]'s method lambda for java/lang/Object}
 
@@ -68,6 +69,7 @@ void init_native()		// the same as "registerNatives" method.
 	native_map[L"java/lang/invoke/MethodHandleNatives"] = java_lang_invoke_methodHandleNatives_search_method;
 	native_map[L"java/lang/reflect/Array"] = java_lang_reflect_array_search_method;
 	native_map[L"java/lang/invoke/MethodHandle"] = java_lang_invoke_methodHandle_search_method;
+	native_map[L"sun/reflect/NativeMethodAccessorImpl"] = sun_reflect_nativeMethodAccessorImpl_search_method;
 }
 
 // find a native method <$signature> in a klass <$klass_name>, return the method in (void *). if didn't find, abort().
