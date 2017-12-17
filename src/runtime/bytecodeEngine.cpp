@@ -61,7 +61,7 @@ using std::make_pair;
  */
 
 /*===----------- StackFrame --------------===*/
-StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
+StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, vm_thread *thread, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
 	if (is_native) {
 		return;
 	}
@@ -74,7 +74,7 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
 #ifdef BYTECODE_DEBUG
-	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value) << std::endl;
+	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value, thread) << std::endl;
 #endif
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
@@ -86,7 +86,7 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 #endif
 }
 
-wstring StackFrame::print_arg_msg(Oop *value)
+wstring StackFrame::print_arg_msg(Oop *value, vm_thread *thread)
 {
 	std::wstringstream ss;
 	if (value == nullptr) {
@@ -132,11 +132,10 @@ wstring StackFrame::print_arg_msg(Oop *value)
 			ss << "[java/lang/Class]: [\"" << type << "\"]";
 		} else {
 			auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
-//				auto toString = real_klass->get_this_class_method(L"toString:()Ljava/lang/String;");
-//				assert(toString != nullptr);
-//				ss << "    the "<< j-1 << " argument is java/lang/Class: [\"" << type << "\"]";
-//				this->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
-			ss << "[" << real_klass->get_name() << "]: [unknown value]";
+			auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
+			assert(toString != nullptr);
+			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
+			ss << "[" << real_klass->get_name() << "]: [\"" << java_lang_string::stringOop_to_wstring(str) << "\"]";
 		}
 	}
 	return ss.str();
@@ -2715,7 +2714,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 						arg_list.push_back((Oop *)&thread);
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
-						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, true));
+						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
 						pc = 0;
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);
@@ -2897,7 +2896,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 						// 还是要意思意思......得添一个栈帧上去......然后 pc 设为 0......
 						uint8_t *backup_pc = pc;
-						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, true));
+						thread.vm_stack.push_back(StackFrame(new_method, pc, nullptr, arg_list, &thread, true));
 						pc = nullptr;
 						// execute !!
 						((void (*)(list<Oop *> &))native_method)(arg_list);

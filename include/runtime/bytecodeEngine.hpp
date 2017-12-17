@@ -31,6 +31,7 @@ using std::shared_ptr;
 #define T_LONG		11
 
 class Method;
+class vm_thread;
 
 struct StackFrame {		// Only a Bean class!
 public:
@@ -42,13 +43,13 @@ public:
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 	bool has_exception = false;
 public:
-	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, bool is_native = false);
+	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, vm_thread *thread, bool is_native = false);
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
 	void clear_all();
 	void reset_method(shared_ptr<Method> new_method) { this->method = new_method; }
 	void reset_return_pc(uint8_t *return_pc) { this->return_pc = return_pc; }
-	wstring print_arg_msg(Oop *value);
+	wstring print_arg_msg(Oop *value, vm_thread *thread);
 };
 
 class vm_thread;

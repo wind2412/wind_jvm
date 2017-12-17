@@ -189,17 +189,20 @@ wstring get_member_name_descriptor(shared_ptr<InstanceKlass> real_klass, const w
 	return descriptor;
 }
 
-shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_klass, const wstring & signature, int ref_kind)
+shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_klass, const wstring & signature, int ref_kind, vm_thread *thread)
 {
 	shared_ptr<Method> target_method;
 	if (ref_kind == 6)	{			// invokeStatic
 		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 		target_method = real_klass->get_this_class_method(signature);
+
+		if (target_method == nullptr && thread != nullptr) {
+			thread->get_stack_trace();
+		}
 		assert(target_method != nullptr);
 	} else if (ref_kind == 5) { 		// invokeVirtual
 		target_method = real_klass->search_vtable(signature);
 		assert(target_method != nullptr);
-
 	} else if (ref_kind == 7) {		// invokeSpecial
 		assert(false);		// not support yet...
 
@@ -281,7 +284,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	if (flags & 0x10000) {		// Method:
 
 		wstring signature = real_name + L":" + descriptor;
-		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
+		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind, thread);
 
 		// build the return MemberName obj.
 		auto member_name2 = fill_in_MemberName_with_Method(target_method, member_name_obj, ref_kind, type, thread);

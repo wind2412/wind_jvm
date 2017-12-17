@@ -63,7 +63,7 @@ void vm_thread::start(list<Oop *> & arg)
 		assert(this->vm_stack.size() == 0);	// check
 		assert(arg.size() == 1);				// run() only has one argument `this`.
 
-		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg));
+		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
 	}
 }
@@ -104,7 +104,7 @@ Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std:
 	// for defense:
 	int frame_num = this->vm_stack.size();
 	uint8_t *backup_pc = this->pc;
-	this->vm_stack.push_back(StackFrame(new_method, this->pc, nullptr, list));		// 设置下一帧的 return_pc 是现在的 pc 值，可以用于 printStackTrace。
+	this->vm_stack.push_back(StackFrame(new_method, this->pc, nullptr, list, this));		// 设置下一帧的 return_pc 是现在的 pc 值，可以用于 printStackTrace。
 	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back(), this->thread_no);
 	this->vm_stack.pop_back();
 	this->pc = backup_pc;
@@ -291,7 +291,7 @@ void vm_thread::init_and_do_main()
 	// new a String.
 	InstanceOop *main_klass = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
 
-	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_klass}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_klass}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	MirrorOop *main_class_mirror = (MirrorOop *)this->execute();
 	assert(main_class_mirror->get_ooptype() == OopType::_InstanceOop);
 
@@ -321,7 +321,7 @@ void vm_thread::init_and_do_main()
 
 
 	// The World's End!
-	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
 	// kill all other running thread...
@@ -381,7 +381,7 @@ ArrayOop * vm_thread::get_stack_trace()
 	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << ":" << m->get_descriptor() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 	int j = 1;
 	for (Oop * value : it->localVariableTable) {
-		ss << "    the localVariableTable[" << j-1 << "] is " << it->print_arg_msg(value) << std::endl;
+		ss << "    the localVariableTable[" << j-1 << "] is " << it->print_arg_msg(value, this) << std::endl;
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 						&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
 			j ++;		// jump. because `long` and `double` take 2 places.
