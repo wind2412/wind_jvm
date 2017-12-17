@@ -80,9 +80,16 @@ public:	// aux
 	static void initial_clinit(shared_ptr<InstanceKlass>, vm_thread & thread);
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
 	static wstring get_real_value(Oop *oop);
+private:		// for invokeDynamic
+	InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread);
+	InstanceOop *MethodType_make(shared_ptr<Method> target_method, vm_thread & thread)
 private:
-	static void invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);
-	static void invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);
+	static void getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack);
+	static void getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread);
+	static void putField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack);
+	static void putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread);
+	static void invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeStatic and invokeSpecial
+	static void invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeVirtual and invokeInterface
 };
 
 

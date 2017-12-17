@@ -451,6 +451,80 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thre
 	}
 }
 
+void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
+{
+	// TODO: $2.8.3 的 FP_strict 浮点数转换！
+	new_field->if_didnt_parse_then_parse();		// **important!!!**
+	Oop *ref = op_stack.top();	op_stack.pop();
+//	std::wcout << ref->get_klass()->get_name() << " " << new_field->get_name() << " " << new_field->get_descriptor() << std::endl;		// delete
+	assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
+//	std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
+//	assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
+	Oop *new_value;
+	assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
+	op_stack.push(new_value);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) get a non-static value : " << get_real_value(new_value) << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
+#endif
+}
+
+void BytecodeEngine::putField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
+{
+	// TODO: $2.8.3 的 FP_strict 浮点数转换！
+	new_field->if_didnt_parse_then_parse();		// **important!!!**
+	Oop *new_value = op_stack.top();	op_stack.pop();
+	Oop *ref = op_stack.top();	op_stack.pop();
+	assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
+//	std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
+//	assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
+	((InstanceOop *)ref)->set_field_value(new_field, new_value);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) put a non-static value (unknown value type): " << get_real_value(new_value) << " from stack, to <class>: " << new_field->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
+#endif
+}
+
+void BytecodeEngine::getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
+{
+	// initialize the new_class... <clinit>
+	shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
+	initial_clinit(new_klass, thread);
+	// parse the field to RUNTIME!!
+	new_field->if_didnt_parse_then_parse();		// **important!!!**
+	if (new_field->get_type() == Type::OBJECT) {
+		// TODO: <clinit> of the Field object oop......
+		assert(new_field->get_type_klass() != nullptr);
+		initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
+	}
+	// get the [static Field] value and save to the stack top
+	Oop *new_top;
+	bool temp = new_klass->get_static_field_value(new_field, &new_top);
+	assert(temp == true);
+	op_stack.push(new_top);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) get a static value : " << get_real_value(new_top) << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
+#endif
+}
+
+void BytecodeEngine::putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
+{
+	// initialize the new_class... <clinit>
+	shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
+	initial_clinit(new_klass, thread);
+	// parse the field to RUNTIME!!
+	new_field->if_didnt_parse_then_parse();		// **important!!!**
+	if (new_field->get_type() == Type::OBJECT) {
+		// TODO: <clinit> of the Field object oop......
+		assert(new_field->get_type_klass() != nullptr);
+		initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
+	}
+	// get the stack top and save to the [static Field]
+	Oop *top = op_stack.top();	op_stack.pop();
+	new_klass->set_static_field_value(new_field, top);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) put a static value (unknown value type): " << get_real_value(top) << " from stack, to <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
+#endif
+}
+
 void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
 {
 	// 因此，得到此方法的目的只有一个，得到方法签名。
@@ -770,7 +844,121 @@ sync_wcout{} << "then push invoke method's return value " << op_stack.top() << "
 	}
 }
 
+InstanceOop *BytecodeEngine::MethodType_make(shared_ptr<Method> target_method, vm_thread & thread)
+{
+	auto args = target_method->parse_argument_list();		// vector<MirrorOop *>
+	auto ret = target_method->parse_return_type();		// MirrorOop *
 
+	// create [Ljava/lang/Class arr obj.
+	shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+	auto class_array_obj = class_arr_klass->new_instance(args.size());
+	for (int i = 0; i < args.size(); i ++) {
+		(*class_array_obj)[i] = args[i];
+	}
+
+	// get MethodType klass.
+	auto method_type_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(METHODTYPE));
+	assert(method_type_klass != nullptr);
+	auto fake_init_method = method_type_klass->get_this_class_method(L"methodType:(" CLS "[" CLS ")" MT);
+	assert(fake_init_method != nullptr);
+
+	// call!
+	InstanceOop *method_type_obj = thread.add_frame_and_execute(fake_init_method, {ret, class_array_obj});
+	assert(method_type_obj != nullptr);
+
+	return method_type_obj;
+}
+
+InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread)
+{
+	// first, get the `MethodHandles.lookup()`.
+	auto methodHandles = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandles"));
+	assert(methodHandles != nullptr);
+	auto lookup_method = methodHandles->get_this_class_method(L"lookup:()Ljava/lang/invoke/MethodHandles$Lookup;");
+	auto lookup_obj = (InstanceOop *)thread.add_frame_and_execute(lookup_method, {});
+	assert(lookup_obj != nullptr);
+
+	pair<int, int> fake_methodhandle_pair = boost::any_cast<pair<int, int>>(rt_pool[method_handle_real_index].second);
+	int ref_kind = fake_methodhandle_pair.first;		// must be 1~9
+	int ref_index = fake_methodhandle_pair.second;
+	switch(ref_kind) {
+		case 1:{		// REF_getField
+			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto findGetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findGetter:(" CLS STR CLS ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findGetter_method,
+						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
+			assert(result != nullptr);
+			return result;
+		}
+		case 2:{		// REF_getStatic
+			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto findStaticGetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStaticGetter:(" CLS STR CLS ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticGetter_method,
+						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
+			assert(result != nullptr);
+			return result;
+		}
+		case 3:{		// REF_puttField
+			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto findSetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findSetter:(" CLS STR CLS ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSetter_method,
+						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
+			assert(result != nullptr);
+			return result;
+		}
+		case 4:{		// REF_putStatic
+			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
+			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto findStaticSetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStaticSetter:(" CLS STR CLS ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticSetter_method,
+						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
+			assert(result != nullptr);
+			return result;
+		}
+		case 5:{		// REF_invokeVirtual
+			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
+			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findVirtual:(" CLS STR MT ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
+						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
+			assert(result != nullptr);
+			return result;
+		}
+
+		// 明天接着写把。
+		case 6:{		// REF_invokeStatic
+			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+			break;
+		}
+		case 7:{		// REF_invokeSpecial
+			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+			break;
+		}
+		case 8:{		// REF_newInvokeSpecial
+			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
+			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			assert(method->get_name() == L"<init>");		// special inner klass!!
+			break;
+		}
+		case 9:{		// REF_invokeInterface
+			assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
+			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+			break;
+		}
+		default:{
+			assert(false);
+		}
+	}
+}
 
 
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
@@ -2892,82 +3080,36 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
-				// initialize the new_class... <clinit>
-				shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
-				initial_clinit(new_klass, thread);
-				// parse the field to RUNTIME!!
-				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				if (new_field->get_type() == Type::OBJECT) {
-					// TODO: <clinit> of the Field object oop......
-					assert(new_field->get_type_klass() != nullptr);
-					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
-				}
-				// get the [static Field] value and save to the stack top
-				Oop *new_top;
-				bool temp = new_klass->get_static_field_value(new_field, &new_top);
-				assert(temp == true);
-				op_stack.push(new_top);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) get a static value : " << get_real_value(new_top) << " from <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " on to the stack." << std::endl;
-#endif
+
+				getStatic(new_field, op_stack, thread);
+
 				break;
 			}
 			case 0xb3:{		// putStatic
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
-				// initialize the new_class... <clinit>
-				shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
-				initial_clinit(new_klass, thread);
-				// parse the field to RUNTIME!!
-				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				if (new_field->get_type() == Type::OBJECT) {
-					// TODO: <clinit> of the Field object oop......
-					assert(new_field->get_type_klass() != nullptr);
-					initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
-				}
-				// get the stack top and save to the [static Field]
-				Oop *top = op_stack.top();	op_stack.pop();
-				new_klass->set_static_field_value(new_field, top);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) put a static value (unknown value type): " << get_real_value(top) << " from stack, to <class>: " << new_klass->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
-#endif
+
+				putStatic(new_field, op_stack, thread);
+
 				break;
 			}
 			case 0xb4:{		// getField
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
-				// TODO: $2.8.3 的 FP_strict 浮点数转换！
-				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				Oop *ref = op_stack.top();	op_stack.pop();
-//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_name() << " " << new_field->get_descriptor() << std::endl;		// delete
-				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
-//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
-//				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
-				Oop *new_value;
-				assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
-				op_stack.push(new_value);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) get a non-static value : " << get_real_value(new_value) << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
-#endif
+
+				getField(new_field, op_stack);
+
 				break;
 			}
 			case 0xb5:{		// putField
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
 				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
-				// TODO: $2.8.3 的 FP_strict 浮点数转换！
-				new_field->if_didnt_parse_then_parse();		// **important!!!**
-				Oop *new_value = op_stack.top();	op_stack.pop();
-				Oop *ref = op_stack.top();	op_stack.pop();
-				assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
-//				std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
-//				assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
-				((InstanceOop *)ref)->set_field_value(new_field, new_value);
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) put a non-static value (unknown value type): " << get_real_value(new_value) << " from stack, to <class>: " << new_field->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << " and override." << std::endl;
-#endif
+
+				putField(new_field, op_stack);
+
 				break;
 			}
 			case 0xb6:		// invokeVirtual
@@ -3049,61 +3191,8 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				// get CONSTANT_MethodHandle_info and arguments from the struct above:
 				// [0] MethodHandle(fake)
 				assert(rt_pool[fake_method_struct.bootstrap_method_ref-1].first == CONSTANT_MethodHandle);
-				pair<int, int> fake_methodhandle_pair = boost::any_cast<pair<int, int>>(rt_pool[fake_method_struct.bootstrap_method_ref-1].second);
-				int ref_kind = fake_methodhandle_pair.first;	assert(ref_kind >= 1 && ref_kind <= 9);
-				int ref_index = fake_methodhandle_pair.second;
-				switch(ref_kind) {
-					case 1:{		// REF_getField
-						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-						break;
-					}
-					case 2:{		// REF_getStatic
-						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-						break;
-					}
-					case 3:{		// REF_puttField
-						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-						break;
-					}
-					case 4:{		// REF_putStatic
-						assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-						auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-						break;
-					}
-					case 5:{		// REF_invokeVirtual
-						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
-						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
-						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-						break;
-					}
-					case 6:{		// REF_invokeStatic
-						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
-						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-						break;
-					}
-					case 7:{		// REF_invokeSpecial
-						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
-						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-						break;
-					}
-					case 8:{		// REF_newInvokeSpecial
-						assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
-						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
-						assert(method->get_name() == L"<init>");		// special inner klass!!
-						break;
-					}
-					case 9:{		// REF_invokeInterface
-						assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-						auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
-						assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-						break;
-					}
-				}
+				InstanceOop *method_handle_obj = MethodHandle_make(rt_pool, fake_method_struct.bootstrap_method_ref-1);
+
 				assert(false);
 
 				// [1] Arguments
@@ -3111,10 +3200,43 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				for (int i = 0; i < fake_method_struct.num_bootstrap_arguments; i ++) {
 					int arg_index = fake_method_struct.bootstrap_arguments[i];
 					pair<int, boost::any> _pair = rt_pool[arg_index-1];
-					assert(_pair.first == CONSTANT_String || _pair.first == CONSTANT_Class || _pair.first == CONSTANT_Integer
-						   || _pair.first == CONSTANT_Float || _pair.first == CONSTANT_Long || _pair.first == CONSTANT_Double
-						   || _pair.first == CONSTANT_MethodHandle || _pair.first == CONSTANT_MethodType);
-
+					switch(_pair.first) {
+						case CONSTANT_String:{
+							arg.push_back(boost::any_cast<Oop *>(_pair.second));
+							break;
+						}
+						case CONSTANT_Class:{
+							arg.push_back(boost::any_cast<shared_ptr<Klass>>(_pair.second)->get_mirror());
+							break;
+						}
+						case CONSTANT_Integer:{
+							arg.push_back(new IntOop(boost::any_cast<int>(_pair.second)));
+							break;
+						}
+						case CONSTANT_Float:{
+							arg.push_back(new FloatOop(boost::any_cast<float>(_pair.second)));
+							break;
+						}
+						case CONSTANT_Long:{
+							arg.push_back(new LongOop(boost::any_cast<long>(_pair.second)));
+							break;
+						}
+						case CONSTANT_Double:{
+							arg.push_back(new DoubleOop(boost::any_cast<double>(_pair.second)));
+							break;
+						}
+						case CONSTANT_MethodHandle:{
+							assert(false);		// I don't know how to make it...
+							break;
+						}
+						case CONSTANT_MethodType:{
+							assert(false);		// I don't know how to make it...
+							break;
+						}
+						default:{
+							assert(false);
+						}
+					}
 
 
 				}

@@ -46,6 +46,7 @@ using std::function;
 #define BA  "[B"
 #define MN  L"Ljava/lang/invoke/MemberName;"
 #define MT  L"Ljava/lang/invoke/MethodType;"
+#define MH  L"Ljava/lang/invoke/MethodHandle;"
 
 #define STRING				L"java/lang/String"
 #define FIELD				L"java/lang/reflect/Field"
