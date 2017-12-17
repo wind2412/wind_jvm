@@ -71,6 +71,7 @@ using std::function;
 #define FLOAT0				L"java/lang/Float"
 #define LONG0				L"java/lang/Long"
 #define DOUBLE0				L"java/lang/Double"
+#define SPECIES_L			L"java/lang/invoke/BoundMethodHandle$Species_L"
 #define SPECIES_LL			L"java/lang/invoke/BoundMethodHandle$Species_LL"
 
 

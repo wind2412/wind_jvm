@@ -6,7 +6,8 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 public class Test5 {
 	public static void main(String[] args) throws Throwable {
-		INDY_BootstrapMethod().invokeExact("icyfenix");
+		MethodHandle h = INDY_BootstrapMethod();
+		h.invokeExact("icyfenix");
 	}
 	public static void testMethod(String s) {
 		System.out.println("hello String:" + s);

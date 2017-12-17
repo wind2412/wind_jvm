@@ -134,7 +134,7 @@ wstring StackFrame::print_arg_msg(Oop *value, vm_thread *thread)
 			auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
 			auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
 			assert(toString != nullptr);
-			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {value});	// 会直接输出到控制台...因此算了...
+			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {value});
 			ss << "[" << real_klass->get_name() << "]: [\"" << java_lang_string::stringOop_to_wstring(str) << "\"]";
 		}
 	}
@@ -946,9 +946,6 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 				assert(op_stack.top()->get_ooptype() == OopType::_ObjArrayOop);		// assert char[] array
 				ObjArrayOop * objarray = (ObjArrayOop *)op_stack.top();	op_stack.pop();
-				if (objarray->get_length() == index) {		// delete
-					thread.get_stack_trace();
-				}
 				assert(objarray->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push((*objarray)[index]);
 #ifdef BYTECODE_DEBUG
@@ -1773,8 +1770,58 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
+			case 0x6f:{		// ddiv
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val2 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::DOUBLE);
+				double val1 = ((DoubleOop*)op_stack.top())->value; op_stack.pop();
 
-
+#ifdef BYTECODE_DEBUG
+	auto print_double = [](double val) {
+		if (val == DOUBLE_NAN)	sync_wcout{} << "DOUBLE_NAN";
+		else if (val == DOUBLE_INFINITY)	sync_wcout{} << "DOUBLE_INFINITY";
+		else if (val == DOUBLE_NEGATIVE_INFINITY)	sync_wcout{} << "DOUBLE_NEGATIVE_INFINITY";
+		else sync_wcout{} << val << "f";
+	};
+	sync_wcout{} << "(DEBUG) ddiv of val2: [";
+	print_double(val2);
+	sync_wcout{} << "] and val1: [";
+	print_double(val1);
+	sync_wcout{} << "], result is: [";
+#endif
+				if (val2 == DOUBLE_NAN || val1 == DOUBLE_NAN) {		// NAN / (any other)
+					op_stack.push(new DoubleOop(DOUBLE_NAN));
+				} else if ((val2 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY) && (val1 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(DOUBLE_NAN));			// INFINITY / INFINITY
+				} else if ((val2 == DOUBLE_INFINITY || val2 == DOUBLE_NEGATIVE_INFINITY) && (val1 != DOUBLE_NAN && val1 != DOUBLE_INFINITY && val1 != DOUBLE_NEGATIVE_INFINITY)) {
+					if ((val2 < 0 && val1 < 0) || (val2 > 0 && val1 > 0)) {
+						op_stack.push(new DoubleOop(DOUBLE_INFINITY));			// INFINITY / non-INFINITY
+					} else {
+						op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));			// INFINITY / non-INFINITY
+					}
+				} else if ((val2 != DOUBLE_NAN && val2 != DOUBLE_INFINITY && val2 != DOUBLE_NEGATIVE_INFINITY) && (val1 == DOUBLE_INFINITY || val1 == DOUBLE_NEGATIVE_INFINITY)) {
+					op_stack.push(new DoubleOop(0.0f));					// non-INFINITY / INFINITY		// TODO: 这里不太明白。规范上说 零值 也有符号，虽然不是没听过，还是难以理解...
+				} else if (val1 == 0.0 && val2 == 0.0) {
+					op_stack.push(new DoubleOop(DOUBLE_NAN));
+				} else if (val2 == 0.0 && (val1 != DOUBLE_NAN && val1 != DOUBLE_INFINITY && val1 != DOUBLE_NEGATIVE_INFINITY && val1 != 0.0)) {
+					if (val1 > 0)
+						op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+					else
+						op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+				} else if ((val2 != DOUBLE_NAN && val2 != DOUBLE_INFINITY && val2 != DOUBLE_NEGATIVE_INFINITY && val2 != 0.0) && val1 == 0.0) {
+					if (val2 > 0)
+						op_stack.push(new DoubleOop(DOUBLE_INFINITY));
+					else
+						op_stack.push(new DoubleOop(DOUBLE_NEGATIVE_INFINITY));
+				} else {
+					op_stack.push(new DoubleOop(val2 / val1));
+				}
+#ifdef BYTECODE_DEBUG
+	print_double(((DoubleOop *)op_stack.top())	->value);
+	sync_wcout{} << "]." << std::endl;
+#endif
+				break;
+			}
 			case 0x70:{		// irem
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
@@ -2646,7 +2693,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 				// 2. get ref.
 				if (ref == nullptr) {
-				thread.get_stack_trace();			// delete
+					thread.get_stack_trace();			// delete
 				}
 				assert(ref != nullptr);			// `this` must not be nullptr!!!!
 #ifdef BYTECODE_DEBUG

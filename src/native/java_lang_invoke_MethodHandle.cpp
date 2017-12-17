@@ -200,7 +200,17 @@ Oop *invoke(InstanceOop *member_name_obj, list<Oop *> & _stack, vm_thread *threa
 		size ++;
 		assert(false);
 	}
-	assert(size == _stack.size());		// 参数一定要相等......
+	assert(size == _stack.size()
+		   || (_stack.size() == 1 && _stack.front()->get_klass()->get_name() == L"[Ljava/lang/Object;"));		// 参数一定要相等......
+
+	// 如果是后者，即没有解包的 [Object，那么就解包。
+	if (size != _stack.size()) {		// 这一句同时也防止了 invoke 的参数真的是 [Object 的情况，然后还 xjb 解包。
+		ObjArrayOop *obj_arr = (ObjArrayOop *)_stack.front();	_stack.pop_front();
+		assert(obj_arr->get_length() == size);		// 这回一定相等了。
+		for (int i = 0; i < obj_arr->get_length(); i ++) {	// 解包之后完全压入！
+			_stack.push_back((*obj_arr)[i]);
+		}
+	}
 
 	// 把参数所有的自动装箱类解除装箱...... 因为 invoke 的参数全是 Object，而真实的参数可能是 int。
 	argument_unboxing(_stack);
@@ -284,6 +294,15 @@ void JVM_InvokeBasic(list<Oop *> & _stack){
 
 }
 
+wstring toString(InstanceOop *oop, vm_thread *thread)		// for debugging
+{
+	auto real_klass = std::static_pointer_cast<InstanceKlass>(oop->get_klass());
+	auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
+	assert(toString != nullptr);
+	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {oop});
+	return java_lang_string::print_stringOop(str);
+}
+
 void JVM_InvokeExact(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();		// pop 出 [0] 的 _this
 	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();			// pop 出 [length-1] 的 vm_thread
@@ -313,23 +332,90 @@ void JVM_InvokeExact(list<Oop *> & _stack){
 //	assert(_this->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");		// DirectMethodHandle 中直接包含了一个 MemberName 项！！
 
 
+	InstanceOop *member_name_obj;
+
 	// `this` may be: `java/lang/invoke/BoundMethodHandle$Species_LL`.
-	_this->get_field_value(SPECIES_LL ":argL0:" OBJ, &oop);		// sample: klass:[DirectMethodHandle], toString():[MethodHandle(PrintStream,String)void]
-	auto argL0 = oop;
-	_this->get_field_value(SPECIES_LL ":argL1:" OBJ, &oop);		// sample: klass:[PrintStream]		( the final argument is in `_stack` ).
-	auto argL1 = oop;
+	if (_this->get_klass()->get_name() == L"java/lang/invoke/BoundMethodHandle$Species_LL") {
+		_this->get_field_value(SPECIES_LL ":argL0:" OBJ, &oop);		// sample: klass:[DirectMethodHandle], toString():[MethodHandle(PrintStream,String)void]
+		auto argL0 = oop;
+		_this->get_field_value(SPECIES_LL ":argL1:" OBJ, &oop);		// sample: klass:[PrintStream]		( the final argument is in `_stack` ).
+		auto argL1 = oop;
 
-	assert(argL0->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");
+		assert(argL0->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");
 
-	// find member_name_obj from argL0
-	((InstanceOop *)argL0)->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
-	InstanceOop *member_name_obj = (InstanceOop *)oop;
+		// find member_name_obj from argL0
+		((InstanceOop *)argL0)->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
+		member_name_obj = (InstanceOop *)oop;
 
-	// attention: if not `invokeStatic`: need to push `argL1` into `_stack`.
-	int flags = ((IntOop *)oop)->value;
-	int ref_kind = ((flags & 0xF000000) >> 24);
-	if (ref_kind != 6) {		// not `invokeStatic`
-		_stack.push_front(argL1);
+		member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+		// attention: if not `invokeStatic`: need to push `argL1` into `_stack`.
+		int flags = ((IntOop *)oop)->value;
+		int ref_kind = ((flags & 0xF000000) >> 24);
+		if (ref_kind != 6) {		// not `invokeStatic`
+			_stack.push_front(argL1);
+		}
+	} else if (_this->get_klass()->get_name() == L"java/lang/invoke/BoundMethodHandle$Species_L") {
+		// 这种情况，_stack 的参数是：_stack is (_this:[Species_L], argument0:[Species_L](including DirectMethodHandle in argL0), arguments...)
+		_this->get_field_value(SPECIES_L ":argL0:" OBJ, &oop);		// sample: klass:[DirectMethodHandle], toString():[MethodHandle(PrintStream,String)void]
+		auto argL0 = oop;		// maybe MethodType...?
+//		std::wcout << toString((InstanceOop *)_this, thread) << std::endl;		// delete
+		assert(argL0->get_klass()->get_name() != L"java/lang/invoke/DirectMethodHandle");
+
+		// get the `argument0`, in it we can get the `DirectMethodHandle`.
+		InstanceOop *another = (InstanceOop *)_stack.front();	_stack.pop_front();		// 竟然还是 species_L...
+		another->get_field_value(SPECIES_L ":argL0:" OBJ, &oop);
+		argL0 = oop;
+
+//		std::wcout << toString((InstanceOop *)another, thread) << std::endl;		// delete
+		assert(argL0->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");
+
+		// find member_name_obj from argL0
+		((InstanceOop *)argL0)->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
+		member_name_obj = (InstanceOop *)oop;
+
+		member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+		// attention: if not `invokeStatic`: need to push `argL1` into `_stack`.
+		int flags = ((IntOop *)oop)->value;
+		int ref_kind = ((flags & 0xF000000) >> 24);
+		if (ref_kind != 6) {		// must be `invokeStatic` because there's no `argL1`.
+			assert(false);
+		}
+	} else if (_this->get_klass()->get_name() == L"java/lang/invoke/SimpleMethodHandle") {
+		// if _this is a SimpleMethodHandle, then ignore it (I don't want to make a check).
+		// then get the next argument, may be the **REAL** DirectMethodHandle.
+		InstanceOop *real_method_handle = (InstanceOop *)_stack.front();	_stack.pop_front();
+		assert(real_method_handle->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle");
+
+		// find member_name_obj from `DirectMethodHandle`
+		((InstanceOop *)real_method_handle)->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
+		member_name_obj = (InstanceOop *)oop;
+
+		member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+		// attention: if not `invokeStatic`: need to push `argL1` into `_stack`.
+		int flags = ((IntOop *)oop)->value;
+		int ref_kind = ((flags & 0xF000000) >> 24);
+		if (ref_kind != 6) {		// may be `invokeStatic`?
+//			_stack.push_front(argL1);
+			assert(false);
+		}
+	} else if (_this->get_klass()->get_name() == L"java/lang/invoke/DirectMethodHandle") {		// 如果特别坦率，上来就是 target，那么直接取得 MemberName 即可～
+		InstanceOop *real_method_handle = (InstanceOop *)_this;
+
+		// find member_name_obj from `DirectMethodHandle`
+		((InstanceOop *)real_method_handle)->get_field_value(DIRECTMETHODHANDLE L":member:" MN, &oop);
+		member_name_obj = (InstanceOop *)oop;
+
+		member_name_obj->get_field_value(MEMBERNAME L":flags:I", &oop);
+		// attention: if not `invokeStatic`: need to push `argL1` into `_stack`.
+		int flags = ((IntOop *)oop)->value;
+		int ref_kind = ((flags & 0xF000000) >> 24);
+		if (ref_kind != 6) {		// may be `invokeStatic`?
+//			_stack.push_front(argL1);
+			assert(false);
+		}
+	} else {
+		std::wcout << _this->get_klass()->get_name() << std::endl;
+		assert(false);
 	}
 
 	Oop *real_result = invoke(member_name_obj, _stack, thread);
