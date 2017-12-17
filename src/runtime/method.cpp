@@ -213,24 +213,26 @@ vector<MirrorOop *> Method::parse_argument_list()
 				}
 			}
 		} else if (args[i][0] == L'L') {	// InstanceOop type
-			ClassLoader *loader = this->klass->get_classloader();
-			shared_ptr<Klass> klass;
-			if (loader == nullptr) {
-				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
-			} else {
-				klass = loader->loadClass(args[i].substr(1, args[i].size() - 2));
-			}
+//			ClassLoader *loader = this->klass->get_classloader();		// bug report: 不要使用此 Method 的 classLoader ！！因为完全有可能是 invoke 方法(BootStrap 加载 java/lang/invoke...)，invoke 了一个 MyclassLoader 加载的类......
+//			shared_ptr<Klass> klass;
+//			if (loader == nullptr) {
+//				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
+//			} else {
+//				klass = loader->loadClass(args[i].substr(1, args[i].size() - 2));
+//			}
+			shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(args[i].substr(1, args[i].size() - 2));
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		} else {		// ArrayType
 			assert(args[i][0] == L'[');
-			ClassLoader *loader = this->klass->get_classloader();
-			shared_ptr<Klass> klass;
-			if (loader == nullptr) {
-				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
-			} else {
-				klass = loader->loadClass(args[i]);
-			}
+//			ClassLoader *loader = this->klass->get_classloader();
+//			shared_ptr<Klass> klass;
+//			if (loader == nullptr) {
+//				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
+//			} else {
+//				klass = loader->loadClass(args[i]);
+//			}
+			shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(args[i]);
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		}

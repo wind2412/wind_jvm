@@ -23,6 +23,9 @@ static unordered_map<wstring, void*> methods = {
 };
 
 // args 是所有的参数，包括 this。而 method->parse_argument_list 是不包括 this 的。
+// 此函数原本意义在于：默认 args 全是包装类。因为 invoke(...) 方法全是 Object... 为变长参数。
+// 不过后来发现实在是有意思...... invokeExact 这种，虽然参数签名是 Object...，不过编译器会区别对待它...... 所以，最后出现在 jvm 中的签名格式，其实可以是 primitive type!!
+// 因此把意义改成了：如果是包装类，且 mirror 是 primitive type，就降级成 primitive type；否则不动就可以了。只要符合签名，即便不 unboxing 也没问题。
 void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, [automatically] etc.
 {
 	vector<MirrorOop *> real_arg_mirrors = method->parse_argument_list();
@@ -47,9 +50,13 @@ void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args)		// Unboxi
 			assert(mirror->get_mirrored_who() != nullptr);
 			temp.push_back(nullptr);
 			continue;
-		} else {						// can be all.
-			InstanceOop *real_oop = (InstanceOop *)oop;
+		} else {						// can be all except: primitive klass.
+			if (oop->get_klass() == nullptr) {	// already primitive type
+				temp.push_back(oop);
+				continue;
+			}									// else, not primitive type
 			wstring klass_name = oop->get_klass()->get_name();
+			InstanceOop *real_oop = (InstanceOop *)oop;
 			Oop *ret;
 			if (mirror->get_mirrored_who() == nullptr) {		// primitive type really. need to be unboxing.
 				if (klass_name == BYTE0) {
@@ -434,7 +441,7 @@ void JVM_InvokeExact(list<Oop *> & _stack){
 		int ref_kind = ((flags & 0xF000000) >> 24);
 		if (ref_kind != 6) {		// may be `invokeStatic`?
 //			_stack.push_front(argL1);
-			assert(false);
+//			assert(false);
 		}
 	} else {
 		std::wcout << _this->get_klass()->get_name() << std::endl;
