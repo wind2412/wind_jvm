@@ -193,7 +193,7 @@ shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_
 {
 	shared_ptr<Method> target_method;
 	if (ref_kind == 6)	{			// invokeStatic
-		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
+//		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 		target_method = real_klass->get_this_class_method(signature);
 //		assert(target_method != nullptr);
 	} else if (ref_kind == 5) { 		// invokeVirtual

@@ -213,7 +213,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 		// override method into [vtable]
 		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });
 		if (iter == vtable.end()) {
-			if (!method->is_static() && !method->is_private())
+			if (!method->is_static()/* && !method->is_private()*/)		// bug report: private 也是 vtable 的方法！！
 				vtable.push_back(method);
 		} else {
 			*iter = method;		// override parent's method
