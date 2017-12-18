@@ -69,23 +69,17 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 	}
 	localVariableTable.resize(method->get_code()->max_locals);
 	int i = 0;	// 注意：这里的 vector 采取一开始就分配好大小的方式。因为后续过程中不可能有 push_back 存在。因为字节码都是按照 max_local 直接对 localVariableTable[i] 进行调用的。
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "===-------------------------------------- localVariableTable of (" << method->get_name() << ") -----------------------------------------===" << std::endl;
-#endif
 	for (Oop * value : args) {
 		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value, thread) << std::endl;
-#endif
+//#ifdef BYTECODE_DEBUG		// bug report: 忽略了...... print_arg_msg 会造成无限循环......
+//	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value, thread) << std::endl;
+//#endif
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
 			localVariableTable.at(i++) = nullptr;
 		}
 	}
-#ifdef BYTECODE_DEBUG
-	sync_wcout{} << "===------------------------------------------------------------------------------------------------------------------------===" << std::endl;
-#endif
 }
 
 wstring StackFrame::print_arg_msg(Oop *value, vm_thread *thread)
@@ -463,7 +457,7 @@ void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & o
 //	std::wcout << ref->get_klass()->get_name() << " " << new_field->get_klass()->get_name() << std::endl;
 //	assert(ref->get_klass() == new_field->get_klass());	// 不正确。因为左边可能是右边的子类。
 	Oop *new_value;
-	assert(((InstanceOop *)ref)->get_field_value(new_field, &new_value) == true);
+	((InstanceOop *)ref)->get_field_value(new_field, &new_value);
 	op_stack.push(new_value);
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) get a non-static value : " << get_real_value(new_value) << " from <class>: " << ref->get_klass()->get_name() << "-->" << new_field->get_name() << ":"<< new_field->get_descriptor() << ", to the stack." << std::endl;
@@ -1039,7 +1033,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 	while (pc < code_begin + code_length) {
 #ifdef BYTECODE_DEBUG
-		sync_wcout{} << L"(DEBUG) [thread " << thread_no << "] <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< klass->get_name() << "::" << method->get_name() << ":" << method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
+		sync_wcout{} << L"(DEBUG) [thread " << thread_no << "] <bytecode> $" << std::dec <<  (pc - code_begin) << " of "<< code_klass->get_name() << "::" << code_method->get_name() << ":" << code_method->get_descriptor() << " --> " << utf8_to_wstring(bccode_map[*pc].first) << std::endl;
 #endif
 		int occupied = bccode_map[*pc].second + 1;
 		switch(*pc) {
@@ -3104,7 +3098,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 		if (oop->get_klass()->get_name() == L"java/lang/String")	sync_wcout{} << "(DEBUG) return: [" << java_lang_string::print_stringOop((InstanceOop *)oop) << "]" << std::endl;
 	}
 	else
-		sync_wcout{} << "(DEBUG) return an ref null from stack: <class>:" << method->return_type() <<  std::endl;
+		sync_wcout{} << "(DEBUG) return an ref null from stack: <class>:" << code_method->return_type() <<  std::endl;
 	sync_wcout{} << "[Now, get out of StackFrame #" << std::dec << thread.vm_stack.size() - 1 << "]..." << std::endl;
 #endif
 //				assert(method->return_type() == oop->get_klass()->get_name());

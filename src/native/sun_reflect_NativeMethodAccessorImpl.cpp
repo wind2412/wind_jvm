@@ -25,10 +25,10 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 	Oop *result;
 
 	// get target InstanceKlass
-	assert(method->get_field_value(METHOD L":clazz:Ljava/lang/Class;", &result));
+	method->get_field_value(METHOD L":clazz:Ljava/lang/Class;", &result);
 	shared_ptr<InstanceKlass> target_klass = std::static_pointer_cast<InstanceKlass>(((MirrorOop *)result)->get_mirrored_who());
 	// get the real method:
-	assert(method->get_field_value(METHOD L":slot:I", &result));
+	method->get_field_value(METHOD L":slot:I", &result);
 	shared_ptr<Method> target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
 
 	// get the real arg:

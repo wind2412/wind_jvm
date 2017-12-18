@@ -22,12 +22,12 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 
 	Oop *result;
 	// get target InstanceKlass
-	assert(ctor->get_field_value(CONSTRUCTOR L":clazz:Ljava/lang/Class;", &result));
+	ctor->get_field_value(CONSTRUCTOR L":clazz:Ljava/lang/Class;", &result);
 	shared_ptr<InstanceKlass> target_klass = std::static_pointer_cast<InstanceKlass>(((MirrorOop *)result)->get_mirrored_who());
 	// new an empty object
 	Oop *init = target_klass->new_instance();
 	// get shared_ptr<Method> of <init>
-	assert(ctor->get_field_value(CONSTRUCTOR L":slot:I", &result));
+	ctor->get_field_value(CONSTRUCTOR L":slot:I", &result);
 	shared_ptr<Method> target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
 	assert(target_method->get_name() == L"<init>");
 	// get arg lists types

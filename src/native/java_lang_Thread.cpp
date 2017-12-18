@@ -36,7 +36,7 @@ static unordered_map<wstring, void*> methods = {
 void JVM_StartThread(list<Oop *> & _stack){		// static
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
-	assert(_this->get_field_value(THREAD L":eetop:J", &result));
+	_this->get_field_value(THREAD L":eetop:J", &result);
 	LongOop *tid = (LongOop *)result;
 	assert(tid->value == 0);			// must be 0. if not 0, it must be started already.
 
@@ -72,7 +72,7 @@ void JVM_IsThreadAlive(list<Oop *> & _stack){
 	sync_wcout{} << "the java.lang.Thread obj's address: [" << _this << "]." << std::endl;
 #endif
 	Oop *result;
-	assert(_this->get_field_value(THREAD L":eetop:J", &result));
+	_this->get_field_value(THREAD L":eetop:J", &result);
 	LongOop *tid = (LongOop *)result;
 //	assert(tid->value != 0);	// simple check
 	/**
@@ -137,7 +137,8 @@ void JVM_CurrentThread(list<Oop *> & _stack){		// static
 	InstanceOop *thread_oop;
 	ThreadTable::print_table();
 	assert(ThreadTable::detect_thread_death(pthread_self()) == false);
-	assert((thread_oop = ThreadTable::get_a_thread(pthread_self())) != nullptr);						// TODO: 我自己都不知道这实现是否正确......多线程太诡异了......
+	thread_oop = ThreadTable::get_a_thread(pthread_self());						// TODO: 我自己都不知道这实现是否正确......多线程太诡异了......
+	assert(thread_oop != nullptr);
 	_stack.push_back(thread_oop);		// 返回值被压入 _stack.
 }
 void JVM_CountStackFrames(list<Oop *> & _stack){

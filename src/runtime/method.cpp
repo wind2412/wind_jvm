@@ -250,7 +250,10 @@ vector<MirrorOop *> Method::parse_argument_list(const wstring & descriptor)
 #ifdef DEBUG
 	sync_wcout{} << "===---------------- arg list (Runtime of " << descriptor << ") -----------------===" << std::endl;
 	for (int i = 0; i < v.size(); i ++) {
-		sync_wcout{} << v[i]->get_klass()->get_name() << std::endl;
+		if (v[i]->get_mirrored_who())
+			sync_wcout{} << v[i]->get_mirrored_who()->get_name() << std::endl;
+		else
+			sync_wcout{} << v[i]->get_extra() << std::endl;
 	}
 	sync_wcout{} << "===--------------------------------------------------------===" << std::endl;
 #endif

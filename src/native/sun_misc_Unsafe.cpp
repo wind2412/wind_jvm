@@ -67,14 +67,14 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	InstanceOop *field = (InstanceOop *)_stack.front();	_stack.pop_front();	// java/lang/reflect/Field obj.
 
 	Oop *oop;
-	assert(field->get_field_value(FIELD L":modifiers:I", &oop));
+	field->get_field_value(FIELD L":modifiers:I", &oop);
 	int modifier = ((IntOop *)oop)->value;
 
 	// static 的方面，在 JVM_StaticFieldOffset 中支持！
-	assert(field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop));
+	field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop);
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
-	assert(field->get_field_value(FIELD L":type:Ljava/lang/Class;", &oop));
+	field->get_field_value(FIELD L":type:Ljava/lang/Class;", &oop);
 	MirrorOop *mirror = (MirrorOop *)oop;
 
 	wstring descriptor = name + L":";
@@ -97,7 +97,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	}
 
 	// get the class which has the member variable.
-	assert(field->get_field_value(FIELD L":clazz:Ljava/lang/Class;", &oop));
+	field->get_field_value(FIELD L":clazz:Ljava/lang/Class;", &oop);
 	MirrorOop *outer_klass_mirror = (MirrorOop *)oop;
 	assert(outer_klass_mirror->get_mirrored_who()->get_type() == ClassType::InstanceClass);	// outer must be InstanceType.
 	shared_ptr<InstanceKlass> outer_klass = std::static_pointer_cast<InstanceKlass>(outer_klass_mirror->get_mirrored_who());

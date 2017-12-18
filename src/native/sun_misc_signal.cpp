@@ -136,7 +136,8 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 		case SIGTERM:{
 			// detect whether the sig is `ignored`. if not, set the handler. if yes, return 1.
 			struct sigaction oact;
-			assert(sigaction(signo, nullptr, &oact) != -1);		// if we only care about the `current handler` and don't want to set a new handler, we can pass a `nullptr` because we don't want to set a new handler, only want it to return the current handler..
+			int ret = sigaction(signo, nullptr, &oact);
+			assert(ret != -1);		// if we only care about the `current handler` and don't want to set a new handler, we can pass a `nullptr` because we don't want to set a new handler, only want it to return the current handler..
 #ifdef __APPLE__
 			void *old_handler = (void *)oact.__sigaction_u.__sa_handler;		// this is the `current handler`.
 #elif defined __linux__
