@@ -3355,12 +3355,26 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				arg_list.push_front(final_invoker_MethodHandle);
 				arg_list.push_back(nullptr);
 				arg_list.push_back((Oop *)&thread);
-				JVM_InvokeExact(arg_list);
-				std::wcout << arg_list.size() << std::endl;
-				std::wcout << arg_list.back()->get_klass()->get_name() << std::endl;
-				// PS: 我在 invokeExact native 方法中自动拆包了 [Object... 应该不能有问题把...
+				JVM_InvokeExact(arg_list);		// TODO: invoke(...) 也不完全。只有 invokeExact(...) 还好。
+				// invoke 方法必然有返回值。
+				assert(arg_list.size() == 1);		// 做一个可能不对的检查......
+				InstanceOop *ret_oop = (InstanceOop *)arg_list.back();
+				// [x] PS: 我在 invokeExact native 方法中自动拆包了 [Object... 应该不能有问题把...
 
-				assert(false);
+				// 14. put it into op_stack.
+				op_stack.push(ret_oop);
+
+				// 15. check return type....
+				if (ret_oop != nullptr) {
+					shared_ptr<InstanceKlass> ret_klass = std::static_pointer_cast<InstanceKlass>(ret_oop->get_klass());
+					MirrorOop *ret_mirror = Method::parse_return_type(Method::return_type(type_descriptor));
+					// 由于 invoke 家族的方法，全是返回装箱的 Object，所以我认为不用担心是 primitive type (以及 void)的情形。
+					shared_ptr<InstanceKlass> ret_klass_should_be = std::static_pointer_cast<InstanceKlass>(ret_mirror->get_mirrored_who());
+					if (!(ret_klass == ret_klass_should_be || ret_klass->check_parent(ret_klass_should_be) || ret_klass->check_interfaces(ret_klass_should_be))) {
+						assert(false);
+					}
+				}
+
 				break;
 			}
 			case 0xbb:{		// new // 仅仅分配了内存！

@@ -383,6 +383,11 @@ void JVM_InvokeExact(list<Oop *> & _stack){
 //		std::wcout << toString((InstanceOop *)_this, thread) << std::endl;		// delete
 		assert(argL0->get_klass()->get_name() != L"java/lang/invoke/DirectMethodHandle");
 
+		if (_stack.size() == 0) {		// TODO: 有待研究...... 这里我仅仅能够做一些小小的工作。有待观察真正的原理。
+			_stack.push_back(argL0);		// L0 is the target... 比如 ()Runnable 的这种，根本就不用真正 invoke 了。argL0 就是结果..... 不知道存不存在特例......
+			return;
+		}
+
 		// get the `argument0`, in it we can get the `DirectMethodHandle`.
 		InstanceOop *another = (InstanceOop *)_stack.front();	_stack.pop_front();		// 竟然还是 species_L...
 		another->get_field_value(SPECIES_L ":argL0:" OBJ, &oop);
