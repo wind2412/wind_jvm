@@ -79,8 +79,12 @@ public:
 	bool is_native() { return (this->access_flags & ACC_NATIVE) == ACC_NATIVE; }
 	bool is_abstract() { return (this->access_flags & ACC_ABSTRACT) == ACC_ABSTRACT; }
 	bool is_synchronized() { return (this->access_flags & ACC_SYNCHRONIZED) == ACC_SYNCHRONIZED; }
-	wstring return_type() { return descriptor.substr(descriptor.find_first_of(L")")+1); }
+	wstring return_type() { return return_type(this->descriptor); }
 	u2 get_flag() { return access_flags; }
+public:
+	static wstring return_type(const wstring & descriptor) { return descriptor.substr(descriptor.find_first_of(L")")+1); }
+	static vector<MirrorOop *> parse_argument_list(const wstring & descriptor);
+	static MirrorOop *parse_return_type(const wstring & return_type);
 public:
 	void set_real_descriptor (const wstring & real_descriptor) { this->real_descriptor = real_descriptor; }	// for MethodHandle.invoke**(...) only.
 	vector<MirrorOop *> if_didnt_parse_exceptions_then_parse();

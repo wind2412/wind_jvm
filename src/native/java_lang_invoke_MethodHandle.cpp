@@ -15,6 +15,7 @@
 #include "utils/os.hpp"
 #include "classloader.hpp"
 #include "wind_jvm.hpp"
+#include "utils/utils.hpp"
 
 static unordered_map<wstring, void*> methods = {
     {L"invoke:([" OBJ ")" OBJ,								(void *)&JVM_Invoke},
@@ -322,15 +323,6 @@ void JVM_InvokeBasic(list<Oop *> & _stack){
 
 	_stack.push_back(real_result);
 
-}
-
-wstring toString(InstanceOop *oop, vm_thread *thread)		// for debugging
-{
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(oop->get_klass());
-	auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
-	assert(toString != nullptr);
-	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {oop});
-	return java_lang_string::print_stringOop(str);
 }
 
 void JVM_InvokeExact(list<Oop *> & _stack){

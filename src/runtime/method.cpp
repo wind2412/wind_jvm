@@ -167,12 +167,22 @@ vector<MirrorOop *> Method::if_didnt_parse_exceptions_then_parse()
 
 vector<MirrorOop *> Method::parse_argument_list()
 {
-	vector<MirrorOop *> v;
-	vector<wstring> args;
 	if (real_descriptor == L"")
-		args = BytecodeEngine::parse_arg_list(this->descriptor);
+		return parse_argument_list(this->descriptor);
 	else
-		args = BytecodeEngine::parse_arg_list(this->real_descriptor);		// patch for MethodHandle.invoke***(Object...)
+		return parse_argument_list(this->real_descriptor);		// patch for MethodHandle.invoke***(Object...)
+}
+
+MirrorOop *Method::parse_return_type()
+{
+	wstring return_type = this->return_type();
+	return parse_return_type(return_type);
+}
+
+vector<MirrorOop *> Method::parse_argument_list(const wstring & descriptor)
+{
+	vector<MirrorOop *> v;
+	vector<wstring> args = BytecodeEngine::parse_arg_list(descriptor);
 	for (int i = 0; i < args.size(); i ++) {
 		if (args[i].size() == 1) {		// primitive type
 			switch (args[i][0]) {
@@ -247,9 +257,8 @@ vector<MirrorOop *> Method::parse_argument_list()
 	return v;
 }
 
-MirrorOop *Method::parse_return_type()
+MirrorOop *Method::parse_return_type(const wstring & return_type)
 {
-	wstring return_type = this->return_type();
 	if (return_type.size() == 1) {		// primitive type
 		switch (return_type[0]) {
 			case L'Z':{
@@ -285,24 +294,26 @@ MirrorOop *Method::parse_return_type()
 			}
 		}
 	} else if (return_type[0] == L'L') {	// InstanceOop type
-		ClassLoader *loader = this->klass->get_classloader();
-		shared_ptr<Klass> klass;
-		if (loader == nullptr) {
-			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type.substr(1, return_type.size() - 2));
-		} else {
-			klass = loader->loadClass(return_type.substr(1, return_type.size() - 2));
-		}
+//		ClassLoader *loader = this->klass->get_classloader();
+//		shared_ptr<Klass> klass;
+//		if (loader == nullptr) {
+//			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type.substr(1, return_type.size() - 2));
+//		} else {
+//			klass = loader->loadClass(return_type.substr(1, return_type.size() - 2));
+//		}
+		shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(return_type.substr(1, return_type.size() - 2));
 		assert(klass != nullptr);
 		return klass->get_mirror();
 	} else {		// ArrayType
 		assert(return_type[0] == L'[');
-		ClassLoader *loader = this->klass->get_classloader();
-		shared_ptr<Klass> klass;
-		if (loader == nullptr) {
-			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type);
-		} else {
-			klass = loader->loadClass(return_type);
-		}
+//		ClassLoader *loader = this->klass->get_classloader();
+//		shared_ptr<Klass> klass;
+//		if (loader == nullptr) {
+//			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type);
+//		} else {
+//			klass = loader->loadClass(return_type);
+//		}
+		shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(return_type);
 		assert(klass != nullptr);
 		return klass->get_mirror();
 	}

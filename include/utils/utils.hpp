@@ -18,6 +18,11 @@ std::string narrow( const std::wstring& str );
 // parse field descriptor to get length (or type), like I, B, D, [I, [[I, [[Ljava.lang.String; .etc
 int parse_field_descriptor(const std::wstring & descriptor);
 
+/*===----------------- Debugging Tool -------------------===*/
+class vm_thread;
+class InstanceOop;
+std::wstring toString(InstanceOop *oop, vm_thread *thread);
+
 /*===-----------------  Constructor ---------------------===*/
 // constructors and destructors
 template <typename Tp, typename Arg1>

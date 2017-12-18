@@ -47,6 +47,7 @@ using std::function;
 #define MN  L"Ljava/lang/invoke/MemberName;"
 #define MT  L"Ljava/lang/invoke/MethodType;"
 #define MH  L"Ljava/lang/invoke/MethodHandle;"
+#define LST L"Ljava/util/List;"
 
 #define STRING				L"java/lang/String"
 #define FIELD				L"java/lang/reflect/Field"
@@ -74,6 +75,7 @@ using std::function;
 #define DOUBLE0				L"java/lang/Double"
 #define SPECIES_L			L"java/lang/invoke/BoundMethodHandle$Species_L"
 #define SPECIES_LL			L"java/lang/invoke/BoundMethodHandle$Species_LL"
+#define CALLSITE				L"java/lang/invoke/CallSite"
 
 
 void init_native();

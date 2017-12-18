@@ -22,6 +22,8 @@
 #include "utils/synchronize_wcout.hpp"
 #include "runtime/thread.hpp"
 #include <deque>
+#include "utils/utils.hpp"
+#include "native/java_lang_invoke_MethodHandle.hpp"
 
 using std::wstringstream;
 using std::list;
@@ -849,6 +851,19 @@ InstanceOop *BytecodeEngine::MethodType_make(shared_ptr<Method> target_method, v
 	auto args = target_method->parse_argument_list();		// vector<MirrorOop *>
 	auto ret = target_method->parse_return_type();		// MirrorOop *
 
+	return MethodType_make_impl(args, ret, thread);
+}
+
+InstanceOop *BytecodeEngine::MethodType_make(const wstring & descriptor, vm_thread & thread)
+{
+	auto args = Method::parse_argument_list(descriptor);							// vector<MirrorOop *>
+	auto ret = Method::parse_return_type(Method::return_type(descriptor));		// MirrorOop *
+
+	return MethodType_make_impl(args, ret, thread);
+}
+
+InstanceOop *BytecodeEngine::MethodType_make_impl(vector<MirrorOop *> & args, MirrorOop *ret, vm_thread & thread)
+{
 	// create [Ljava/lang/Class arr obj.
 	shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
 	auto class_array_obj = class_arr_klass->new_instance(args.size());
@@ -863,24 +878,34 @@ InstanceOop *BytecodeEngine::MethodType_make(shared_ptr<Method> target_method, v
 	assert(fake_init_method != nullptr);
 
 	// call!
-	InstanceOop *method_type_obj = thread.add_frame_and_execute(fake_init_method, {ret, class_array_obj});
+	InstanceOop *method_type_obj = (InstanceOop *)thread.add_frame_and_execute(fake_init_method, {ret, class_array_obj});
 	assert(method_type_obj != nullptr);
 
 	return method_type_obj;
 }
 
-InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread)
+InstanceOop *BytecodeEngine::MethodHandles_Lookup_make(vm_thread & thread)
 {
-	// first, get the `MethodHandles.lookup()`.
 	auto methodHandles = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandles"));
 	assert(methodHandles != nullptr);
 	auto lookup_method = methodHandles->get_this_class_method(L"lookup:()Ljava/lang/invoke/MethodHandles$Lookup;");
 	auto lookup_obj = (InstanceOop *)thread.add_frame_and_execute(lookup_method, {});
 	assert(lookup_obj != nullptr);
+	return lookup_obj;
+}
 
+InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread, bool is_bootStrap_method)
+{
+	// first, get the `MethodHandles.lookup()`.
+	auto lookup_obj = MethodHandles_Lookup_make(thread);
+
+	assert(rt_pool[method_handle_real_index].first == CONSTANT_MethodHandle);
 	pair<int, int> fake_methodhandle_pair = boost::any_cast<pair<int, int>>(rt_pool[method_handle_real_index].second);
 	int ref_kind = fake_methodhandle_pair.first;		// must be 1~9
 	int ref_index = fake_methodhandle_pair.second;
+	if (is_bootStrap_method) {
+		assert(ref_kind == 6 || ref_kind == 8);		// Spec.4.7.23
+	}
 	switch(ref_kind) {
 		case 1:{		// REF_getField
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
@@ -922,37 +947,53 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findVirtual:(" CLS STR MT ")" MH);
+			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->search_vtable(L"findVirtual:(" CLS STR MT ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
 			return result;
 		}
-
-		// 明天接着写把。
 		case 6:{		// REF_invokeStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			break;
+			auto findStatic_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStatic:(" CLS STR MT ")" MH);
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStatic_method,
+						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
+			assert(result != nullptr);
+			return result;
 		}
 		case 7:{		// REF_invokeSpecial
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			break;
+			assert(false);		// TODO: 且 findSpecial 的参数有误.....
+			auto findSpecial_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道 get_class_method 对不对......
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSpecial_method,
+						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
+			assert(result != nullptr);
+			return result;
 		}
 		case 8:{		// REF_newInvokeSpecial
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() == L"<init>");		// special inner klass!!
-			break;
+			assert(false);		// TODO: 其实我认为应该是 findConstructor...		// 且 findSpecial 的参数有误.....
+			auto findSpecial_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道这里对不对......
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSpecial_method,
+						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
+			assert(result != nullptr);
+			return result;
 		}
 		case 9:{		// REF_invokeInterface
 			assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			break;
+			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_class_method(L"findVirtual:(" CLS STR MT ")" MH);	// 注意：和 REF_invokeVirtual 调用的方法不同。
+			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
+						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
+			assert(result != nullptr);
+			return result;
 		}
 		default:{
 			assert(false);
@@ -1454,7 +1495,9 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					// TODO: should throw NullpointerException
 					assert(false);
 				}
-				assert(op_stack.top()->get_ooptype() == OopType::_ObjArrayOop);		// assert char[] array
+				// aaload 必然是一个引用数组，因此有如下的限制条件。
+				assert((op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && ((TypeArrayOop *)op_stack.top())->get_dimension() >= 2)
+					   || op_stack.top()->get_ooptype() == OopType::_ObjArrayOop);
 				ObjArrayOop * objarray = (ObjArrayOop *)op_stack.top();	op_stack.pop();
 				assert(objarray->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push((*objarray)[index]);
@@ -1770,7 +1813,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				Oop *value = op_stack.top();	op_stack.pop();
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				Oop *array_ref = op_stack.top();	op_stack.pop();
-				assert(array_ref != nullptr && array_ref->get_ooptype() == OopType::_ObjArrayOop);
+				assert(array_ref != nullptr && (array_ref->get_ooptype() == OopType::_ObjArrayOop ||
+						(array_ref->get_ooptype() == OopType::_TypeArrayOop && ((TypeArrayOop *)array_ref)->get_dimension() >= 2)));
 //				if (value != nullptr) {
 //					sync_wcout{} << value->get_ooptype() << ((ObjArrayOop *)array_ref)->get_dimension() << std::endl;
 //					assert(value->get_ooptype() == OopType::_InstanceOop);		// 不做检查了。因为也会有把 一个[[[Ljava.lang.String; 放到 [Ljava.lang.Object;的 [1] 中去的。
@@ -3179,80 +3223,142 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(pc[3] == 0 && pc[4] == 0);		// default.
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_InvokeDynamic);
-				// get CONSTANT_InvokeDynamic_info:
+				// 1. get CONSTANT_InvokeDynamic_info:
 				pair<int, int> invokedynamic_pair = boost::any_cast<pair<int, int>>(rt_pool[rtpool_index-1].second);
-				// get BootStrapMethod table from `code_klass`!!
+				// 2. get BootStrapMethod table from `code_klass`!!
 				auto bm = code_klass->get_bm();
 				assert(bm != nullptr);		// in invokeDynamic already, `bm` must not be nullptr!!
-				// get target BootStrapMethod index and the struct:
+				// 3. get target BootStrapMethod index and the struct:
 				int bootstrap_method_index = invokedynamic_pair.first;
 				assert(bootstrap_method_index >= 0 && bootstrap_method_index < bm->num_bootstrap_methods);
 				auto fake_method_struct = bm->bootstrap_methods[bootstrap_method_index];	// struct BootstrapMethods_attribute::bootstrap_methods_t
-				// get CONSTANT_MethodHandle_info and arguments from the struct above:
-				// [0] MethodHandle(fake)
+				// 4. using `CONSTANT_invokeDynamic_info` to get target NameAndType index and Name && Type
+				int name_and_type_index = invokedynamic_pair.second;
+				assert(rt_pool[name_and_type_index-1].first == CONSTANT_NameAndType);
+				pair<int, int> nameAndType_pair = boost::any_cast<pair<int, int>>(rt_pool[name_and_type_index-1].second);
+				assert(rt_pool[nameAndType_pair.first-1].first == CONSTANT_Utf8);
+				assert(rt_pool[nameAndType_pair.second-1].first == CONSTANT_Utf8);
+				wstring name = boost::any_cast<wstring>(rt_pool[nameAndType_pair.first-1].second);					// run
+				wstring type_descriptor = boost::any_cast<wstring>(rt_pool[nameAndType_pair.second-1].second);		// ()Ljava/lang/Runnable;	// 注意：此描述符，是 invokeDynamic 的方法描述符！因为 new Thread( () -> System.out.println("...") ); 中间的 lambda 最终一定是要返回一个 Runnable 对象的！！所以，这里的描述符不是真正的 run 方法的描述符 ()V !!
+//				std::wcout << name << " " << type_descriptor << std::endl;	// delete
+				// 5. get CONSTANT_MethodHandle_info and arguments from the struct above:
+				// 5-[0] MethodHandle(real)	// 这个 MethodHandle 包含了一个 `java/lang/invoke/LambdaMetafactory.metafactory(...)` 方法。
 				assert(rt_pool[fake_method_struct.bootstrap_method_ref-1].first == CONSTANT_MethodHandle);
-				InstanceOop *method_handle_obj = MethodHandle_make(rt_pool, fake_method_struct.bootstrap_method_ref-1);
-
-				assert(false);
-
-				// [1] Arguments
-				list<Oop *> arg;
+				InstanceOop *method_handle_obj = MethodHandle_make(rt_pool, fake_method_struct.bootstrap_method_ref-1, thread, true);
+				// 5-[1] Arguments
+				list<Oop *> callsite_args;
+				// 5-[1]-[0] make the $0: MethodHandles.Lookup(caller) and add it to the callsite_args
+				InstanceOop *lookup_obj = MethodHandles_Lookup_make(thread);
+				callsite_args.push_back(lookup_obj);
+				// 5-[1]-[1] make the $1: String: get the `invokedynamic` real target method name. like: `run`, and add it to the callsite_args
+				callsite_args.push_back(java_lang_string::intern(name));
+				// 5-[1]-[2] make the $2: MethodType: get the `invokedynamic` real target method descripor like: `:()java/lang/Runnable`, and add it to the callsite_args
+				callsite_args.push_back(MethodType_make(type_descriptor, thread));
+				// 5-[1]-[3] make the remain [4~n) arguments
 				for (int i = 0; i < fake_method_struct.num_bootstrap_arguments; i ++) {
 					int arg_index = fake_method_struct.bootstrap_arguments[i];
 					pair<int, boost::any> _pair = rt_pool[arg_index-1];
+//					std::wcout << _pair.first << std::endl;		// delete
 					switch(_pair.first) {
 						case CONSTANT_String:{
-							arg.push_back(boost::any_cast<Oop *>(_pair.second));
+							callsite_args.push_back(boost::any_cast<Oop *>(_pair.second));
 							break;
 						}
 						case CONSTANT_Class:{
-							arg.push_back(boost::any_cast<shared_ptr<Klass>>(_pair.second)->get_mirror());
+							callsite_args.push_back(boost::any_cast<shared_ptr<Klass>>(_pair.second)->get_mirror());
 							break;
 						}
 						case CONSTANT_Integer:{
-							arg.push_back(new IntOop(boost::any_cast<int>(_pair.second)));
+							callsite_args.push_back(new IntOop(boost::any_cast<int>(_pair.second)));
 							break;
 						}
 						case CONSTANT_Float:{
-							arg.push_back(new FloatOop(boost::any_cast<float>(_pair.second)));
+							callsite_args.push_back(new FloatOop(boost::any_cast<float>(_pair.second)));
 							break;
 						}
 						case CONSTANT_Long:{
-							arg.push_back(new LongOop(boost::any_cast<long>(_pair.second)));
+							callsite_args.push_back(new LongOop(boost::any_cast<long>(_pair.second)));
 							break;
 						}
 						case CONSTANT_Double:{
-							arg.push_back(new DoubleOop(boost::any_cast<double>(_pair.second)));
+							callsite_args.push_back(new DoubleOop(boost::any_cast<double>(_pair.second)));
 							break;
 						}
 						case CONSTANT_MethodHandle:{
-							assert(false);		// I don't know how to make it...
+							callsite_args.push_back(MethodHandle_make(rt_pool, arg_index-1, thread));
+//							Oop *temp;																	// delete
+//							((InstanceOop *)callsite_args.back())->get_field_value(DIRECTMETHODHANDLE ":member:" MN, &temp);	// delete
+//							std::wcout << toString((InstanceOop *)temp, &thread) << std::endl;			// delete
 							break;
 						}
 						case CONSTANT_MethodType:{
-							assert(false);		// I don't know how to make it...
+							wstring method_type_descriptor = boost::any_cast<wstring>(_pair.second);
+							callsite_args.push_back(MethodType_make(method_type_descriptor, thread));
 							break;
 						}
 						default:{
 							assert(false);
 						}
 					}
-
-
 				}
-
-				// get target NameAndType index and Name && Type
-				int name_and_type_index = invokedynamic_pair.second;
-				assert(rt_pool[name_and_type_index-1].first == CONSTANT_NameAndType);
-				pair<int, int> nameAndType_pair = boost::any_cast<pair<int, int>>(rt_pool[name_and_type_index-1].second);
-				assert(rt_pool[nameAndType_pair.first-1].first == CONSTANT_Utf8);
-				assert(rt_pool[nameAndType_pair.second-1].first == CONSTANT_Utf8);
-				wstring name = boost::any_cast<wstring>(rt_pool[nameAndType_pair.first-1].second);
-				wstring type = boost::any_cast<wstring>(rt_pool[nameAndType_pair.second-1].second);
-//				std::wcout << name << " " << type << std::endl;	// delete
-
-
-
+				// 6. make all arguments into a Java List<T>!!
+				auto arrayList_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/util/ArrayList"));
+				assert(arrayList_klass != nullptr);
+				auto arrayList_init_method = arrayList_klass->get_this_class_method(L"<init>:()V");
+				auto arrayList_add_method = arrayList_klass->get_this_class_method(L"add:(" OBJ ")Z");
+				assert(arrayList_init_method != nullptr && arrayList_add_method != nullptr);
+				auto arrayList_obj = arrayList_klass->new_instance();
+				// 6-0. do ArrayList.<init>:()V!
+				thread.add_frame_and_execute(arrayList_init_method, {arrayList_obj});
+				// 6-1. do ArrayList.add() for all oop in callsite_args!
+				for (Oop *oop : callsite_args) {
+					Oop *result = thread.add_frame_and_execute(arrayList_add_method, {arrayList_obj, oop});
+					assert((bool)((IntOop *)result)->value == true);		// return success.
+				}
+				// 7. get the CallSite obj using `MethodHanle.invokeArguments(List<T>)!!
+				// 7-1. get method `invokeArguments`
+				auto invokeArguments_method = std::static_pointer_cast<InstanceKlass>(method_handle_obj->get_klass())
+						->search_vtable(L"invokeWithArguments:(" LST ")" OBJ);		// `method_handle_obj` may be a child of klass `MethodHandle`. so should `search_vtable()`.
+				assert(invokeArguments_method != nullptr);
+				// 8. get the CallSite !!
+				InstanceOop *callsite = (InstanceOop *)thread.add_frame_and_execute(invokeArguments_method, {method_handle_obj, arrayList_obj});
+				assert(callsite != nullptr);
+//				std::wcout << toString(callsite, &thread) << std::endl;		// delete
+				// 9. get the `invokedynamic` real target method arguments size.
+				// 9-1. get other argument size.
+				int size = Method::parse_argument_list(type_descriptor).size();		// **ATTENTION** no need to add `this` !!
+				// [x] 9-2. does the method need `this`? We should parse the `CallSite`, because except `CallSite`, no one knows the `invokedynamic` method's information.
+				// so we should get the method's `flag` first.	// 并不需要。findVirtual 中就会把正确的 MethodType 给出来。去找 name="run", descriptor="()V" 的 MH，会自动变成 (Runnable)V.
+//				Oop *result;
+//				callsite->get_field_value(CALLSITE L":target:" MH, &result);		// 很遗憾这是不准的。直接从 CallSite 中捞取是不行的。需要得到最终的 dynamicinvoker 才行(也是 MethodHandle).
+//				auto real_method_handle_obj = (InstanceOop *)result;
+//				std::wcout << real_method_handle_obj->get_klass()->get_name() << std::endl;
+				// 9-3. change CallSite to a MethodHandle invoker! using `CallSite.dynamicInvoker()`.
+				auto callsite_dynamicInvoker_method = std::static_pointer_cast<InstanceKlass>(callsite->get_klass())
+						->search_vtable(L"dynamicInvoker:()" MH);		// It is an abstract Method.
+				assert(callsite_dynamicInvoker_method != nullptr);
+				auto final_invoker_MethodHandle = (InstanceOop *)thread.add_frame_and_execute(callsite_dynamicInvoker_method, {callsite});
+				assert(final_invoker_MethodHandle != nullptr);
+				// 10. fill in the arguments.		// TODO: 现阶段暂时不考虑 invokedynamic 的调用 native，synchronize 以及抛出 Exception 方面的问题。
+				list<Oop *> arg_list;
+				assert(op_stack.size() >= size);
+				while (size > 0) {
+					arg_list.push_front(op_stack.top());
+					op_stack.pop();
+					size --;
+				}
+				// 12. get the invokeExact Method in MH.
+				auto invokeExact_method = std::static_pointer_cast<InstanceKlass>(final_invoker_MethodHandle->get_klass())
+										->search_vtable(L"invokeExact:([" OBJ ")" OBJ);
+				// 13. Call!!!
+				// 像 native 一样 call 吧。所以最前要加上 this methodhandler，最后要多两个参数。
+				arg_list.push_front(final_invoker_MethodHandle);
+				arg_list.push_back(nullptr);
+				arg_list.push_back((Oop *)&thread);
+				JVM_InvokeExact(arg_list);
+				std::wcout << arg_list.size() << std::endl;
+				std::wcout << arg_list.back()->get_klass()->get_name() << std::endl;
+				// PS: 我在 invokeExact native 方法中自动拆包了 [Object... 应该不能有问题把...
 
 				assert(false);
 				break;

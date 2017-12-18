@@ -321,7 +321,7 @@ void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	auto obj_klass = std::static_pointer_cast<InstanceKlass>(obj->get_klass());
 	auto this_klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
 
-	if (obj_klass == this_klass || obj_klass->check_parent(this_klass))		// 千万别忘了判等啊！！QAQ......
+	if (obj_klass == this_klass || obj_klass->check_parent(this_klass) || obj_klass->check_interfaces(this_klass))		// 千万别忘了判等啊！！QAQ......
 		_stack.push_back(new IntOop(true));
 	else
 		_stack.push_back(new IntOop(false));
@@ -784,7 +784,10 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 }
 void JVM_GetProtectionDomain(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	assert(false);
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
+//	thread->get_stack_trace();
+
+	_stack.push_back(nullptr);		// 都不知道对不对...	// TODO: emmmm.... 非常害怕这里出错。
 }
 void JVM_GetDeclaredClasses(list<Oop *> & _stack){		// return the mirror's inner: public/protected/private inner classes.
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();

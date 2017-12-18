@@ -81,8 +81,11 @@ public:	// aux
 	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
 	static wstring get_real_value(Oop *oop);
 private:		// for invokeDynamic
-	InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread);
-	InstanceOop *MethodType_make(shared_ptr<Method> target_method, vm_thread & thread)
+	static InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread, bool = false);
+	static InstanceOop *MethodType_make(shared_ptr<Method> target_method, vm_thread & thread);
+	static InstanceOop *MethodType_make(const wstring & descriptor, vm_thread & thread);
+	static InstanceOop *MethodType_make_impl(vector<MirrorOop *> & args, MirrorOop *ret, vm_thread & thread);
+	static InstanceOop *MethodHandles_Lookup_make(vm_thread & thread);
 private:
 	static void getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack);
 	static void getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread);

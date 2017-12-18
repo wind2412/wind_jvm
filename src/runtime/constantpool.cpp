@@ -192,7 +192,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 		}
 		case CONSTANT_MethodType:{
 			CONSTANT_MethodType_info *target = (CONSTANT_MethodType_info*)bufs[i];
-			this->pool[i] = (make_pair(bufs[i]->tag, boost::any((int)target->descriptor_index)));	// int 索引。指向一个 utf8。
+			assert(bufs[target->descriptor_index-1]->tag == CONSTANT_Utf8);
+			wstring result = boost::any_cast<wstring>((*this)[target->descriptor_index - 1].second);		// 强制先解析 utf-8，并且在这里获得。
+			this->pool[i] = (make_pair(bufs[i]->tag, boost::any(result)));					// wstring 类型。
 			break;
 		}
 		case CONSTANT_InvokeDynamic:{
