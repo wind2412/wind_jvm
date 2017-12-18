@@ -187,7 +187,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 		}
 
 		// convert to a MetaClass (link)
-		shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, /*this*/ nullptr, loader_mirror);	// I think nullptr maybe good choice?? 反正是对所有 loader 都不可见...
+		shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this /*nullptr*/, loader_mirror);	// [x] I think nullptr maybe good choice?? 反正是对所有 loader 都不可见... [√] 不行！因为在这些 VM Anonymous class 的常量池中，在 invokeDynamic 生成的这些类里，会有用户类的常量池句柄！这样就没法加载了！必须把 loader 传进去。
 		// 拦截：在这里可以拦截一些 VM Anonymous Klass，截获字节码。
 //		if (newklass->get_name() == L"xxxxx") {
 //			std::wcout << "success!!" << std::endl;
