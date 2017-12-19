@@ -28,7 +28,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 			ifstream f(wstring_to_utf8(jl.get_sun_dir() + L"/" + target).c_str(), std::ios::binary);
 			if(!f.is_open()) {
 				std::wcerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
-				return nullptr;
+				exit(-1);
 			}
 #ifdef DEBUG
 			sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
@@ -222,7 +222,7 @@ MyClassLoader::get_loader().print();
 				ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);		// use `ifstream`
 				if(!f.is_open()) {
 					std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
-					return nullptr;
+					exit(-1);
 				}
 #ifdef DEBUG
 				sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;

@@ -716,8 +716,8 @@ int InstanceKlass::get_all_field_offset(const wstring & BIG_signature)
 /*===---------------    MirrorKlass (aux)    --------------------===*/
 MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *loader) {
 	// 注意 mirrored_who 可以为 nullptr。因为在数组类使用了 new_mirror(nullptr, nullptr).
-	LockGuard lg(system_classmap_lock);
-	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
+//	LockGuard lg(system_classmap_lock);		// bug report: 在指定 ./bin/wind_jvm Test18 的时候，Test18 根本没有的时候，java_lang_ClassLoader::find_bootstrap_class 方法中会 load sun/misc/launcher，然后在设置 mirror 的时候会冲突！但是即使设置了递归锁也没有用。所以我去掉了这两句无用的检测。
+//	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
 
 	// then inject it!!
 	if (mirrored_who != nullptr && mirrored_who->get_name() == L"java/lang/Exception") {

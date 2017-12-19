@@ -199,22 +199,6 @@ void vm_thread::init_and_do_main()
 		}
 		assert(this->vm_stack.size() == 0);
 
-		// 关于这里，对 Class 的强制执行初始化 + 强行赋值魔改进行说明。
-		// 在 java 中，有一个仅仅给 jdk 使用的 Unsafe 类。这个类支持原子的 “compareAndSwap(CAS)” 二合一操作。
-		// 在 linux 中也有类似的函数 atom_xchg 这一类，是支持并发的基础设施。
-		// 不过在 java 中，这个功能的实现略微繁琐。
-		// 因为 java 对地址支持的局限性没法直接操作内存，以及没法直接调用 lock 指令等多种原因，所以仅仅能够通过 jvm 的 native 来执行。
-		// Unsafe 类就是支持这个的方法。它通过取一个成员变量相对于类的 offset，传递给 jvm 并且由 jvm 算出目标距离，然后 xchg。
-		// 不过这仅仅能够支持 openjdk 类似的 vm。因为他们的 fields 都有固定的偏移 ———— static field 挂在 Klass 外部一个可计算的距离内存中； field 挂载 Oop 外部一个可计算的距离内存中。
-		// 可是我的不行......我的无论是 static field，还是 field，统统都经由指针引向内存的某处了。因为 C++ class 的大小是不可变的，而 java field 总大小是完全可变的。
-		// 因而，除了像 openjdk 这样挂在外边不占用 class 内存，还能够保持相同的相对距离，我是没有其他的方法了。而且一开始着手写的时候，也根本不知道还会有这种事......竟然还要计算偏移量......
-		// 虽然强行计算并且换值肯定也是可以的。不过日后要支持 GC，本来偏移就不定，一个 GC，那刚才求得的 offset 就肯定错了。
-		// 严格来说应该算设计问题吧。Unsafe 这里我就不支持了。
-		// 而 System 类开启的过程中，一定需要 Unsafe 类来支持 CAS，从而来变更 java/lang/Class 的缓存(cashed) java/lang/reflect/Field。而这个缓存有个开关，就是 uncashed;
-		// 这个 uncashed 会在 System 类 initted 之后，可以使用。但是现在我们还没有 init...... System.out 都没做出来呢......
-		// 只有魔改了（逃。
-		// 所以如你所见，下边我强行初始化了 Class (为了防止改好的值经过初始化，他又变回去了)
-		// 所以先初始化然后赋值。以上即经过。
 		BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(class_klass), *this);
 		std::static_pointer_cast<InstanceKlass>(class_klass)->set_static_field_value(L"useCaches:Z", new IntOop(false));
 
@@ -317,9 +301,6 @@ void vm_thread::init_and_do_main()
 		BytecodeEngine::initial_clinit(methodhandle_klass, *this);
 
 	}
-
-
-
 
 	// The World's End!
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。

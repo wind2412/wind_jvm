@@ -560,6 +560,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 	// 2. get ref.
 	if (ref == nullptr) {
 		thread.get_stack_trace();			// delete
+		std::wcout << new_method->get_klass()->get_name() << " " << signature << std::endl;
 	}
 	assert(ref != nullptr);			// `this` must not be nullptr!!!!
 #ifdef BYTECODE_DEBUG
@@ -1870,7 +1871,19 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #endif
 				break;
 			}
-
+			case 0x58:{		// pop2
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				if (val1->get_ooptype() == OopType::_BasicTypeOop && 		// 分类二
+						(((BasicTypeOop *)val1)->get_type() == Type::LONG || ((BasicTypeOop *)val1)->get_type() == Type::DOUBLE)) {
+					// do nothing
+				} else {
+					op_stack.pop();		// pop another.
+				}
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) pop2 from stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x59:{		// dup
 				op_stack.push(if_BasicType_then_copy_else_return_only(op_stack.top()));
 #ifdef BYTECODE_DEBUG
@@ -1935,8 +1948,30 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				}
 				break;
 			}
-
-
+			case 0x5d:{		// dup2_x1
+				Oop *val1 = op_stack.top();	op_stack.pop();
+				Oop *val2 = op_stack.top();	op_stack.pop();
+				if (val1->get_ooptype() == OopType::_BasicTypeOop && 		// 分类二
+						(((BasicTypeOop *)val1)->get_type() == Type::LONG || ((BasicTypeOop *)val1)->get_type() == Type::DOUBLE)) {
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val2);
+					op_stack.push(val1);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) dup2_x1[1] from stack." << std::endl;
+#endif
+				} else {
+					Oop *val3 = op_stack.top();	op_stack.pop();
+					op_stack.push(if_BasicType_then_copy_else_return_only(val2));
+					op_stack.push(if_BasicType_then_copy_else_return_only(val1));
+					op_stack.push(val3);
+					op_stack.push(val2);
+					op_stack.push(val1);
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) dup2_x1[2] from stack." << std::endl;
+#endif
+				}
+				break;
+			}
 			case 0x5e:{		// dup2_x2
 				Oop *val1 = op_stack.top();	op_stack.pop();
 				Oop *val2 = op_stack.top();	op_stack.pop();
