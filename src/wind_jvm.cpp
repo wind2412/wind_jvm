@@ -377,7 +377,7 @@ ArrayOop * vm_thread::get_stack_trace()
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":fileName:" STR,       file_name);
 		((InstanceOop *)(*arr)[i])->set_field_value(STACKTRACEELEMENT L":lineNumber:I",        new IntOop(line_num));
 
-//#ifdef DEBUG
+#ifdef DEBUG
 	ss << "[backtrace " << this->vm_stack.size() - i - 1 << "] pc: [" << last_pc_debug << "], at <" << m->get_klass()->get_name() << ">::[" << m->get_name() << ":" << m->get_descriptor() << "], at [" << m->get_klass()->get_source_file_name() << "], line [" << line_num << "]." << std::endl;
 	int j = 1;
 	for (Oop * value : it->localVariableTable) {
@@ -388,19 +388,19 @@ ArrayOop * vm_thread::get_stack_trace()
 		}
 		j ++;
 	}
-//#endif
+#endif
 
 		i ++;
 	}
 
-//#ifdef DEBUG
+#ifdef DEBUG
 	bool _switch_ = sync_wcout::_switch();
 	sync_wcout::set_switch(true);
 	sync_wcout{} << "===-------------------------------------- printStackTrace() -----------------------------------------===" << std::endl;
 	sync_wcout{} << ss.str();
 	sync_wcout{} << "===--------------------------------------------------------------------------------------------------===" << std::endl;
 	sync_wcout::set_switch(_switch_);
-//#endif
+#endif
 
 	return arr;
 }
