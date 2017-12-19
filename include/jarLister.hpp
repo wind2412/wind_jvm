@@ -85,13 +85,22 @@ private:
 	RtJarDirectory rjd;
 	const wstring rtlist = L"rt.list";
 	const wstring uncompressed_dir = L"sun_src";
+	unordered_set<wstring> cache;
 private:
 	// get rt.jar files list and put them into a file `rt.list`
 	bool getjarlist(const std::wstring & rtjar_pos) const;
 public:
 	JarLister();
 	bool find_file(const std::wstring & classname) {	// java/util/Map.class
-		return rjd.find_file(StringSplitter(classname));
+		if (cache.find(classname) != cache.end()) {
+			return true;
+		} else {
+			bool result = rjd.find_file(StringSplitter(classname));
+			if (result) {
+				cache.insert(classname);
+			}
+			return result;
+		}
 	}
 	wstring get_sun_dir() { return uncompressed_dir; }
 	void print() { rjd.print(); }

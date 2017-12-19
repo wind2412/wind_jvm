@@ -15,6 +15,7 @@
 #include "runtime/thread.hpp"
 #include <regex>
 #include "utils/synchronize_wcout.hpp"
+#include <pthread.h>
 
 Lock thread_num_lock;
 int all_thread_num;
@@ -37,7 +38,7 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)
 
 	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
-	pthread_create(&tid, nullptr, scapegoat, &p);
+	pthread_create(&tid, nullptr, scapegoat, &p);		// 这里有可能产生的 tid 是相同数值的：但是并没有问题。因为这里可能会有 tid 的复用问题。
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
 
@@ -324,8 +325,8 @@ void vm_thread::init_and_do_main()
 	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
 	this->execute();
 
-	// kill all other running thread...
-	ThreadTable::kill_all_except_main_thread(pthread_self());
+	// **DO NOT** kill all other running thread except the one should be killed...
+//	ThreadTable::kill_all_except_main_thread(pthread_self());
 
 //	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 //

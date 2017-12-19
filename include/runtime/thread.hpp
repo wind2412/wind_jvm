@@ -30,6 +30,7 @@ private:
 		static Lock lock;
 		return lock;
 	}
+public:
 	static unordered_map<pthread_t, pair<int, InstanceOop *>> & get_thread_table() {
 		static unordered_map<pthread_t, pair<int, InstanceOop *>> thread_table;
 		return thread_table;
