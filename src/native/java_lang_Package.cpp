@@ -20,8 +20,7 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_GetSystemPackage0(list<Oop *> & _stack){		// static				// TODO:...
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
-	std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
-	assert(false);
+	_stack.push_back(nullptr);		// 就全返回 nullptr 了。没有 system package （逃
 }
 
 // 返回 fnPtr.
