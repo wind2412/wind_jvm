@@ -134,7 +134,7 @@ private:
 													// 父类有 static，子类不会去继承......但是会共用。 所以 static_field_layout 不用 copy 下来，只 copy fields_layout 就好......不过，如果查找 set_static_field 的话。【如果本类没有，就必须去 父类去查找...... 这时两个类共用 static。。。】
 													// 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
 													// 而且，也要把 oop 的 get_static 和 set_static 改成一样的逻辑......QAQ
-													// TODO: 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
+													// 原来如此......！ java.lang.Class 的生成，仅仅分配空间就可以！因为没有构造函数！！所以......～折磨好几天的问题啊......
 	// should add message to recode whether this field is parent klass's field, for java/lang/Class.getDeclaredFields0()...
 	unordered_map<int, bool> is_this_klass_field;		// don't use vector<bool>...		// use fields_layout.second.first as index.
 	// layouts.		// bug of fields_layout: 由于父类可能有和子类一样名字+描述符的变量，因此会冲突...... 不得不加上了 klass 的命名空间来解决这个问题......悲伤。变成了历史遗留问题......
@@ -164,7 +164,7 @@ private:
 	u2 signature_index = 0;
 	BootstrapMethods_attribute *bm = nullptr;
 
-	Parameter_annotations_t *rva = nullptr;		// TODO: 最终因为 java/lang/reflection/Field 的原因，必须要按照 openjdk 的方式来重新 parse Annotations。即，Array<u1> 的格式......难受得很......唉QAQ
+	Parameter_annotations_t *rva = nullptr;		// 最终因为 java/lang/reflection/Field 的原因，必须要按照 openjdk 的方式来重新 parse Annotations。即，Array<u1> 的格式......难受得很......唉QAQ
 
 	u2 num_RuntimeVisibleTypeAnnotations = 0;
 	TypeAnnotation *rvta = nullptr;

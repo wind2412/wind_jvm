@@ -1197,7 +1197,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	sync_wcout{} << "(DEBUG) push class: "<< klass->get_name() << "'s mirror "<< "on stack." << std::endl;
 #endif
 				} else {
-					// TODO: Constant_MethodHandle and Constant_MethodType
+					// TODO: Constant_MethodHandle and Constant_MethodType		// TODO: 其实按照 invokedynamic 里边生成就行。暂时懒得写了
 					std::cerr << "doesn't support Constant_MethodHandle and Constant_MethodType now..." << std::endl;
 					assert(false);
 				}
