@@ -200,7 +200,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 	// copy vtable from parent
 	if (this->parent != nullptr) {	// if this class is not java.lang.Object
 		shared_ptr<InstanceKlass> the_parent = std::static_pointer_cast<InstanceKlass>(parent);
-		this->vtable.insert(this->vtable.end(), the_parent->vtable.begin(), the_parent->vtable.end());
+		this->vtable = the_parent->vtable;		// copy directly
 	}
 
 	// traverse all this.Methods
@@ -208,15 +208,17 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 	for(int i = 0; i < cf->methods_count; i ++) {
 		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
 		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
+		wstring signature = ss.str();
 		// add method into [all methods]
-		this->methods.insert(make_pair(ss.str(), make_pair(i, method)));
+		this->methods.insert(make_pair(signature, make_pair(i, method)));
 		// override method into [vtable]
-		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });
+//		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });	// 这个 lambda 还挺好看，留下了。
+		auto iter = vtable.find(signature);
 		if (iter == vtable.end()) {
 			if (!method->is_static()/* && !method->is_private()*/)		// bug report: private 也是 vtable 的方法！！
-				vtable.push_back(method);
+				vtable.insert(make_pair(signature, method));
 		} else {
-			*iter = method;		// override parent's method
+			iter->second = method;		// override parent's method
 		}
 
 		ss.str(L"");		// make empty
@@ -619,13 +621,11 @@ bool InstanceKlass::check_interfaces(const wstring & signature)		// 查看此 In
 
 shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
 {
-	for (auto method : this->vtable) {
-		wstring method_signature = method->get_name() + L":" + method->get_descriptor();		// TODO: Optimise
-		if (method_signature == signature) {
-			return method;
-		}
+	auto iter = this->vtable.find(signature);
+	if (iter == this->vtable.end()) {
+		return nullptr;
 	}
-	return nullptr;
+	return iter->second;
 }
 
 InstanceOop * InstanceKlass::new_instance() {

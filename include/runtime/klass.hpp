@@ -148,7 +148,7 @@ private:
 									// Fields 直接挂在此类的后边...
 	// static methods + vtable + itable
 	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
-	vector<shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
+	unordered_map<wstring, shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
 	unordered_map<wstring, pair<int, shared_ptr<Method>>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !! [the `pair<int, ...>` 's int is the slot number. for: sun/reflect/NativeConstructorAccessorImpl-->newInstance0]
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
@@ -233,7 +233,7 @@ public:		// for reflection.
 	vector<pair<int, shared_ptr<Method>>> get_constructors();
 	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
 public:		// for invokedynamic.
-	bool is_in_vtable(shared_ptr<Method> m) { return std::find(vtable.begin(), vtable.end(), m) != vtable.end(); }
+	bool is_in_vtable(shared_ptr<Method> m) { wstring signature = m->get_name() + L":" + m->get_descriptor(); return vtable.find(signature) != vtable.end(); }
 	const auto & get_field_layout() { return this->fields_layout; }
 	const auto & get_static_field_layout() { return this->static_fields_layout; }
 	BootstrapMethods_attribute *get_bm() { return this->bm; }
