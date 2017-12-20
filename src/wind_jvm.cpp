@@ -22,9 +22,9 @@ int all_thread_num;
 
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
-	if (real->cur_thread_obj != nullptr) {
+//	if (real->cur_thread_obj != nullptr) {		// so the ThreadTable::get_thread_obj may be nullptr.		// I add all thread into Table due to gc should stop all threads.
 		ThreadTable::add_a_thread(pthread_self(), real->cur_thread_obj);		// the cur_thread_obj is from `java/lang/Thread.start0()`.
-	}
+//	}
 	real->thread->start(*real->arg);
 	return nullptr;
 };
