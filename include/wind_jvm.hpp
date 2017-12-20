@@ -16,6 +16,7 @@
 #include "utils/lock.hpp"
 #include "runtime/bytecodeEngine.hpp"
 #include "utils/synchronize_wcout.hpp"
+#include "runtime/gc.hpp"
 
 class vm_thread;
 class wind_jvm;
@@ -31,8 +32,10 @@ extern int all_thread_num;
 
 class vm_thread {
 	friend BytecodeEngine;
+	friend GC;
 private:
 	temp p;			// pthread aux struct. must be global!!!
+	pthread_t tid;
 	shared_ptr<Method> method;
 	std::list<Oop *> arg;
 //	const std::list<Oop *> & arg;		// 卧槽我是白痴.....又一次用错了引用...start0 里边是局部变量...我竟然直接通过引用把局部变量引了过来......QAQ
@@ -41,7 +44,7 @@ private:
 	int thread_no;
 public:
 	vm_thread(shared_ptr<Method> method, const std::list<Oop *> & arg) 	// usually `main()` or `run()` method.
-																: method(method), arg(arg), pc(0) {
+																: method(method), arg(arg), pc(0), tid(0) {
 		LockGuard lg(thread_num_lock);
 #ifdef DEBUG
 		sync_wcout{} << "[*]this thread_no is [" << all_thread_num << "]:" << std::endl;		// delete
@@ -89,6 +92,12 @@ public:
 };
 
 
+extern pthread_mutex_t _all_thread_wait_mutex;
+extern pthread_cond_t _all_thread_wait_cond;
+
+// 此函数用于唤醒所有线程。(GC)
+void wait_cur_thread();
+void signal_all_thread();
 
 
 

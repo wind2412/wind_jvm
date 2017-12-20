@@ -33,7 +33,7 @@ static unordered_map<wstring, void*> methods = {
     {L"setNativeName:(" STR L")V",		(void *)&JVM_SetNativeThreadName},
 };
 
-void JVM_StartThread(list<Oop *> & _stack){		// static
+void JVM_StartThread(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	Oop *result;
 	_this->get_field_value(THREAD L":eetop:J", &result);
@@ -57,6 +57,7 @@ void JVM_StartThread(list<Oop *> & _stack){		// static
 		new_thread = &wind_jvm::threads().back();
 	}
 	wind_jvm::lock().unlock();
+
 	// start!
 	new_thread->launch(_this);
 }

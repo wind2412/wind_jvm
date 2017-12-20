@@ -1013,6 +1013,13 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	uint8_t * & pc = thread.pc;
 	pc = code_begin;
 
+	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
+	if (ThreadTable::size() == 3) {	// delete
+		GC::gc() = true;
+	}
+	GC::set_safepoint_here(&thread);
+
+
 	bool backup_switch = sync_wcout::_switch();
 
 	// filter debug tool:

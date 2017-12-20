@@ -33,10 +33,14 @@ public:
 	static void add_a_thread(pthread_t tid, InstanceOop *_thread);
 	static void remove_a_thread(pthread_t tid);
 	static int get_threadno(pthread_t tid);
+	static bool is_in(pthread_t tid);
 	static InstanceOop * get_a_thread(pthread_t tid);
 	static bool detect_thread_death(pthread_t tid);
 	static void print_table();
 	static void kill_all_except_main_thread(pthread_t main_tid);
+	static int size() { return get_thread_table().size(); }
+public:
+	static void wake_up_all_threads_force();		// after gc
 };
 
 #endif /* INCLUDE_RUNTIME_THREAD_HPP_ */

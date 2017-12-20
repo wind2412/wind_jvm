@@ -29,7 +29,7 @@ void * scapegoat (void *pp) {
 	return nullptr;
 };
 
-void vm_thread::launch(InstanceOop *cur_thread_obj)
+void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调用 start() 函数。所以，这个 launch 函数是唯一的入口点。
 {
 	// start one thread
 	p.thread = this;
@@ -39,6 +39,8 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)
 	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
 	pthread_create(&tid, nullptr, scapegoat, &p);		// 这里有可能产生的 tid 是相同数值的：但是并没有问题。因为这里可能会有 tid 的复用问题。
+
+	this->tid = tid;		// save to the vm_thread.
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
 
@@ -394,8 +396,27 @@ void vm_thread::set_exception_at_last_second_frame() {
 	iter->has_exception = true;
 }
 
+pthread_mutex_t _all_thread_wait_mutex;
+pthread_cond_t _all_thread_wait_cond;
+
+// 不设置信号了。那样太糟糕了。
+void wait_cur_thread()
+{
+	pthread_mutex_lock(&_all_thread_wait_mutex);
+	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	pthread_mutex_unlock(&_all_thread_wait_mutex);
+}
+
+void signal_all_thread()		// 垃圾回收之后，就可以调用它，把所有的线程全部重新开启......
+{
+	pthread_mutex_lock(&_all_thread_wait_mutex);
+	pthread_cond_broadcast(&_all_thread_wait_cond);
+	pthread_mutex_unlock(&_all_thread_wait_mutex);
+}
+
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
+
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
 

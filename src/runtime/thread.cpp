@@ -7,6 +7,7 @@
 
 #include "runtime/thread.hpp"
 #include "utils/synchronize_wcout.hpp"
+#include "wind_jvm.hpp"
 
 Lock & ThreadTable::get_lock()
 {
@@ -44,6 +45,16 @@ int ThreadTable::get_threadno(pthread_t tid)
 		return (*iter).second.first;
 	}
 	return -1;
+}
+
+bool ThreadTable::is_in(pthread_t tid)
+{
+	LockGuard lg(get_lock());
+	auto iter = get_thread_table().find(tid);
+	if (iter != get_thread_table().end()) {
+		return true;
+	}
+	return false;
 }
 
 InstanceOop * ThreadTable::get_a_thread(pthread_t tid)
@@ -92,4 +103,9 @@ void ThreadTable::kill_all_except_main_thread(pthread_t main_tid)
 			}
 		}
 	}
+}
+
+void ThreadTable::wake_up_all_threads_force()
+{
+	signal_all_thread();
 }
