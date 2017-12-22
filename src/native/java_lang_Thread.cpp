@@ -136,7 +136,6 @@ void JVM_Sleep(list<Oop *> & _stack){			// static
 }
 void JVM_CurrentThread(list<Oop *> & _stack){		// static
 	InstanceOop *thread_oop;
-	ThreadTable::print_table();
 	assert(ThreadTable::detect_thread_death(pthread_self()) == false);
 	thread_oop = ThreadTable::get_a_thread(pthread_self());						// TODO: 我自己都不知道这实现是否正确......多线程太诡异了......
 	assert(thread_oop != nullptr);

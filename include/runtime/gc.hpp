@@ -32,9 +32,10 @@ public:
 	}
 public:
 	static void init_gc();		// 设置标志位以及目标 vm_threads
-	static void receive_signal(vm_thread *);		// vm_thread 发送一个 ready 信号给 GC 类。此时所有的 vm_thread 应该都进入了 safepoint，即 native 函数以外。
-	static void system_gc();		// 应该由另一个新的 GC 线程开启。
+	static bool receive_signal(vm_thread *);		// vm_thread 发送一个 ready 信号给 GC 类。此时所有的 vm_thread 应该都进入了 safepoint，即 native 函数以外。
+	static void* system_gc(void *);		// 应该由另一个新的 GC 线程开启。
 	static void set_safepoint_here(vm_thread *);
+	static void print_table();
 };
 
 

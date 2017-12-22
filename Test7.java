@@ -37,10 +37,18 @@ public class Test7 extends Thread{
 		Test7 t = new Test7();
 		Test7 t1 = new Test7();
 		Test7 t2 = new Test7();
+		Test7 t3 = new Test7();
+		Test7 t4 = new Test7();
+		Test7 t5 = new Test7();
+		Test7 t6 = new Test7();
 		
 		t.start();
 		t1.start();
 		t2.start();
+		t3.start();
+		t4.start();
+		t5.start();
+//		t6.start();
 		
 		Field[] field = Test7.class.getDeclaredFields();
 		for (Field f : field) {

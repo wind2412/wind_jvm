@@ -996,6 +996,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 	}
 }
 
+	Lock init_lock;		// delete
 
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
 // TODO: 注意！！以下，所有代码，不应该出现 ByteOop、BooleanOop、ShortOop ！！ 取而代之的应当是 IntOop ！！
@@ -1014,9 +1015,13 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	pc = code_begin;
 
 	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
-	if (ThreadTable::size() == 3) {	// delete
-		GC::gc() = true;
+	static bool inited = false;
+	init_lock.lock();
+	if (!inited && ThreadTable::size() == 3) {	// delete
+		GC::init_gc();
+		inited = true;
 	}
+	init_lock.unlock();
 	GC::set_safepoint_here(&thread);
 
 
