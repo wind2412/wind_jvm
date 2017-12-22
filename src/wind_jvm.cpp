@@ -445,4 +445,9 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 	init_native();
 
 	init_thread->launch();		// begin this thread.
+
+	// finally! delete all allocated memory!!
+	for (auto iter : Mempool::oop_handler_pool()) {
+		delete iter;
+	}
 }

@@ -9,6 +9,54 @@
 #include "classloader.hpp"
 #include "utils/synchronize_wcout.hpp"
 
+/*===---------------- Memory -------------------===*/
+void *MemAlloc::allocate(size_t size)
+{
+	if (size == 0) {
+		return nullptr;			// 直接返回！
+	}
+
+	LockGuard lg(mem_lock());
+	void *ptr = malloc(size);
+	memset(ptr, 0, size);		// default bzero!
+
+	// add it to the Mempool
+	Mempool::oop_handler_pool().insert((Oop *)ptr);
+
+	return ptr;
+}
+
+void MemAlloc::deallocate(void *ptr)
+{
+	LockGuard lg(mem_lock());
+
+	// TODO: 这里要怎么规划......是先把所有的全都扫描一遍并且复制到另一堆中，然后把这个 unordered_set 全部删除把...... 这样的话，这里什么也不用写就好了。
+
+//	assert(false);		// 先 assert(false) 了。
+
+	free(ptr);
+}
+
+void *MemAlloc::operator new(size_t size) throw()
+{
+	return allocate(size);
+}
+
+void *MemAlloc::operator new[](size_t size) throw()
+{
+	return allocate(size);
+}
+
+void MemAlloc::operator delete(void *ptr)
+{
+	return deallocate(ptr);
+}
+
+void MemAlloc::operator delete[](void *ptr)
+{
+	return deallocate(ptr);
+}
+
 /*===----------------  InstanceOop  -----------------===*/
 InstanceOop::InstanceOop(shared_ptr<InstanceKlass> klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.

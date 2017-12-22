@@ -86,14 +86,27 @@ bool GC::receive_signal(vm_thread *thread) 	// vm_thread 发送一个 ready 信�
 	}
 }
 
-// 这个函数应该被执行在一个新的 GC 进程中。
+// 这个函数应该被执行在一个新的 GC 进程中。执行此 GC 之前，必须要先进行 stop-the-world。也就是，此函数进行之前，所有除了此 GC 进程之外的线程已经全部停止。
 void* GC::system_gc(void *)
 {
-//	assert(false);
+	// GC-Root and Copy Algorithm
+	// 1. get the need-gc-threads:
+	// (no need to lock. because there's only this thread in the whole world...)
 
+
+
+
+
+
+
+
+	// final: 收尾工作，必须进行。
 	unordered_map<vm_thread *, bool>().swap(target_threads());
 	gc() = false;
 	signal_all_thread();
+
+	std::wcout << "gc over!!" << std::endl;		// delete
+
 	return nullptr;
 }
 

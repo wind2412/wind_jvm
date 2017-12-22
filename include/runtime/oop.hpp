@@ -11,34 +11,41 @@
 #include "runtime/klass.hpp"
 #include "runtime/field.hpp"
 #include "utils/monitor.hpp"
+#include "utils/lock.hpp"
 
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <unordered_set>
 
-// TODO: 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
+using std::unordered_set;
+
+// [x] 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
+// [√] 不对吧。这些 field 全是通过 setField 字节码设置的。所以本体肯定再外边，用不着回收了吧。
 
 class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
-
+public:
+	static unordered_set<Oop *> & oop_handler_pool() {
+		static unordered_set<Oop *> oop_handler_pool;		// 存放所有的对象，以备日后的 delete。
+		return oop_handler_pool;
+	}
 };
 
 class MemAlloc {
-public:
-	static void *allocate(size_t size) {		// TODO: change to real Mem Pool (Heap)
-		if (size == 0) {
-			return nullptr;		// 这里！！
-		}
-		void *ptr = malloc(size);
-		memset(ptr, 0, size);		// default bzero!
-		return ptr;
+private:
+	static Lock & mem_lock() {
+		static Lock mem_lock;
+		return mem_lock;
 	}
-	static void deallocate(void *ptr) { free(ptr); }
-	void *operator new(size_t size) throw() { return allocate(size); }
-	void *operator new(size_t size, const std::nothrow_t &) throw() { return allocate(size); }
-	void *operator new[](size_t size) throw() { return allocate(size); }
-	void *operator new[](size_t size, const std::nothrow_t &) throw() { return allocate(size); }
-	void operator delete(void *ptr) { return deallocate(ptr); }
-	void operator delete[](void *ptr) { return deallocate(ptr); }
+public:
+	static void *allocate(size_t size);
+	static void deallocate(void *ptr);
+	static void *operator new(size_t size) throw();
+	static void *operator new(size_t size, const std::nothrow_t &) throw() { exit(-2); }		// do not use it.
+	static void *operator new[](size_t size) throw();
+	static void *operator new[](size_t size, const std::nothrow_t &) throw() { exit(-2); }		// do not use it.
+	static void operator delete(void *ptr);
+	static void operator delete[](void *ptr);
 };
 
 
