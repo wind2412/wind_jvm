@@ -25,10 +25,17 @@ struct temp {		// pthread aux struct...
 	vm_thread *thread;
 	std::list<Oop *> *arg;
 	InstanceOop *cur_thread_obj;
+	bool should_be_stop_first = false;		// 使用 start0() 开启一个新的子线程的时候需要指定此变量为 true！！其他情况不用。这是防止 gc 的时候和 start0() 产生冲突的情况。
 };
 
 extern Lock thread_num_lock;
 extern int all_thread_num;
+
+enum thread_state {
+	Running,
+	Waiting,
+	Death,
+};
 
 class vm_thread {
 	friend BytecodeEngine;
@@ -36,6 +43,8 @@ class vm_thread {
 private:
 	temp p;			// pthread aux struct. must be global!!!
 	pthread_t tid;
+	thread_state state = Running;
+
 	shared_ptr<Method> method;
 	std::list<Oop *> arg;
 //	const std::list<Oop *> & arg;		// 卧槽我是白痴.....又一次用错了引用...start0 里边是局部变量...我竟然直接通过引用把局部变量引了过来......QAQ
@@ -61,6 +70,7 @@ public:
 	ArrayOop *get_stack_trace();
 	int get_stack_size() { return vm_stack.size(); }
 	void set_exception_at_last_second_frame();
+	void set_state(thread_state s) { state = s; }
 };
 
 class wind_jvm {

@@ -25,7 +25,16 @@ void * scapegoat (void *pp) {
 //	if (real->cur_thread_obj != nullptr) {		// so the ThreadTable::get_thread_obj may be nullptr.		// I add all thread into Table due to gc should stop all threads.
 		ThreadTable::add_a_thread(pthread_self(), real->cur_thread_obj);		// the cur_thread_obj is from `java/lang/Thread.start0()`.
 //	}
-	real->thread->start(*real->arg);
+
+	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
+		std::wcout << "... AAA " << pthread_self() << std::endl;
+		real->thread->set_state(Waiting);
+		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
+		real->thread->set_state(Running);
+		std::wcout << "... 000 " << pthread_self() << std::endl;
+	}
+
+	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
 	return nullptr;
 };
 
@@ -35,6 +44,9 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 	p.thread = this;
 	p.arg = &const_cast<std::list<Oop *> &>(arg);
 	p.cur_thread_obj = cur_thread_obj;
+	if (cur_thread_obj != nullptr) {		// if arg is not nullptr, must be a thread created by `start0`.
+		p.should_be_stop_first = true;
+	}
 
 	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
 	pthread_t tid;
@@ -69,6 +81,7 @@ void vm_thread::start(list<Oop *> & arg)
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
 	}
+	this->state = Death;
 }
 
 Oop *vm_thread::execute()

@@ -20,7 +20,7 @@ public class Test7 extends Thread{
 
 	@Override
 	public synchronized void run() {
-		for (int i = 0; i < 20; i ++) {
+		for (int i = 0; i < 5; i ++) {
 			System.out.println(i);
 			if (i == 10)
 				Thread.yield();
@@ -48,7 +48,7 @@ public class Test7 extends Thread{
 		t3.start();
 		t4.start();
 		t5.start();
-//		t6.start();
+		t6.start();
 		
 		Field[] field = Test7.class.getDeclaredFields();
 		for (Field f : field) {

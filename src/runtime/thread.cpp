@@ -95,7 +95,7 @@ void ThreadTable::print_table()
 	sync_wcout::set_switch(true);
 	sync_wcout{} << "===------------- ThreadTable ----------------===" << std::endl;		// TODO: 这里，sync_wcout 会 dead lock ??????
 	for (auto iter : get_thread_table()) {
-		sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << iter.second.first << "] thread, Thread Oop address: [" << iter.second.second << "]" << std::endl;
+		sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << iter.second.first << "] thread, Thread Oop address: [" << std::dec << (long)iter.second.second << "]" << std::endl;
 	}
 	sync_wcout{} << "===------------------------------------------===" << std::endl;
 //#endif

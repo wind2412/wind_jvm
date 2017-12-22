@@ -1016,8 +1016,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
 	static bool inited = false;
-	init_lock.lock();
-	if (!inited && ThreadTable::size() == 3) {	// delete
+	init_lock.lock();		// 可耻地设置了这里是仅仅 gc 一次，测出了 stop-the-world 应该完成了...??
+	if (!inited && ThreadTable::size() >= 3) {	// delete
 		GC::init_gc();
 		inited = true;
 	}
