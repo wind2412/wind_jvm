@@ -20,9 +20,9 @@ public class Test7 extends Thread{
 
 	@Override
 	public synchronized void run() {
-		for (int i = 0; i < 5; i ++) {
+		for (int i = 90; i < 95; i ++) {
 			System.out.println(i);
-			if (i == 10)
+			if (i == 93)
 				Thread.yield();
 		}
 		System.out.println(Thread.currentThread());
@@ -34,21 +34,27 @@ public class Test7 extends Thread{
 	
 	public static void main(String[] args) throws Throwable {
 		
-		Test7 t = new Test7();
+		Test7 t0 = new Test7();
 		Test7 t1 = new Test7();
 		Test7 t2 = new Test7();
 		Test7 t3 = new Test7();
 		Test7 t4 = new Test7();
 		Test7 t5 = new Test7();
 		Test7 t6 = new Test7();
+		Test7 t7 = new Test7();
+		Test7 t8 = new Test7();
+		Test7 t9 = new Test7();
 		
-		t.start();
+		t0.start();
 		t1.start();
 		t2.start();
 		t3.start();
 		t4.start();
 		t5.start();
 		t6.start();
+		t7.start();
+		t8.start();
+		t9.start();
 		
 		Field[] field = Test7.class.getDeclaredFields();
 		for (Field f : field) {

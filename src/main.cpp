@@ -11,9 +11,9 @@
 
 int main(int argc, char *argv[])
 {
-#ifdef DEBUG
+//#ifdef DEBUG
 	sync_wcout::set_switch(true);
-#endif
+//#endif
 
 	if (argc != 2) {
 		std::wcerr << "argc is not 2. please re-run." << std::endl;

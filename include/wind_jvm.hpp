@@ -44,6 +44,7 @@ private:
 	temp p;			// pthread aux struct. must be global!!!
 	pthread_t tid;
 	thread_state state = Running;
+	int monitor_num = 0;				// 此线程在多少个管程之内
 
 	shared_ptr<Method> method;
 	std::list<Oop *> arg;
@@ -70,7 +71,11 @@ public:
 	ArrayOop *get_stack_trace();
 	int get_stack_size() { return vm_stack.size(); }
 	void set_exception_at_last_second_frame();
+public:
 	void set_state(thread_state s) { state = s; }
+	void monitor_inc() { this->monitor_num ++; }
+	void monitor_dec() { this->monitor_num --; }
+	int get_monitor_num() { return this->monitor_num; }
 };
 
 class wind_jvm {

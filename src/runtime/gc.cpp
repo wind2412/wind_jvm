@@ -20,21 +20,22 @@ void GC::init_gc()	// 设置标志位以及目标 vm_threads
 	// get all gc roots:
 	// must use wind_jvm::Lock and GC::Lock.
 	LockGuard lg_wind_jvm(wind_jvm::lock());
-	list<vm_thread> & thread_list = wind_jvm::threads();		 // [x] 注意：这时也可以有新的线程被加进来。想了想，没有必要在线程创建那里加安全点......
-	for (auto & thread : thread_list) {
+	list<vm_thread> & thread_list = wind_jvm::threads();		 // [√] 注意：这时也可以有新的线程被加进来。想了想，没有必要在线程创建那里加安全点......
+	for (auto & thread : thread_list) {			// [√] target_threads 这个快照，不一定是完整的。因为建立完这个快照之后，也有可能多个线程被创建出来。保证这个快照的正确性的方法，就是让后出现的线程上来就直接自动停止，和 dalvik vm 一样，这样才能够解决两边不一致的缺陷。
 		// detect the vm_stack is alive?
 		// in fact, `thread.vm_stack.size() == 0` can judge: 1. the vm_thread is waiting (create by `start0`) 2. the thread is dead. Because these two conditions are both: vm_thread.stack().size() == 0.
 		if (thread.state == Waiting || thread.state == Death /*thread.vm_stack.size() == 0*/) {		// the vm_thread is waiting (create by `start0`) / end already.
 			sync_wcout{} << "ignore [" << thread.tid << "] because of: [" << (thread.state == Waiting ? "waiting]" : "death]") << std::endl;
 			continue;
 		}
-		ThreadTable::print_table();
-		GC::print_table();
 		// add it to the target_threads.
 		sync_wcout{} << "insert: " << thread.tid << " " << (long)&thread << std::endl;
 		bool ret = target_threads().insert(make_pair(&thread, false)).second;
 		assert(ret);
 	}
+	ThreadTable::print_table();
+	GC::print_table();
+	sync_wcout{} << "init_gc() over." << std::endl;
 }
 
 /**
@@ -68,7 +69,7 @@ bool GC::receive_signal(vm_thread *thread) 	// vm_thread 发送一个 ready 信�
 			target_threads()[iter.first] = true;
 			total_ready_num ++;
 		} else {
-			return false;
+			continue;
 		}
 	}
 
@@ -96,13 +97,13 @@ void* GC::system_gc(void *)
 	return nullptr;
 }
 
-void GC::set_safepoint_here(vm_thread *thread)
+void GC::set_safepoint_here(vm_thread *thread)		// 不能强行设置 safepoint !! 如果比如是一堆线程，都要执行 sysout.println()，那么 safepoint 必须设置在不在管程内的时候！！因为如果不这样的话，如果进入了管程的时候就被 stop-the-world 强行中断了的话，那么后边的所有线程将会死锁！！！
 {
 	LockGuard lg(gc_lock());
 	if (GC::gc()) {
 		bool need_block = GC::receive_signal(thread);		// send and regist this thread to gc!!
 		if (need_block) {
-			std::wcout << "block" << std::endl;
+			sync_wcout{} << "block" << std::endl;		// delete
 			thread->state = Waiting;
 			wait_cur_thread();				// stop this thread!!
 			thread->state = Running;

@@ -598,6 +598,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 
 	// synchronize
 	if (target_method->is_synchronized()) {
+		thread.monitor_inc();
 		ref->enter_monitor();
 #ifdef BYTECODE_DEBUG
 		sync_wcout{} << "(DEBUG) synchronize obj: [" << ref << "]." << std::endl;
@@ -665,6 +666,7 @@ sync_wcout{} << "then push invoke method's return value " << op_stack.top() << "
 
 	// unsynchronize
 	if (target_method->is_synchronized()) {
+		thread.monitor_dec();
 		ref->leave_monitor();
 #ifdef BYTECODE_DEBUG
 		sync_wcout{} << "(DEBUG) unsynchronize obj: [" << ref << "]." << std::endl;
@@ -737,6 +739,7 @@ void BytecodeEngine::invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & 
 	// synchronized:
 	Oop *this_obj;
 	if (new_method->is_synchronized()) {
+		thread.monitor_inc();
 		if (new_method->is_static()) {	// if static, lock the `mirror` of this klass.	// for 0xb8: invokeStatic
 			new_method->get_klass()->get_mirror()->enter_monitor();
 #ifdef BYTECODE_DEBUG
@@ -827,6 +830,7 @@ sync_wcout{} << "then push invoke method's return value " << op_stack.top() << "
 	}
 	// unsynchronize
 	if (new_method->is_synchronized()) {
+		thread.monitor_dec();
 		if (new_method->is_static()) {
 			new_method->get_klass()->get_mirror()->leave_monitor();
 #ifdef BYTECODE_DEBUG
@@ -1017,12 +1021,16 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
 	static bool inited = false;
 	init_lock.lock();		// 可耻地设置了这里是仅仅 gc 一次，测出了 stop-the-world 应该完成了...??
-	if (!inited && ThreadTable::size() >= 3) {	// delete
+	if (!inited && ThreadTable::size() >= 5) {	// delete
+		sync_wcout{} << pthread_self() << " triggered gc!!" << std::endl;
 		GC::init_gc();
 		inited = true;
 	}
 	init_lock.unlock();
-	GC::set_safepoint_here(&thread);
+
+	if (thread.get_monitor_num() == 0) {		// 只有在没在任何管程内的时候，才可以 stop-this-thread！！见 GC::set_safepoint_here() 的解释。
+		GC::set_safepoint_here(&thread);
+	}
 
 
 	bool backup_switch = sync_wcout::_switch();
@@ -1030,12 +1038,13 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	// filter debug tool:
 	if (DebugTool::is_open() && DebugTool::match(code_method->get_name(), code_method->get_descriptor(), code_klass->get_name())) {
 		sync_wcout::set_switch(true);
-	} else {
-		// 注：以下是：由于 DEBUG 模式会输出所有信息。因此这里设置如果开启 DEBUG 宏，那么不会关闭 sync_wcout。即，只有没定义 DEBUG 时，才会关闭掉。
+	}/* else {
+		// [x] 注：以下是：由于 DEBUG 模式会输出所有信息。因此这里设置如果开启 DEBUG 宏，那么不会关闭 sync_wcout。即，只有没定义 DEBUG 时，才会关闭掉。
+		// 但是这样造成了即便是非 DEBUG 模式也会缺少输出...... 所以注释掉了。以后用到再说。
 #ifndef DEBUG
 		sync_wcout::set_switch(false);
 #endif
-	}
+	}*/
 
 	// TODO: 记一个有趣的事情～～这个 DebugTool::is_open() 方法，一开始是内嵌在 DebugTool::match() 中第一行判断的。用 make -j 3 编译，就会报 ICE 错误；但是放在这里，就不会报 ICE 错误...... 而且使用 make -j 4，一定会报 ICE 错误...... 非常好奇～～
 	// TODO: 而且，第二个有趣的事情，如果打开 BYTECODE_DEBUG 宏，那么程序会跑得相当慢。因为各种 sync_wcout 都在往缓冲区中写。一直以来我认为往控制台上输出才是最耗时间的。结果没想到即便 _switch 是关闭的，也就是仅仅写入 sync_wcout 的 buffer，并不往控制台输出，也相当消耗时间......
@@ -3671,6 +3680,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				Oop *ref_value = op_stack.top();	op_stack.pop();
 				// TODO: 重入？？见 Spec 关于 monitorenter 的解释...也就是递归锁 ???
 				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
+				thread.monitor_inc();
 				ref_value->enter_monitor();
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) Monitor enter into obj of class:[" << ref_value->get_klass()->get_name() << "], address: [" << ref_value << "]" << std::endl;
@@ -3681,6 +3691,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				Oop *ref_value = op_stack.top();	op_stack.pop();
 				assert(ref_value != nullptr);		// TODO: 改成 NullptrException
 				// TODO: IllegalMonitorStateException...
+				thread.monitor_dec();
 				ref_value->leave_monitor();
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) Monitor exit from obj of class:[" << ref_value->get_klass()->get_name() << "], address: [" << ref_value << "]" << std::endl;

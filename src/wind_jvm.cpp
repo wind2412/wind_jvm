@@ -27,11 +27,11 @@ void * scapegoat (void *pp) {
 //	}
 
 	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
-		std::wcout << "... AAA " << pthread_self() << std::endl;
+		sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
 		real->thread->set_state(Waiting);
 		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
 		real->thread->set_state(Running);
-		std::wcout << "... 000 " << pthread_self() << std::endl;
+		sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
 	}
 
 	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
