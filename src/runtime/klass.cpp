@@ -637,6 +637,14 @@ InstanceKlass::~InstanceKlass() {
 		delete attributes[i];
 	}
 	delete[] attributes;
+
+	destructor(this->rva);
+	free(this->rva);
+
+	for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
+		destructor(&rvta[i]);
+	}
+	free(rvta);
 };
 
 vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()

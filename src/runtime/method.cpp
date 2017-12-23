@@ -366,3 +366,33 @@ int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 #endif
 	return 0;
 }
+
+Method::~Method() {
+	for (int i = 0; i < attributes_count; i ++) {
+		delete attributes[i];
+	}
+	delete[] attributes;
+	delete lnt;		// delete LineNumberTable.
+
+	destructor(this->rva);
+	free(this->rva);
+
+	for (int i = 0; i < num_RuntimeVisibleTypeAnnotations; i ++) {
+		destructor(&rvta[i]);
+	}
+	free(rvta);
+
+	for (int i = 0; i < num_RuntimeVisibleParameterAnnotation; i ++) {
+		destructor(&rvpa[i]);
+	}
+	free(rvpa);
+
+	for (int i = 0; i < Code_num_RuntimeVisibleTypeAnnotations; i ++) {
+		destructor(&Code_rvta[i]);
+	}
+	free(Code_rvta);
+
+	destructor(this->ad);
+	free(this->ad);
+
+}

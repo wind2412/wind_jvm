@@ -58,14 +58,14 @@ private:
 //	StackMapTable_attribute *smt = nullptr;					// 此属性用于虚拟机的类型检查阶段。
 	// RuntimeTypeAnnotation [of Code attribute]
 	u2 Code_num_RuntimeVisibleTypeAnnotations = 0;
-	TypeAnnotation *Code_rvta = nullptr;				// [n]
+	TypeAnnotation *Code_rvta = nullptr;			// [n]
 
 	Exceptions_attribute *exceptions = nullptr;
 	bool parsed = false;
 	unordered_map<wstring, shared_ptr<Klass>> exceptions_tb;
 
 	u2 signature_index = 0;
-	Element_value *ad = nullptr;
+	Element_value *ad = nullptr;					// [1]
 	CodeStub _ad;
 //	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
 
@@ -141,13 +141,7 @@ public:
 	CodeStub *get_ad() { if (ad) return &this->_ad; else return nullptr;}
 	int where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp);
 
-	~Method() {
-		for (int i = 0; i < attributes_count; i ++) {
-			delete attributes[i];
-		}
-		delete[] attributes;
-		delete lnt;		// delete LineNumberTable.
-	}
+	~Method();
 };
 
 
