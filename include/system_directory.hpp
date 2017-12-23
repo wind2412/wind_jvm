@@ -22,6 +22,6 @@ class Klass;
 
 extern Lock system_classmap_lock;
 
-extern unordered_map<wstring, shared_ptr<Klass>> system_classmap;		// java/lang/Object.class
+extern unordered_map<wstring, Klass *> system_classmap;		// java/lang/Object.class
 
 #endif /* INCLUDE_SYSTEM_DIRECTORY_HPP_ */

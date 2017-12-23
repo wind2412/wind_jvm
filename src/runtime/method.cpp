@@ -7,7 +7,7 @@
 #include "classloader.hpp"
 #include "utils/synchronize_wcout.hpp"
 
-Method::Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool) : klass(klass) {
+Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) : klass(klass) {
 	assert(constant_pool[mi.name_index-1]->tag == CONSTANT_Utf8);
 	name = ((CONSTANT_Utf8_info *)constant_pool[mi.name_index-1])->convert_to_Unicode();
 	assert(constant_pool[mi.descriptor_index-1]->tag == CONSTANT_Utf8);
@@ -153,7 +153,7 @@ vector<MirrorOop *> Method::if_didnt_parse_exceptions_then_parse()
 			for (int i = 0; i < exceptions->number_of_exceptions; i ++) {
 				auto rt_pool = this->klass->get_rtpool();
 				assert((*rt_pool)[exceptions->exception_index_table[i]-1].first == CONSTANT_Class);
-				auto excp_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[exceptions->exception_index_table[i]-1].second);
+				auto excp_klass = boost::any_cast<Klass *>((*rt_pool)[exceptions->exception_index_table[i]-1].second);
 				exceptions_tb[excp_klass->get_name()] = excp_klass;
 			}
 	}
@@ -224,25 +224,25 @@ vector<MirrorOop *> Method::parse_argument_list(const wstring & descriptor)
 			}
 		} else if (args[i][0] == L'L') {	// InstanceOop type
 //			ClassLoader *loader = this->klass->get_classloader();		// bug report: 不要使用此 Method 的 classLoader ！！因为完全有可能是 invoke 方法(BootStrap 加载 java/lang/invoke...)，invoke 了一个 MyclassLoader 加载的类......
-//			shared_ptr<Klass> klass;
+//			Klass *klass;
 //			if (loader == nullptr) {
 //				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
 //			} else {
 //				klass = loader->loadClass(args[i].substr(1, args[i].size() - 2));
 //			}
-			shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(args[i].substr(1, args[i].size() - 2));
+			Klass *klass = MyClassLoader::get_loader().loadClass(args[i].substr(1, args[i].size() - 2));
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		} else {		// ArrayType
 			assert(args[i][0] == L'[');
 //			ClassLoader *loader = this->klass->get_classloader();
-//			shared_ptr<Klass> klass;
+//			Klass *klass;
 //			if (loader == nullptr) {
 //				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
 //			} else {
 //				klass = loader->loadClass(args[i]);
 //			}
-			shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(args[i]);
+			Klass *klass = MyClassLoader::get_loader().loadClass(args[i]);
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		}
@@ -298,31 +298,31 @@ MirrorOop *Method::parse_return_type(const wstring & return_type)
 		}
 	} else if (return_type[0] == L'L') {	// InstanceOop type
 //		ClassLoader *loader = this->klass->get_classloader();
-//		shared_ptr<Klass> klass;
+//		Klass *klass;
 //		if (loader == nullptr) {
 //			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type.substr(1, return_type.size() - 2));
 //		} else {
 //			klass = loader->loadClass(return_type.substr(1, return_type.size() - 2));
 //		}
-		shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(return_type.substr(1, return_type.size() - 2));
+		Klass *klass = MyClassLoader::get_loader().loadClass(return_type.substr(1, return_type.size() - 2));
 		assert(klass != nullptr);
 		return klass->get_mirror();
 	} else {		// ArrayType
 		assert(return_type[0] == L'[');
 //		ClassLoader *loader = this->klass->get_classloader();
-//		shared_ptr<Klass> klass;
+//		Klass *klass;
 //		if (loader == nullptr) {
 //			klass = BootStrapClassLoader::get_bootstrap().loadClass(return_type);
 //		} else {
 //			klass = loader->loadClass(return_type);
 //		}
-		shared_ptr<Klass> klass = MyClassLoader::get_loader().loadClass(return_type);
+		Klass *klass = MyClassLoader::get_loader().loadClass(return_type);
 		assert(klass != nullptr);
 		return klass->get_mirror();
 	}
 }
 
-int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
+int Method::where_is_catch(int cur_pc, InstanceKlass *cur_excp)
 {
 #ifdef DEBUG
 	sync_wcout{} << "===-------------- [Begin Finding Catch/Finally Block...] -----------------===" << std::endl;
@@ -345,7 +345,7 @@ int Method::where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp)
 			} else {		// catch block. should judge current exception type is the `catch_type` or not?
 				auto _pair = (*rt_pool)[excp_tbl.catch_type - 1];
 				assert(_pair.first == CONSTANT_Class);
-				auto catch_klass = std::static_pointer_cast<InstanceKlass>(boost::any_cast<shared_ptr<Klass>>(_pair.second));
+				auto catch_klass = ((InstanceKlass *)(boost::any_cast<Klass *>(_pair.second)));
 				if (cur_excp == catch_klass || cur_excp->check_interfaces(catch_klass) || cur_excp->check_parent(catch_klass)) {	// bug report: 卡了两天的 bug ！！卧槽......没有 catch 住 ClassNotFoundException，真正的原因在于没有判断此类是不是 catch_klass... 只判断 check_parent 和 check_interface 了...... 托这 bug 的福...... 把各种 ClassLoader 的源码翻了个遍...... 很有收获......
 #ifdef DEBUG
 	sync_wcout{} << "which's holder is `"<< excp_tbl.handler_pc << "` --> catch block.[V]" << std::endl;

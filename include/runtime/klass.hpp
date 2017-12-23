@@ -14,14 +14,12 @@
 #include <vector>
 #include <memory>
 #include <utility>
-#include <bitset>
 #include "utils/synchronize_wcout.hpp"
 
 using std::unordered_map;
 using std::vector;
-using std::shared_ptr;
 using std::pair;
-using std::bitset;
+using std::shared_ptr;
 
 //#define KLASS_DEBUG
 
@@ -63,6 +61,7 @@ class MirrorOop;
 
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
 
+/* 悲伤。由于循环引用以及在构造函数中就要使用 this 的 shared_ptr，造成了内存泄漏。经过考虑，决定舍弃 Klass 的 shared_ptr，直接使用指针。 */
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
 public:
 	enum KlassState{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
@@ -76,18 +75,12 @@ protected:
 
 	MirrorOop *java_mirror = nullptr;	// java.lang.Class's object oop!!	// A `MirrorOop` object.
 
-	shared_ptr<Klass> parent;
-	shared_ptr<Klass> next_sibling;
-	shared_ptr<Klass> child;
+	Klass * parent = nullptr;
 public:
 	KlassState get_state() { return state; }
 	void set_state(KlassState s) { state = s; }
-	shared_ptr<Klass> get_parent() { return parent; }
-	void set_parent(shared_ptr<Klass> parent) { this->parent = parent; }
-	shared_ptr<Klass> get_next_sibling() { return next_sibling; }
-	void set_next_sibling(shared_ptr<Klass> next_sibling) { this->next_sibling = next_sibling; }
-	shared_ptr<Klass> get_child() { return child; }
-	void set_child(shared_ptr<Klass> child) { this->child = child; }
+	Klass *get_parent() { return parent; }
+	void set_parent(Klass * parent) { this->parent = parent; }
 	int get_access_flags() { return access_flags; }
 	void set_access_flags(int access_flags) { this->access_flags = access_flags; }
 	wstring get_name() { return this->name; }
@@ -129,7 +122,7 @@ private:
 	cp_info **constant_pool;			// 同样，留一个指针在这里。留作 rt_pool 的 parse 的参照标准用。
 
 	// interfaces
-	unordered_map<wstring, shared_ptr<InstanceKlass>> interfaces;
+	unordered_map<wstring, InstanceKlass *> interfaces;
 	// fields (non-static / static)					// 这些 layout...... 要加上父类的啊！！！！QAQQAQ 可以直接把父类的 copy 下来......不用递归 OWO.
 													// 父类有 static，子类不会去继承......但是会共用。 所以 static_field_layout 不用 copy 下来，只 copy fields_layout 就好......不过，如果查找 set_static_field 的话。【如果本类没有，就必须去 父类去查找...... 这时两个类共用 static。。。】
 													// 所以 get_static 和 set_static 也要改...... 要增加 去父类查找 的例程...
@@ -170,7 +163,7 @@ private:
 	TypeAnnotation *rvta = nullptr;
 
 	// for Anonymous Klass only:
-	shared_ptr<InstanceKlass> host_klass;		// if this klass is not Anonymous Klass, will be nullptr.
+	InstanceKlass * host_klass = nullptr;		// if this klass is not Anonymous Klass, will be nullptr.
 
 private:
 	void parse_methods(shared_ptr<ClassFile> cf);
@@ -192,8 +185,8 @@ public:
 private:
 	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
-	shared_ptr<InstanceKlass> get_hostklass() { return host_klass; }
-	void set_hostklass(shared_ptr<InstanceKlass> hostklass) { host_klass = hostklass; }
+	InstanceKlass *get_hostklass() { return host_klass; }
+	void set_hostklass(InstanceKlass *hostklass) { host_klass = hostklass; }
 	MirrorOop *get_java_loader() { return this->java_loader; }
 	pair<int, shared_ptr<Field_info>> get_field(const wstring & descriptor);	// [name + ':' + descriptor]
 	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
@@ -208,17 +201,17 @@ public:
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
 	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
-	bool check_interfaces(shared_ptr<InstanceKlass> klass);
+	bool check_interfaces(InstanceKlass *klass);
 	bool check_parent(const wstring & signature) {
-		if (this->parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
-		bool success1 = this->parent->get_name() == signature;
-		bool success2 = (this->parent == nullptr) ? false : std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(signature);
+		if (parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
+		bool success1 = parent->get_name() == signature;
+		bool success2 = (parent == nullptr) ? false : ((InstanceKlass *)parent)->check_parent(signature);
 		return success1 || success2;
 	}
-	bool check_parent(shared_ptr<InstanceKlass> klass) {
-		if (this->parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
-		bool success1 = this->parent == klass;
-		bool success2 = (this->parent == nullptr) ? false : std::static_pointer_cast<InstanceKlass>(this->parent)->check_parent(klass);
+	bool check_parent(InstanceKlass *klass) {
+		if (parent == nullptr)	return false;		// java/lang/Object can't be parent of itself!!
+		bool success1 = parent == klass;
+		bool success2 = (parent == nullptr) ? false : ((InstanceKlass *)parent)->check_parent(klass);
 		return success1 || success2;
 	}
 	InstanceOop* new_instance();
@@ -251,7 +244,7 @@ class MirrorKlass : public InstanceKlass {		// this class, only used to static_c
 private:
 	MirrorKlass();
 public:
-	MirrorOop *new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *loader);
+	MirrorOop *new_mirror(Klass * mirrored_who, MirrorOop *loader);
 };
 
 class ArrayKlass : public Klass {
@@ -260,16 +253,16 @@ private:
 	MirrorOop *java_loader = nullptr;
 
 	int dimension;			// (n) dimension (this)
-	shared_ptr<Klass> higher_dimension;	// (n+1) dimension
-	shared_ptr<Klass> lower_dimension;	// (n-1) dimension
+	Klass * higher_dimension = nullptr;	// (n+1) dimension
+	Klass * lower_dimension = nullptr;	// (n-1) dimension
 	// TODO: vtable
 	// TODO: mirror: reflection support
 
 public:
-	shared_ptr<Klass> get_higher_dimension() { return higher_dimension; }
-	void set_higher_dimension(shared_ptr<Klass> higher) { higher_dimension = higher; }
-	shared_ptr<Klass> get_lower_dimension() { return lower_dimension; }
-	void set_lower_dimension(shared_ptr<Klass> lower) { lower_dimension = lower; }
+	Klass * get_higher_dimension() { return higher_dimension; }
+	void set_higher_dimension(Klass * higher) { higher_dimension = higher; }
+	Klass * get_lower_dimension() { return lower_dimension; }
+	void set_lower_dimension(Klass * lower) { lower_dimension = lower; }
 	int get_dimension() { return dimension; }
 	ArrayOop* new_instance(int length);
 private:
@@ -277,12 +270,12 @@ private:
 public:
 	MirrorOop *get_java_loader() { return this->java_loader; }
 	shared_ptr<Method> get_class_method(const wstring & signature) {	// 这里其实就是直接去 java.lang.Object 中去查找。
-		shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
+		shared_ptr<Method> target = ((InstanceKlass *)parent)->get_class_method(signature);
 		assert(target != nullptr);
 		return target;
 	}
 public:
-	ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype);
+	ArrayKlass(int dimension, ClassLoader *loader, Klass * lower_dimension, Klass * higher_dimension, MirrorOop *java_loader, ClassType classtype);
 	~ArrayKlass() {};
 };
 
@@ -294,19 +287,19 @@ public:
 private:
 	TypeArrayKlass(const TypeArrayKlass &);
 public:
-	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::TypeArrayClass);
+	TypeArrayKlass(Type type, int dimension, ClassLoader *loader, Klass * lower_dimension, Klass * higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::TypeArrayClass);
 	~TypeArrayKlass() {};
 };
 
 class ObjArrayKlass : public ArrayKlass {
 private:
-	shared_ptr<InstanceKlass> element_klass;		// e.g. java.lang.String
+	InstanceKlass *element_klass = nullptr;		// e.g. java.lang.String
 public:
-	shared_ptr<InstanceKlass> get_element_klass() { return element_klass; }
+	InstanceKlass *get_element_klass() { return element_klass; }
 private:
 	ObjArrayKlass(const ObjArrayKlass &);
 public:
-	ObjArrayKlass(shared_ptr<InstanceKlass> element, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::ObjArrayClass);
+	ObjArrayKlass(InstanceKlass *element, int dimension, ClassLoader *loader, Klass * lower_dimension, Klass * higher_dimension, MirrorOop *java_loader = nullptr, ClassType classtype = ClassType::ObjArrayClass);
 	~ObjArrayKlass() {};
 };
 

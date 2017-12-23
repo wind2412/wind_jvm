@@ -61,7 +61,7 @@ RtJarDirectory::RtJarDirectory(const wstring & filename) : name(filename) {
 	else subdir.reset(new set<shared_ptr<RtJarDirectory>, shared_RtJarDirectory_compare>);	// why shared_ptr cancelled the openator = ... emmmm...
 }
 
-shared_ptr<RtJarDirectory> RtJarDirectory::findFolderInThis(const wstring & fdr_name) const	// fdr --> folder 
+shared_ptr<RtJarDirectory> RtJarDirectory::findFolderInThis(const wstring & fdr_name) const	// fdr --> folder
 {
 	if (this->subdir == nullptr) return nullptr;
 
@@ -95,7 +95,7 @@ void RtJarDirectory::add_file(StringSplitter && ss)
 	}
 }	
 
-bool RtJarDirectory::find_file(StringSplitter && ss) const 
+bool RtJarDirectory::find_file(StringSplitter && ss) const
 {
 	const wstring & target = ss.result()[ss.counter()];
 	// first check `target` is this a file && is this the true file.

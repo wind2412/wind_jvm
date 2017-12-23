@@ -67,12 +67,12 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		wstring name = delay_mirrors.front();
 		delay_mirrors.pop();
 
-		shared_ptr<Klass> klass = system_classmap.find(L"java/lang/Class.class")->second;
+		Klass *klass = system_classmap.find(L"java/lang/Class.class")->second;
 		if (name.size() == 1)	// ... switch only accept an integer... can't accept a wstring.
 			switch (name[0]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':case L'V':{	// include `void`.
 					// insert into.
-					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+					MirrorOop *basic_type_mirror = ((MirrorKlass *)klass)->new_mirror(nullptr, nullptr);
 					basic_type_mirror->set_extra(name);			// set the name `I`, `J` if it's a primitve type.
 					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
 					break;
@@ -84,7 +84,7 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 		else if (name.size() == 2 && name[0] == L'[') {
 			switch (name[1]) {
 				case L'I':case L'Z':case L'B':case L'C':case L'S':case L'F':case L'J':case L'D':{
-					MirrorOop *basic_type_mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(nullptr, nullptr);
+					MirrorOop *basic_type_mirror = ((MirrorKlass *)klass)->new_mirror(nullptr, nullptr);
 					get_single_basic_type_mirrors().insert(make_pair(name, basic_type_mirror));
 					auto arr_klass = BootStrapClassLoader::get_bootstrap().loadClass(name);		// load the simple array klass first.
 					basic_type_mirror->set_mirrored_who(arr_klass);
@@ -101,7 +101,7 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 			auto iter = system_classmap.find(name);
 			assert(iter != system_classmap.end());
 			assert((*iter).second->get_mirror() == nullptr);
-			(*iter).second->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>((*iter).second), nullptr));
+			(*iter).second->set_mirror(((MirrorKlass *)klass)->new_mirror(((InstanceKlass *)(*iter).second), nullptr));
 		}
 	}
 }
@@ -116,7 +116,7 @@ MirrorOop *java_lang_class::get_basic_type_mirror(const wstring & signature) {	/
 	return nullptr;
 }
 
-void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, MirrorOop *loader_mirror) {
+void java_lang_class::if_Class_didnt_load_then_delay(Klass *klass, MirrorOop *loader_mirror) {
 	// set java_mirror
 	// this if only for Primitive Array/Primitive Type.
 	if (java_lang_class::state() != java_lang_class::Fixed) {	// java.lang.Class not loaded... delay it.
@@ -127,18 +127,18 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Mi
 			assert(false);
 //				auto delayed_queue = get_single_delay_mirrors();
 //				if (delayed_queue)
-//				java_lang_class::get_single_delay_mirrors().push(std::static_pointer_cast<Obj>() + L".class");
+//				java_lang_class::get_single_delay_mirrors().push(((Obj *)) + L".class");
 		} else {
 			assert(false);
 		}
 	} else {
 		if (klass->get_type() == ClassType::InstanceClass) {
-			klass->set_mirror(std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(std::static_pointer_cast<InstanceKlass>(klass), loader_mirror));	// set java_mirror
+			klass->set_mirror(((MirrorKlass *)klass)->new_mirror((InstanceKlass *)klass, loader_mirror));	// set java_mirror
 		}
 		else if (klass->get_type() == ClassType::TypeArrayClass) {
 			MirrorOop *mirror;
 			if ((mirror = get_basic_type_mirror(klass->get_name())) == nullptr) {
-				mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
+				mirror = ((MirrorKlass *)klass)->new_mirror(klass, nullptr);
 				get_single_basic_type_mirrors().insert(make_pair(klass->get_name(), mirror));
 			}
 			klass->set_mirror(mirror);	// set java_mirror
@@ -146,7 +146,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, Mi
 	sync_wcout{} << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
 #endif
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {
-			MirrorOop *mirror = std::static_pointer_cast<MirrorKlass>(klass)->new_mirror(klass, nullptr);
+			MirrorOop *mirror = ((MirrorKlass *)klass)->new_mirror(klass, nullptr);
 			klass->set_mirror(mirror);	// set java_mirror
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) add array " << klass->get_name() << "'s mirror..." << std::endl;
@@ -250,12 +250,12 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) forClassName: [" << klass_name << "]." << std::endl;
 #endif
-		shared_ptr<Klass> klass = BootStrapClassLoader::get_bootstrap().loadClass(std::regex_replace(klass_name, std::wregex(L"\\."), L"/"));
+		Klass *klass = BootStrapClassLoader::get_bootstrap().loadClass(std::regex_replace(klass_name, std::wregex(L"\\."), L"/"));
 		assert(klass != nullptr);		// wrong. Because user want to load a non-exist class.
 		// because my BootStrapLoader inner doesn't has BasicType Klass. So we don't need to judge whether it's a BasicTypeKlass.
 		if (initialize) {
 			if (klass->get_type() == ClassType::InstanceClass)	// not an ArrayKlass
-				BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(klass), thread);
+				BytecodeEngine::initial_clinit(((InstanceKlass *)klass), thread);
 		}
 		_stack.push_back(klass->get_mirror());
 	}
@@ -299,7 +299,7 @@ void JVM_IsInterface(list<Oop *> & _stack){
 	if (_this->get_mirrored_who()) {	// not primitive class
 		auto klass = _this->get_mirrored_who();
 		if (klass->get_type() == ClassType::InstanceClass) {
-			_stack.push_back(new IntOop(std::static_pointer_cast<InstanceKlass>(klass)->is_interface()));
+			_stack.push_back(new IntOop(((InstanceKlass *)klass)->is_interface()));
 		} else {
 			_stack.push_back(new IntOop(false));
 		}
@@ -318,8 +318,8 @@ void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	assert(obj != nullptr);
 	assert(_this->get_mirrored_who() != nullptr);
 
-	auto obj_klass = std::static_pointer_cast<InstanceKlass>(obj->get_klass());
-	auto this_klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+	auto obj_klass = ((InstanceKlass *)obj->get_klass());
+	auto this_klass = ((InstanceKlass *)_this->get_mirrored_who());
 
 	if (obj_klass == this_klass || obj_klass->check_parent(this_klass) || obj_klass->check_interfaces(this_klass))		// 千万别忘了判等啊！！QAQ......
 		_stack.push_back(new IntOop(true));
@@ -351,8 +351,8 @@ void JVM_IsAssignableFrom(list<Oop *> & _stack){
 		sync_wcout{} << "compare with: " << sub->get_name() << " and " << super->get_name() << std::endl;
 #endif
 		if (sub->get_type() == ClassType::InstanceClass && sub->get_type() == ClassType::InstanceClass) {
-			auto real_sub = std::static_pointer_cast<InstanceKlass>(sub);
-			auto real_super = std::static_pointer_cast<InstanceKlass>(super);
+			auto real_sub = ((InstanceKlass *)sub);
+			auto real_super = ((InstanceKlass *)super);
 			if (real_sub == real_super) {
 				_stack.push_back(new IntOop(true));
 			} else if (real_sub->check_interfaces(real_super) || real_sub->check_parent(real_super)) {
@@ -417,9 +417,9 @@ void JVM_GetComponentType(list<Oop *> & _stack){
 	assert(klass->get_type() == ClassType::ObjArrayClass || klass->get_type() == ClassType::TypeArrayClass);
 
 	if (klass->get_type() == ClassType::ObjArrayClass) {
-		_stack.push_back(std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass()->get_mirror());
+		_stack.push_back(((ObjArrayKlass *)klass)->get_element_klass()->get_mirror());
 	} else {
-		Type type = std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type();
+		Type type = ((TypeArrayKlass *)klass)->get_basic_type();
 		switch (type) {
 			case Type::BYTE:
 			case Type::BOOLEAN:
@@ -487,11 +487,11 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	}
 
 	// load java/lang/reflect/Field and [Ljava/lang/reflect/Field;.
-	auto Field_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Field"));
+	auto Field_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Field"));
 	assert(Field_klass != nullptr);
-	auto Field_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Field;"));
+	auto Field_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Field;"));
 	assert(Field_arr_klass != nullptr);
-	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	auto Byte_arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
 	assert(Byte_arr_klass != nullptr);
 
 	// create [Java] java/lang/reflect/Field[] from [C++] shared_ptr<Field_info>.
@@ -503,10 +503,6 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 
 			// create a Field oop obj.
 			auto field_oop = Field_klass->new_instance();
-
-			// important!!! Because I used the lazy parsing the Field's klass(like java/lang/Class.classLoader, the ClassLoader is not parsed), so we should
-			// parse here.
-			field->if_didnt_parse_then_parse();
 
 			// fill in!		// see: openjdk: share/vm/runtime/reflection.cpp
 			field_oop->set_field_value(FIELD L":clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
@@ -590,15 +586,15 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	assert(_this->get_mirrored_who()->get_type() == ClassType::InstanceClass);
 
 	// load java/lang/reflect/Method
-	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Method"));
+	auto klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Method"));
 	assert(klass != nullptr);
-	auto Method_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Method;"));
+	auto Method_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Method;"));
 	assert(Method_arr_klass != nullptr);
-	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	auto Byte_arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
 	assert(Byte_arr_klass != nullptr);
 
 	// get all this_klass_methods except <clinit>.	// see JDK API.
-	vector<pair<int, shared_ptr<Method>>> methods = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who())->get_declared_methods();
+	vector<pair<int, shared_ptr<Method>>> methods = ((InstanceKlass *)_this->get_mirrored_who())->get_declared_methods();
 
 	vector<InstanceOop *> v;
 
@@ -619,7 +615,7 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 		// parse arg list.
 		vector<MirrorOop *> args = method->parse_argument_list();
 		// create [Ljava/lang/Class arr obj.
-		shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+		ObjArrayKlass * class_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
 		auto class_array_obj = class_arr_klass->new_instance(args.size());
 		for (int i = 0; i < args.size(); i ++) {
 			(*class_array_obj)[i] = args[i];
@@ -698,15 +694,15 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	assert(_this->get_mirrored_who()->get_type() == ClassType::InstanceClass);
 
 	// load java/lang/reflect/Constructor
-	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Constructor"));
+	auto klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/reflect/Constructor"));
 	assert(klass != nullptr);
-	auto Ctor_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Constructor;"));
+	auto Ctor_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/reflect/Constructor;"));
 	assert(Ctor_arr_klass != nullptr);
-	auto Byte_arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
+	auto Byte_arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
 	assert(Byte_arr_klass != nullptr);
 
 	// get all ctors
-	vector<pair<int, shared_ptr<Method>>> ctors = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who())->get_constructors();
+	vector<pair<int, shared_ptr<Method>>> ctors = ((InstanceKlass *)_this->get_mirrored_who())->get_constructors();
 
 	vector<InstanceOop *> v;
 
@@ -722,7 +718,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 		// parse arg list.
 		vector<MirrorOop *> args = method->parse_argument_list();
 		// create [Ljava/lang/Class arr obj.
-		shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+		ObjArrayKlass * class_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
 		auto class_array_obj = class_arr_klass->new_instance(args.size());
 		for (int i = 0; i < args.size(); i ++) {
 			(*class_array_obj)[i] = args[i];
@@ -807,7 +803,7 @@ void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用�
 		_stack.push_back(nullptr);
 		return;
 	}
-	auto klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+	auto klass = ((InstanceKlass *)_this->get_mirrored_who());
 	auto rt_pool = klass->get_rtpool();
 	auto inner_class_attr = klass->get_inner_class();
 	if (inner_class_attr == nullptr) {
@@ -822,13 +818,13 @@ void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用�
 		int noff = inner_class_attr->classes[i].inner_name_index;		// of no use.
 
 		if (ioff != 0) {
-			auto target_inner_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[ioff-1].second);
+			auto target_inner_klass = boost::any_cast<Klass *>((*rt_pool)[ioff-1].second);
 			if (target_inner_klass == klass) {		// get the inner is `this`. then find the outer.
 				if (ooff == 0) {
 					_stack.push_back(nullptr);
 					return;
 				} else {
-					auto target_outer_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[ooff-1].second);
+					auto target_outer_klass = boost::any_cast<Klass *>((*rt_pool)[ooff-1].second);
 					_stack.push_back(target_outer_klass->get_mirror());
 					return;
 				}
@@ -872,7 +868,7 @@ void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 		_stack.push_back(nullptr);
 		return;
 	}
-	auto klass = std::static_pointer_cast<InstanceKlass>(_this->get_mirrored_who());
+	auto klass = ((InstanceKlass *)_this->get_mirrored_who());
 	auto enclosing_method_attr = klass->get_enclosing_method();
 	if (enclosing_method_attr == nullptr) {
 		_stack.push_back(nullptr);
@@ -882,13 +878,13 @@ void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	auto rt_pool = klass->get_rtpool();
 
 	// 0. initialize the container: Object[3].
-	auto obj_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Object;"));
+	auto obj_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Object;"));
 	assert(obj_arr_klass != nullptr);
 	auto obj_arr = obj_arr_klass->new_instance(3);
 
 	// 1. get the klass: ---> ClassInfo
 	int target_klass_index = enclosing_method_attr->class_index;
-	auto target_klass = boost::any_cast<shared_ptr<Klass>>((*rt_pool)[target_klass_index-1].second);
+	auto target_klass = boost::any_cast<Klass *>((*rt_pool)[target_klass_index-1].second);
 	assert(target_klass != nullptr);
 	// 1.5. put in.
 	(*obj_arr)[0] = target_klass->get_mirror();

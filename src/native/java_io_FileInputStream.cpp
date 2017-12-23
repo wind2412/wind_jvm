@@ -67,7 +67,7 @@ void JVM_Open0(list<Oop *> & _stack){
 		// throw FileNotFoundException: xxx is a directory.
 
 		// get the exception klass
-		auto excp_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/FileNotFoundException"));
+		auto excp_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/FileNotFoundException"));
 		// get current thread
 		vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 		// make a message

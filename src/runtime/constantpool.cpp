@@ -18,7 +18,7 @@ using std::make_pair;
 using std::wstring;
 using std::make_shared;
 
-shared_ptr<Klass> rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
+Klass *rt_constant_pool::if_didnt_load_then_load(ClassLoader *loader, const wstring & name)
 {
 	if (loader == nullptr) {
 		return BootStrapClassLoader::get_bootstrap().loadClass(name);
@@ -37,7 +37,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 	switch (bufs[i]->tag) {
 		case CONSTANT_Class:{
 			if (i == this_class_index - 1) {
-				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(this_class))));		// shared_ptr<Klass>，不过其实真正的是 shared_ptr<InstanceKlass>.
+				this->pool[i] = (make_pair(bufs[i]->tag, boost::any((Klass *)this_class)));		// Klass *，不过其实真正的是 InstanceKlass *.
 			} else {
 				// get should-be-loaded class name
 				CONSTANT_CS_info* target = (CONSTANT_CS_info*)bufs[i];
@@ -47,9 +47,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 #ifdef DEBUG
 				sync_wcout{} << "load class ===> " << "<" << name << ">" << std::endl;
 #endif
-				shared_ptr<Klass> new_class = if_didnt_load_then_load(loader, name);	// TODO: 这里可能得到数组类！需要额外判断一下！
+				Klass *new_class = if_didnt_load_then_load(loader, name);	// TODO: 这里可能得到数组类！需要额外判断一下！
 				assert(new_class != nullptr);
-				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(shared_ptr<Klass>(new_class))));			// shared_ptr<Klass> ，不过可能可以是 InstanceKlass 或者 TypeArrayKlass 或者 ObjArrayKlass......
+				this->pool[i] = (make_pair(bufs[i]->tag, boost::any((Klass *)new_class)));			// Klass * ，不过可能可以是 InstanceKlass 或者 TypeArrayKlass 或者 ObjArrayKlass......
 			}
 			break;
 		}
@@ -81,7 +81,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 			// get class name
 			wstring class_name = ((CONSTANT_Utf8_info *)bufs[((CONSTANT_CS_info *)bufs[target->class_index-1])->index-1])->convert_to_Unicode();
 			// load class
-			shared_ptr<Klass> new_class = std::static_pointer_cast<Klass>(if_didnt_load_then_load(loader, class_name));		// [—— 这里不可能得到数组类]。错！！卧槽...... 这里调试了一天...... 太武断了！比如这里，就要从 一个数组类中去寻找 java.lang.Object::clone 方法！！！
+			Klass *new_class = ((Klass *)if_didnt_load_then_load(loader, class_name));		// [—— 这里不可能得到数组类]。错！！卧槽...... 这里调试了一天...... 太武断了！比如这里，就要从 一个数组类中去寻找 java.lang.Object::clone 方法！！！
 			assert(new_class != nullptr);
 			// get field/method/interface_method name
 			auto name_type_ptr = (CONSTANT_NameAndType_info *)bufs[target->name_and_type_index-1];
@@ -95,7 +95,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				sync_wcout{} << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
-				shared_ptr<Field_info> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
+				shared_ptr<Field_info> target = ((InstanceKlass *)new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
 				assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
 			} else if (target->tag == CONSTANT_Methodref) {
@@ -123,9 +123,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				}
 
 				if (new_class->get_type() == ClassType::ObjArrayClass || new_class->get_type() == ClassType::TypeArrayClass) {
-					target = std::static_pointer_cast<ArrayKlass>(new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。
+					target = ((ArrayKlass *)new_class)->get_class_method(name + L":" + descriptor);	// 这里可能是 数组类 和 普通类。需要判断才行。
 				} else if (new_class->get_type() == ClassType::InstanceClass){
-					target = std::static_pointer_cast<InstanceKlass>(new_class)->get_class_method(name + L":" + descriptor);
+					target = ((InstanceKlass *)new_class)->get_class_method(name + L":" + descriptor);
 				} else {
 					std::cerr << "only support ArrayKlass and InstanceKlass now!" << std::endl;
 					assert(false);
@@ -142,7 +142,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				sync_wcout{} << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
-				shared_ptr<Method> target = std::static_pointer_cast<InstanceKlass>(new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
+				shared_ptr<Method> target = ((InstanceKlass *)new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
 				assert(target != nullptr);
 				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
 			}

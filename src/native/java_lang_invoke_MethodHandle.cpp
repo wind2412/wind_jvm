@@ -99,7 +99,7 @@ void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args)		// Unboxi
 InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wstring & return_type)	// $3 is prevent from returning `void`. I think it should be boxed to `Void`.
 {
 	if (return_type == L"V") {		// TODO: 并不确保正确......应当试验一番......
-		return std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void"))->new_instance();
+		return ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void"))->new_instance();
 	}
 
 	if (basic_type_oop == nullptr)	return nullptr;
@@ -109,49 +109,49 @@ InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wst
 	shared_ptr<Method> target_method;
 	switch (((BasicTypeOop *)basic_type_oop)->get_type()) {
 		case Type::BOOLEAN: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(BOOLEAN0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(BOOLEAN0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(Z)Ljava/lang/Boolean;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new IntOop(((IntOop *)basic_type_oop)->value)});
 		}
 		case Type::BYTE: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(BYTE0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(BYTE0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(B)Ljava/lang/Byte;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new IntOop(((IntOop *)basic_type_oop)->value)});
 		}
 		case Type::SHORT: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(SHORT0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(SHORT0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(S)Ljava/lang/Short;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new IntOop(((IntOop *)basic_type_oop)->value)});
 		}
 		case Type::CHAR: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(CHARACTER0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(CHARACTER0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(C)Ljava/lang/Character;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new IntOop(((IntOop *)basic_type_oop)->value)});
 		}
 		case Type::INT: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(INTEGER0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(INTEGER0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(I)Ljava/lang/Integer;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new IntOop(((IntOop *)basic_type_oop)->value)});
 		}
 		case Type::FLOAT: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(FLOAT0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(FLOAT0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(F)Ljava/lang/Float;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new FloatOop(((FloatOop *)basic_type_oop)->value)});
 		}
 		case Type::LONG: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(LONG0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(LONG0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(J)Ljava/lang/Long;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new LongOop(((LongOop *)basic_type_oop)->value)});
 		}
 		case Type::DOUBLE: {
-			auto box_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(DOUBLE0));
+			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(DOUBLE0));
 			target_method = box_klass->get_this_class_method(L"valueOf:(D)Ljava/lang/Double;");		// static
 			assert(target_method != nullptr);
 			return (InstanceOop *)thread->add_frame_and_execute(target_method, {new DoubleOop(((DoubleOop *)basic_type_oop)->value)});
@@ -201,7 +201,7 @@ Oop *invoke(InstanceOop *member_name_obj, list<Oop *> & _stack, vm_thread *threa
 	 */
 	assert(ref_kind >= 5 && ref_kind <= 9);		// must be method call...
 
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+	auto real_klass = ((InstanceKlass *)klass);
 	wstring real_name = java_lang_string::stringOop_to_wstring(name);
 	if (real_name == L"<clinit>" || real_name == L"<init>") {
 		assert(false);		// can't be the two names.
@@ -297,7 +297,7 @@ void JVM_InvokeBasic(list<Oop *> & _stack){
 	InstanceOop *methodType = (InstanceOop *)oop;
 
 //	// delete all for debug (toString())
-//	auto toString = std::static_pointer_cast<InstanceKlass>(methodType->get_klass())->get_this_class_method(L"toString:()" STR);
+//	auto toString = ((InstanceKlass *)methodType->get_klass())->get_this_class_method(L"toString:()" STR);
 //	assert(toString != nullptr);
 //	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {methodType});
 //	std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
@@ -336,7 +336,7 @@ void JVM_InvokeExact(list<Oop *> & _stack){
 	InstanceOop *methodType = (InstanceOop *)oop;
 
 //	// delete all for debug (toString())
-//	auto toString = std::static_pointer_cast<InstanceKlass>(methodType->get_klass())->get_this_class_method(L"toString:()" STR);
+//	auto toString = ((InstanceKlass *)methodType->get_klass())->get_this_class_method(L"toString:()" STR);
 //	assert(toString != nullptr);
 //	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {methodType});
 //	std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;

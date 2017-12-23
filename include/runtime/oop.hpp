@@ -18,6 +18,7 @@
 #include <memory>
 #include <unordered_set>
 
+using std::shared_ptr;
 using std::unordered_set;
 
 // [x] 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
@@ -53,11 +54,11 @@ class Oop : public MemAlloc {		// 注意：Oop 必须只能使用 new ( = ::oper
 protected:
 	// TODO: HashCode .etc
 	OopType ooptype;
-	shared_ptr<Klass> klass;
+	Klass *klass = nullptr;
 	Monitor m;
 public:
 	// TODO: HashCode .etc
-	shared_ptr<Klass> get_klass() { return klass; }
+	Klass *get_klass() { return klass; }
 	OopType get_ooptype() { return ooptype; }
 public:
 	void enter_monitor() { m.enter(); }
@@ -68,7 +69,7 @@ public:
 	void leave_monitor() { m.leave(); }
 	void force_unlock_when_athrow() { m.force_unlock_when_athrow(); }
 public:
-	explicit Oop(shared_ptr<Klass> klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
+	explicit Oop(Klass *klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!
 };
 
@@ -77,17 +78,17 @@ private:
 	int field_length;
 	vector<Oop *> fields;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
 public:
-	InstanceOop(shared_ptr<InstanceKlass> klass);
+	InstanceOop(InstanceKlass *klass);
 	InstanceOop(const InstanceOop & rhs);		// shallow copy
 public:		// 以下 8 个方法全部用来赋值。
 	bool get_field_value(shared_ptr<Field_info> field, Oop **result);
 	void set_field_value(shared_ptr<Field_info> field, Oop *value);
 	bool get_field_value(const wstring & BIG_signature, Oop **result);				// use for forging String Oop at parsing constant_pool.
 	void set_field_value(const wstring & BIG_signature, Oop *value);					// BIG_signature is: <classname + ':' + name + ':' + descriptor>...
-	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(field, result); }
-	void set_static_field_value(shared_ptr<Field_info> field, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(field, value); }
-	bool get_static_field_value(const wstring & signature, Oop **result) { return std::static_pointer_cast<InstanceKlass>(klass)->get_static_field_value(signature, result); }
-	void set_static_field_value(const wstring & signature, Oop *value) { std::static_pointer_cast<InstanceKlass>(klass)->set_static_field_value(signature, value); }
+	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result) { return ((InstanceKlass *)klass)->get_static_field_value(field, result); }
+	void set_static_field_value(shared_ptr<Field_info> field, Oop *value) { ((InstanceKlass *)klass)->set_static_field_value(field, value); }
+	bool get_static_field_value(const wstring & signature, Oop **result) { return ((InstanceKlass *)klass)->get_static_field_value(signature, result); }
+	void set_static_field_value(const wstring & signature, Oop *value) { ((InstanceKlass *)klass)->set_static_field_value(signature, value); }
 public:
 	int get_all_field_offset(const wstring & BIG_signature);			// for Unsafe.
 	vector<Oop *> & get_fields_addr() { return fields; }				// for Unsafe.
@@ -100,28 +101,26 @@ private:
 
 class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.
 private:
-	shared_ptr<Klass> mirrored_who;		// this Oop being instantiation, must after java.lang.Class loaded !!!
+	Klass * mirrored_who = nullptr;		// this Oop being instantiation, must after java.lang.Class loaded !!!
 	wstring extra;						// bad design... if it's basic type like int, long, use the `extra`. this time , mirrored_who == nullptr.
 public:
 	wstring get_extra() { return extra; }
 	void set_extra(const wstring & s) { extra = s; }
 public:
-	MirrorOop(shared_ptr<Klass> mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
+	MirrorOop(Klass *mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
 public:
-	shared_ptr<Klass> get_mirrored_who() { return mirrored_who; }
-	void set_mirrored_who(shared_ptr<Klass> mirrored_who) { this->mirrored_who = mirrored_who; }
-	const auto & get_mirrored_all_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->fields_layout; }
-	const auto & get_mirrored_all_static_fields() { return std::static_pointer_cast<InstanceKlass>(mirrored_who)->static_fields_layout; }
+	Klass *get_mirrored_who() { return mirrored_who; }
+	void set_mirrored_who(Klass *mirrored_who) { this->mirrored_who = mirrored_who; }
+	const auto & get_mirrored_all_fields() { return ((InstanceKlass *)mirrored_who)->fields_layout; }
+	const auto & get_mirrored_all_static_fields() { return ((InstanceKlass *)mirrored_who)->static_fields_layout; }
 	bool is_the_field_owned_by_this(int offset) {
-		auto & this_fields_map = std::static_pointer_cast<InstanceKlass>(mirrored_who)->is_this_klass_field;
+		auto & this_fields_map = ((InstanceKlass *)mirrored_who)->is_this_klass_field;
 		auto iter = this_fields_map.find(offset);
-//assert(iter != this_fields_map.end());
-//		std::wcout << "searching..." << iter->
 		assert (iter != this_fields_map.end()); // 那么一定在 static field 中。this 的 field 没有！调用者需要在 static field 中找。
 		return iter->second;
 	}
 //	bool is_the_static_field_owned_by_this(const wstring & signature) {
-//		auto & this_static_field_map = std::static_pointer_cast<InstanceKlass>(mirrored_who)->static_fields_layout;
+//		auto & this_static_field_map = ((InstanceKlass *)mirrored_who)->static_fields_layout;
 //		return this_static_field_map.find(signature) != this_static_field_map.end();
 //	}
 };
@@ -132,12 +131,12 @@ protected:
 	vector<Oop *> buf;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
 							// 这里， java/util/concurrent/ConcurrentHashMap 源码最后几行中，发现内部计算 Unsafe 的数组元素偏移量，是完全通过 ABASE + i << ASHIFT 的。而 i << ASHIFT 就是平台指针的大小，也就是 scale。所以必须固定大小储存。
 public:
-	ArrayOop(shared_ptr<ArrayKlass> klass, int length, OopType ooptype) : Oop(klass, ooptype) {
+	ArrayOop(ArrayKlass *klass, int length, OopType ooptype) : Oop(klass, ooptype) {
 		buf.resize(length);
 	}
 	ArrayOop(const ArrayOop & rhs);
 	int get_length() { return buf.size(); }
-	int get_dimension() { return std::static_pointer_cast<ArrayKlass>(klass)->get_dimension(); }
+	int get_dimension() { return ((ArrayKlass *)klass)->get_dimension(); }
 	Oop* & operator[] (int index) {
 		assert(index >= 0 && index < buf.size());	// TODO: please replace with ArrayIndexOutofBound...
 		return buf[index];
@@ -158,14 +157,14 @@ public:
 
 class TypeArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is BasicTypeOop.
-	TypeArrayOop(shared_ptr<TypeArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_TypeArrayOop) {}
+	TypeArrayOop(TypeArrayKlass *klass, int length) : ArrayOop(klass, length, OopType::_TypeArrayOop) {}
 public:
 
 };
 
 class ObjArrayOop : public ArrayOop {
 public:		// Most inner type of `buf` is InstanceOop.		// 注意：维度要由自己负责！！并不会进行检查。
-	ObjArrayOop(shared_ptr<ObjArrayKlass> klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
+	ObjArrayOop(ObjArrayKlass * klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
 public:
 };
 

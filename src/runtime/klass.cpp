@@ -72,7 +72,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	// ** first copy parent's non-static fields / interfaces' non-static fields here ** (don't copy static fields !!)
 	// 1. super_klass
 	if (this->parent != nullptr) {		// if this_klass is **NOT** java.lang.Object
-		auto & super_map = std::static_pointer_cast<InstanceKlass>(this->parent)->fields_layout;
+		auto & super_map = ((InstanceKlass *)this->parent)->fields_layout;
 #ifdef DEBUG
 		sync_wcout{} << "now this klass is ..." << this->get_name() << "... super klass is ..." << this->parent->get_name() << std::endl;
 #endif
@@ -80,7 +80,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 			this->fields_layout[iter.first] = iter.second;
 			this->is_this_klass_field.insert(make_pair(this->fields_layout[iter.first].first, false));		// 不是自己的 field
 		}
-		this->total_non_static_fields_num = std::static_pointer_cast<InstanceKlass>(this->parent)->total_non_static_fields_num;
+		this->total_non_static_fields_num = ((InstanceKlass *)this->parent)->total_non_static_fields_num;
 	}
 	// 2. interfaces
 	for (auto iter : this->interfaces) {
@@ -95,7 +95,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	wstringstream ss;
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf->fields_count; i ++) {
-		shared_ptr<Field_info> metaField = make_shared<Field_info>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->fields[i], cf->constant_pool);
+		shared_ptr<Field_info> metaField = make_shared<Field_info>(this, cf->fields[i], cf->constant_pool);
 		if (!metaField->is_static()) {
 			ss << metaField->get_klass()->get_name() << L":";		// for fixing bug: must have the namespace in field_layout... !!!
 		}
@@ -146,16 +146,16 @@ void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *load
 		assert(cf->constant_pool[cf->super_class-1]->tag == CONSTANT_Class);
 		wstring super_name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->super_class-1])->index-1])->convert_to_Unicode();
 		if (loader == nullptr) {	// bootstrap classloader do this
-			this->parent = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(super_name));
+			this->parent = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(super_name));
 		} else {		// my classloader do this
-			this->parent = std::static_pointer_cast<InstanceKlass>(loader->loadClass(super_name));
+			this->parent = ((InstanceKlass *)loader->loadClass(super_name));
 		}
 
-		if (this->parent != nullptr) {
-			this->next_sibling = this->parent->get_child();		// set this's elder brother	// note: this->parent->child can't pass the compile. because this->parent is okay, but parent->child is visiting Klass in the InstanceKlass. `Protected` is: InstanceKlass can visit [the Klass part] inside of the IntanceKlass object. But here is: InstanceKlass visit the Klass part inside of the InstanceKlass part(this->parent), but then visit the Klass outer class (parent->child). parent variable is inside the InstanceKlass, but point to an outer Klass not in the InstanceKlass. To solve it, only use setters and getters.
-			this->parent->set_child(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}));			// set parent's newest child
-			// above ↑ is a little hack. I don't know whether there is a side effect.
-		}
+//		if (this->parent != nullptr) {
+//			this->next_sibling = this->parent->get_child();		// set this's elder brother	// note: this->parent->child can't pass the compile. because this->parent is okay, but parent->child is visiting Klass in the InstanceKlass. `Protected` is: InstanceKlass can visit [the Klass part] inside of the IntanceKlass object. But here is: InstanceKlass visit the Klass part inside of the InstanceKlass part(this->parent), but then visit the Klass outer class (parent->child). parent variable is inside the InstanceKlass, but point to an outer Klass not in the InstanceKlass. To solve it, only use setters and getters.
+//			this->parent->set_child(InstanceKlass *(this, [](InstanceKlass*){}));			// set parent's newest child
+//			// above ↑ is a little hack. I don't know whether there is a side effect.
+//		}
 	}
 #ifdef KLASS_DEBUG
 	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug SuperClass ---------------===" << std::endl;
@@ -174,11 +174,11 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 		// get interface name
 		assert(cf->constant_pool[cf->interfaces[i]-1]->tag == CONSTANT_Class);
 		wstring interface_name = ((CONSTANT_Utf8_info *)cf->constant_pool[((CONSTANT_CS_info *)cf->constant_pool[cf->interfaces[i]-1])->index-1])->convert_to_Unicode();
-		shared_ptr<InstanceKlass> interface;
+		InstanceKlass *interface;
 		if (loader == nullptr) {
-			interface = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(interface_name));
+			interface = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(interface_name));
 		} else {
-			interface = std::static_pointer_cast<InstanceKlass>(loader->loadClass(interface_name));
+			interface = ((InstanceKlass *)loader->loadClass(interface_name));
 			assert(interface != nullptr);
 		}
 		assert(interface != nullptr);
@@ -199,14 +199,14 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 {
 	// copy vtable from parent
 	if (this->parent != nullptr) {	// if this class is not java.lang.Object
-		shared_ptr<InstanceKlass> the_parent = std::static_pointer_cast<InstanceKlass>(parent);
+		InstanceKlass *the_parent = ((InstanceKlass *)parent);
 		this->vtable = the_parent->vtable;		// copy directly
 	}
 
 	// traverse all this.Methods
 	wstringstream ss;
 	for(int i = 0; i < cf->methods_count; i ++) {
-		shared_ptr<Method> method = make_shared<Method>(shared_ptr<InstanceKlass>(this, [](InstanceKlass*){}), cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
+		shared_ptr<Method> method = make_shared<Method>(this, cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
 		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
 		wstring signature = ss.str();
 		// add method into [all methods]
@@ -236,8 +236,7 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 
 void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader)
 {
-	shared_ptr<InstanceKlass> this_class(this, [](InstanceKlass*){});
-	this->rt_pool = make_shared<rt_constant_pool>(this_class, loader, cf);
+	this->rt_pool = make_shared<rt_constant_pool>(this, loader, cf);
 #ifdef KLASS_DEBUG
 	// this has been deleted because lazy parsing constant_pool...
 //	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
@@ -319,7 +318,7 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Mirr
 	cf->attributes_count = 0;
 
 	// set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<InstanceKlass>(this, [](auto*){}), java_loader);
+	java_lang_class::if_Class_didnt_load_then_delay(this, java_loader);
 
 	// super_class
 	parse_superclass(cf, loader);
@@ -356,7 +355,7 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Mirr
 pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descriptor)		// 字段解析时的查找
 {
 	pair<int, shared_ptr<Field_info>> target = std::make_pair(-1, nullptr);
-	shared_ptr<InstanceKlass> instance_klass(shared_ptr<InstanceKlass>(this, [](auto *){}));
+	InstanceKlass *instance_klass = this;
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
 		// search in this->fields_layout
@@ -378,10 +377,10 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descr
 			// search in super_class: parent : reference Java SE 8 Specification $5.4.3.2: Parsing Fields
 			// TODO: 这里的强转会有问题！需要 Klass 实现一个方法返回这个 Klass 能不能是 InstanceKlass ！！暂时不考虑。等崩溃的时候再说。
 //			if (this->parent != nullptr)	// this class is not java.lang.Object. java.lang.Object has no parent.
-//				target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_field(BIG_signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
+//				target = ((InstanceKlass *)this->parent)->get_field(BIG_signature);		// TODO: 这里暂时不是多态，因为没有虚方法。所以我改成了 static_pointer_cast。以后没准 InstanceKlass 要修改，需要注意。
 //			return target;		// nullptr or Real result.
 //			else {
-			instance_klass = std::static_pointer_cast<InstanceKlass>(instance_klass->get_parent());		// find by parent's BIG_signature
+			instance_klass = ((InstanceKlass *)instance_klass->get_parent());		// find by parent's BIG_signature
 			continue;
 //			}
 		} else {
@@ -409,13 +408,12 @@ bool InstanceKlass::get_static_field_value(const wstring & signature, Oop **resu
 	if (iter == this->static_fields_layout.end()) {
 		// ** search in parent for static !! **
 		if (this->parent != nullptr)
-			return std::static_pointer_cast<InstanceKlass>(this->parent)->get_static_field_value(signature, result);
+			return ((InstanceKlass *)this->parent)->get_static_field_value(signature, result);
 		else
 			return false;
 	}
 	int offset = iter->second.first;
 	*result = this->static_fields[offset];
-	iter->second.second->if_didnt_parse_then_parse();		// like: get_static_field_value of: java/lang/Class.classLoader Field, if `java.lang.ClassLoader` klass is not parsed, then parse it.
 	return true;
 }
 
@@ -424,7 +422,7 @@ void InstanceKlass::set_static_field_value(const wstring & signature, Oop *value
 	auto iter = this->static_fields_layout.find(signature);
 	if (iter == this->static_fields_layout.end()) {
 		if (this->parent != nullptr) {
-			std::static_pointer_cast<InstanceKlass>(this->parent)->set_static_field_value(signature, value);
+			((InstanceKlass *)this->parent)->set_static_field_value(signature, value);
 			return;
 		} else {
 			std::cerr << "don't have this static field !!! fatal fault !!!" << std::endl;
@@ -433,7 +431,6 @@ void InstanceKlass::set_static_field_value(const wstring & signature, Oop *value
 	}
 	int offset = iter->second.first;
 	this->static_fields[offset] = value;
-	iter->second.second->if_didnt_parse_then_parse();		// important!! parse it!!
 }
 
 shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
@@ -458,7 +455,7 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bo
 	}
 	// search in parent class (parent 既可以代表接口，又可以代表类。如果此类是接口，那么 parent 是接口。如果此类是个类，那么 parent 也是类。parent 完全按照 this 而定。)
 	if (this->parent != nullptr)	// not java.lang.Object
-		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_class_method(signature);
+		target = ((InstanceKlass *)this->parent)->get_class_method(signature);
 	if (target != nullptr)	return target;
 	// search in interfaces and interfaces' [parent interface].
 	if (search_interfaces)		// this `switch` is for `invokeInterface`. Because `invokeInterface` only search in `this` and `parent`, not in `interfaces`.
@@ -487,7 +484,7 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	}
 	// search in parent... Big probability is java.lang.Object...
 	if (this->parent != nullptr)	// this is not java.lang.Object
-		target = std::static_pointer_cast<InstanceKlass>(this->parent)->get_interface_method(signature);
+		target = ((InstanceKlass *)this->parent)->get_interface_method(signature);
 	if (target != nullptr)	return target;
 
 	return nullptr;
@@ -596,7 +593,7 @@ wstring InstanceKlass::get_source_file_name()
 	return this->sourceFile;
 }
 
-bool InstanceKlass::check_interfaces(shared_ptr<InstanceKlass> klass)
+bool InstanceKlass::check_interfaces(InstanceKlass *klass)
 {
 	return check_interfaces(klass->get_name());
 }
@@ -615,7 +612,7 @@ bool InstanceKlass::check_interfaces(const wstring & signature)		// 查看此 In
 	}
 	// 3. then if `this`'s parent has the interface, also okay.
 	if (this->get_parent() != nullptr)
-		return std::static_pointer_cast<InstanceKlass>(this->get_parent())->check_interfaces(signature);
+		return ((InstanceKlass *)this->get_parent())->check_interfaces(signature);
 	return false;
 }
 
@@ -629,7 +626,7 @@ shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
 }
 
 InstanceOop * InstanceKlass::new_instance() {
-	return new InstanceOop(shared_ptr<InstanceKlass>(this, [](auto *){}));
+	return new InstanceOop(this);
 }
 
 InstanceKlass::~InstanceKlass() {
@@ -691,7 +688,6 @@ int InstanceKlass::get_static_field_offset(const wstring & signature)
 		assert(false);
 	}
 	int offset = iter->second.first;
-	iter->second.second->if_didnt_parse_then_parse();		// important !!
 
 #ifdef DEBUG
 	sync_wcout{} << "this: [" << this << "], klass_name:[" << this->get_name() << "], (static)" << signature << ":[" << "(encoding: " << offset + this->non_static_field_num() << ")]" << std::endl;
@@ -707,7 +703,6 @@ int InstanceKlass::get_all_field_offset(const wstring & BIG_signature)
 		return get_static_field_offset(BIG_signature.substr(BIG_signature.find_first_of(L":") + 1));
 	}
 	int offset = iter->second.first;
-	iter->second.second->if_didnt_parse_then_parse();		// important !!
 
 	// 不行，完全支持不了。java 默认所有 同一 klass 的 obj 都是相同的内存布局。我把 fields 挂在外边计算和 this 的距离，根本算不出来！每次都不同！！
 	// [√] 只有一种手段可以解决 ———— 变绝对距离成相对距离，就像分布式系统变绝对时间为相对逻辑时间一样！！这样应该可以完美解决！！
@@ -722,7 +717,7 @@ int InstanceKlass::get_all_field_offset(const wstring & BIG_signature)
 }
 
 /*===---------------    MirrorKlass (aux)    --------------------===*/
-MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *loader) {
+MirrorOop *MirrorKlass::new_mirror(Klass *mirrored_who, MirrorOop *loader) {
 	// 注意 mirrored_who 可以为 nullptr。因为在数组类使用了 new_mirror(nullptr, nullptr).
 //	LockGuard lg(system_classmap_lock);		// bug report: 在指定 ./bin/wind_jvm Test18 的时候，Test18 根本没有的时候，java_lang_ClassLoader::find_bootstrap_class 方法中会 load sun/misc/launcher，然后在设置 mirror 的时候会冲突！但是即使设置了递归锁也没有用。所以我去掉了这两句无用的检测。
 //	assert (system_classmap.find(L"java/lang/Class.class") != system_classmap.end());
@@ -744,7 +739,7 @@ MirrorOop *MirrorKlass::new_mirror(shared_ptr<Klass> mirrored_who, MirrorOop *lo
 }
 
 /*===---------------    ArrayKlass    --------------------===*/
-ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), java_loader(java_loader), Klass()/*, classtype(classtype)*/ {
+ArrayKlass::ArrayKlass(int dimension, ClassLoader *loader, Klass *lower_dimension, Klass *higher_dimension, MirrorOop *java_loader, ClassType classtype)  : dimension(dimension), loader(loader), lower_dimension(lower_dimension), higher_dimension(higher_dimension), java_loader(java_loader), Klass()/*, classtype(classtype)*/ {
 	assert(dimension > 0);
 	this->classtype = classtype;		// 这个变量不能放在初始化列表中初始化，即【不能用初始化列表直接初始化 不在基类构造函数参数列表 中的 基类的 protected 成员。】。会提示：error: member initializer 'classtype' does not name a non-static data member or base class
 	// set super class
@@ -755,9 +750,9 @@ ArrayOop* ArrayKlass::new_instance(int length)
 {
 	ArrayOop *oop;
 	if (this->get_type() == ClassType::TypeArrayClass)
-		oop = new TypeArrayOop(shared_ptr<TypeArrayKlass>((TypeArrayKlass*)this, [](auto*){}), length);
+		oop = new TypeArrayOop((TypeArrayKlass *)this, length);
 	else
-		oop = new ObjArrayOop(shared_ptr<ObjArrayKlass>((ObjArrayKlass*)this, [](auto*){}), length);
+		oop = new ObjArrayOop((ObjArrayKlass *)this, length);
 	for (int i = 0; i < length; i ++) {
 		if (this->get_type() == ClassType::ObjArrayClass) {
 			(*oop)[i] = nullptr;		// nullptr is the best !
@@ -794,7 +789,7 @@ ArrayOop* ArrayKlass::new_instance(int length)
 }
 
 /*===---------------  TypeArrayKlass  --------------------===*/
-TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype) : type(type), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
+TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, Klass *lower_dimension, Klass *higher_dimension, MirrorOop *java_loader, ClassType classtype) : type(type), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
 {	// B:byte C:char D:double F:float I:int J:long S:short Z:boolean s: String e:enum c:Class @:Annotation [:Array
 	// 1. get name
 	wstringstream ss;		// 注：基本类型没有 enum 和 annotation。因为 enum 在 java 编译器处理之后，会被转型为 inner class。而 annotation 本质上就是普通的接口，相当于 class。所以基础类型没有他们。
@@ -844,11 +839,11 @@ TypeArrayKlass::TypeArrayKlass(Type type, int dimension, ClassLoader *loader, sh
 	}
 	this->name = ss.str();
 	// set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
+	java_lang_class::if_Class_didnt_load_then_delay(this, java_loader);
 	// TODO: 要不要设置 object 的 child ...? 但是 sibling 的话，应该这个 higher 和 lower dimension 应该够 ???
 }
 
-ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimension, ClassLoader *loader, shared_ptr<Klass> lower_dimension, shared_ptr<Klass> higher_dimension, MirrorOop *java_loader, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
+ObjArrayKlass::ObjArrayKlass(InstanceKlass *element_klass, int dimension, ClassLoader *loader, Klass *lower_dimension, Klass *higher_dimension, MirrorOop *java_loader, ClassType classtype) : element_klass(element_klass), ArrayKlass(dimension, loader, lower_dimension, higher_dimension, java_loader, classtype)
 {
 	// 1. set name
 	wstringstream ss;
@@ -858,6 +853,6 @@ ObjArrayKlass::ObjArrayKlass(shared_ptr<InstanceKlass> element_klass, int dimens
 	ss << L"L" << element_klass->get_name() << L";";
 	this->name = ss.str();
 	// 2. set java_mirror
-	java_lang_class::if_Class_didnt_load_then_delay(shared_ptr<Klass>(this, [](auto*){}), java_loader);
+	java_lang_class::if_Class_didnt_load_then_delay(this, java_loader);
 }
 

@@ -86,7 +86,7 @@ void *find_native(const wstring & klass_name, const wstring & signature)	// such
 	}
 }
 
-void native_throw_Exception(shared_ptr<InstanceKlass> excp_klass, vm_thread *thread, list<Oop *> & _stack, const std::wstring & msg)
+void native_throw_Exception(InstanceKlass *excp_klass, vm_thread *thread, list<Oop *> & _stack, const std::wstring & msg)
 {
 	auto excp_obj = excp_klass->new_instance();
 	thread->set_exception_at_last_second_frame();		// set exception.

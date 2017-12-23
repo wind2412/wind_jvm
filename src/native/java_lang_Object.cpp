@@ -44,7 +44,7 @@ void JVM_Clone(list<Oop *> & _stack){
 
 	if (_this->get_klass()->get_type() == ClassType::InstanceClass) {
 		// then, it must implemented the Ljava/lang/Cloneable; interface...
-		auto instance_klass = std::static_pointer_cast<InstanceKlass>(_this->get_klass());
+		auto instance_klass = ((InstanceKlass *)_this->get_klass());
 		if (!instance_klass->check_interfaces(L"java/lang/Cloneable")) {
 			std::wcerr << _this->get_klass()->get_name() << " doesn't implemented the java/lang/Cloneable interface ??" << std::endl;
 			assert(false);
@@ -59,7 +59,7 @@ void JVM_Clone(list<Oop *> & _stack){
 
 	} else if (_this->get_klass()->get_type() == ClassType::TypeArrayClass || _this->get_klass()->get_type() == ClassType::ObjArrayClass) {
 		// default implemented java/lang/Cloneable IMPLICITLY. should not check.
-		auto array_klass = std::static_pointer_cast<ArrayKlass>(_this->get_klass());
+		auto array_klass = ((ArrayKlass *)_this->get_klass());
 
 		// shallow copy
 		ArrayOop *clone = new ArrayOop(*((ArrayOop *)_this));

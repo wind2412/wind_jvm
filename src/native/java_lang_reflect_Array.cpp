@@ -28,7 +28,7 @@ void JVM_NewArray(list<Oop *> & _stack){		// static
 	if (real_klass == nullptr) {	// 1. should create a primitive-type array.
 		wstring arr_name = L"[" + mirror->get_extra();
 		assert(arr_name != L"[V");		// not void
-		auto arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(arr_name));
+		auto arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(arr_name));
 		assert(arr_klass != nullptr);
 		_stack.push_back(arr_klass->new_instance(length));
 #ifdef DEBUG
@@ -36,13 +36,13 @@ void JVM_NewArray(list<Oop *> & _stack){		// static
 #endif
 		return;
 	} else if (real_klass->get_type() == ClassType::InstanceClass) {
-		auto real_instance_klass = std::static_pointer_cast<InstanceKlass>(real_klass);
+		auto real_instance_klass = ((InstanceKlass *)real_klass);
 		ClassLoader *loader = real_instance_klass->get_classloader();
-		shared_ptr<ObjArrayKlass> arr_klass;
+		ObjArrayKlass * arr_klass;
 		if (loader == nullptr) {
-			arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_instance_klass->get_name() + L";"));
+			arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_instance_klass->get_name() + L";"));
 		} else {
-			arr_klass = std::static_pointer_cast<ObjArrayKlass>(loader->loadClass(L"[L" + real_instance_klass->get_name() + L";"));
+			arr_klass = ((ObjArrayKlass *)loader->loadClass(L"[L" + real_instance_klass->get_name() + L";"));
 		}
 		assert(arr_klass != nullptr);
 		_stack.push_back(arr_klass->new_instance(length));
@@ -51,7 +51,7 @@ void JVM_NewArray(list<Oop *> & _stack){		// static
 #endif
 		return;
 	} else if (real_klass->get_type() == ClassType::TypeArrayClass) {
-		auto arr_klass = std::static_pointer_cast<TypeArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));	// add one dimension
+		auto arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));	// add one dimension
 		assert(arr_klass != nullptr);
 		_stack.push_back(arr_klass->new_instance(length));
 #ifdef DEBUG
@@ -59,13 +59,13 @@ void JVM_NewArray(list<Oop *> & _stack){		// static
 #endif
 		return;
 	} else if (real_klass->get_type() == ClassType::ObjArrayClass) {
-		auto inner_element_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass)->get_element_klass();		// return InstanceKlass
+		auto inner_element_klass = ((ObjArrayKlass *)real_klass)->get_element_klass();		// return InstanceKlass
 		ClassLoader *loader = inner_element_klass->get_classloader();
-		shared_ptr<ObjArrayKlass> arr_klass;
+		ObjArrayKlass * arr_klass;
 		if (loader == nullptr) {
-			arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + inner_element_klass->get_name()));
+			arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" + inner_element_klass->get_name()));
 		} else {
-			arr_klass = std::static_pointer_cast<ObjArrayKlass>(loader->loadClass(L"[" + inner_element_klass->get_name()));
+			arr_klass = ((ObjArrayKlass *)loader->loadClass(L"[" + inner_element_klass->get_name()));
 		}
 		assert(arr_klass != nullptr);
 		_stack.push_back(arr_klass->new_instance(length));

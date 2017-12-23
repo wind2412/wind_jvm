@@ -62,6 +62,11 @@ using std::make_pair;
  * 确实在 pop_front() 的时候要调用析构函数。毕竟 STL 的值是 [复制] 进去的。
  */
 
+/**
+ * 把各种诸如 ((InstanceKlass *)this->parent) 替换成 ((InstanceKlass *)this->parent):
+ * std::static_pointer_cast<(.*)>\((.*)\)  ------>  (($1 *)$2) replace 即可。
+ */
+
 /*===----------- StackFrame --------------===*/
 StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, vm_thread *thread, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
 	if (is_native) {
@@ -127,7 +132,7 @@ wstring StackFrame::print_arg_msg(Oop *value, vm_thread *thread)
 			wstring type = ((MirrorOop *)value)->get_mirrored_who() == nullptr ? ((MirrorOop *)value)->get_extra() : ((MirrorOop *)value)->get_mirrored_who()->get_name();
 			ss << "[java/lang/Class]: [\"" << type << "\"]";
 		} else {
-			auto real_klass = std::static_pointer_cast<InstanceKlass>(value->get_klass());
+			auto real_klass = ((InstanceKlass *)value->get_klass());
 			auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
 			assert(toString != nullptr);
 			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {value});
@@ -308,13 +313,13 @@ Oop *if_BasicType_then_copy_else_return_only(Oop *oop)
 	}
 }
 
-bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass)
+bool BytecodeEngine::check_instanceof(Klass *ref_klass, Klass *klass)
 {
 	bool result;
 	if (ref_klass->get_type() == ClassType::InstanceClass) {
 		if (ref_klass->is_interface()) {		// a. ref_klass is an interface
 			if (klass->is_interface()) {		// a1. klass is an interface, too
-				if (ref_klass == klass || std::static_pointer_cast<InstanceKlass>(ref_klass)->check_interfaces(std::static_pointer_cast<InstanceKlass>(klass))) {
+				if (ref_klass == klass || ((InstanceKlass *)ref_klass)->check_interfaces((InstanceKlass *)klass)) {
 					result = true;
 				} else {
 					result = false;
@@ -334,7 +339,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			}
 		} else {								// b. ref_klass is a normal class
 			if (klass->is_interface()) {		// b1. klass is an interface
-				if (std::static_pointer_cast<InstanceKlass>(ref_klass)->check_interfaces(std::static_pointer_cast<InstanceKlass>(klass))) {
+				if (((InstanceKlass *)ref_klass)->check_interfaces((InstanceKlass *)klass)) {
 					result = true;
 				} else {
 					result = false;
@@ -343,7 +348,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	sync_wcout{} << "(DEBUG) ref_klass: " << ref_klass->get_name() << " is normal class but klass " << klass->get_name() << " is an interface. [`instanceof` is " << std::boolalpha << result << "]" << std::endl;
 #endif
 			} else {							// b2. klass is a normal class, too
-				if (ref_klass == klass || std::static_pointer_cast<InstanceKlass>(ref_klass)->check_parent(std::static_pointer_cast<InstanceKlass>(klass))) {
+				if (ref_klass == klass || ((InstanceKlass *)ref_klass)->check_parent((InstanceKlass *)klass)) {
 					result = true;
 				} else {
 					result = false;
@@ -376,11 +381,11 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			}
 		} else if (klass->get_type() == ClassType::TypeArrayClass) {		// c3. klass is an TypeArrayKlass
 			// 1. 编译器保证 ref 和 klass 的 dimension 必然相同。
-			int ref_dimension = (std::static_pointer_cast<ArrayKlass>(ref_klass))->get_dimension();
-			int klass_dimension = (std::static_pointer_cast<ArrayKlass>(klass))->get_dimension();
+			int ref_dimension = (((ArrayKlass *)ref_klass))->get_dimension();
+			int klass_dimension = (((ArrayKlass *)klass))->get_dimension();
 			assert (ref_dimension == klass_dimension);
 			// 2. judge
-			if (ref_klass->get_type() == ClassType::TypeArrayClass && std::static_pointer_cast<TypeArrayKlass>(klass)->get_basic_type() == std::static_pointer_cast<TypeArrayKlass>(ref_klass)->get_basic_type()) {
+			if (ref_klass->get_type() == ClassType::TypeArrayClass && ((TypeArrayKlass *)klass)->get_basic_type() == ((TypeArrayKlass *)ref_klass)->get_basic_type()) {
 				result = true;
 			} else {
 				result = false;
@@ -391,14 +396,14 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 			return result;
 		} else if (klass->get_type() == ClassType::ObjArrayClass) {		// c4. klass is an ObjArrayKlass
 			// 1. 编译器保证 ref 和 klass 的 dimension 必然相同。
-			int ref_dimension = (std::static_pointer_cast<ArrayKlass>(ref_klass))->get_dimension();
-			int klass_dimension = (std::static_pointer_cast<ArrayKlass>(klass))->get_dimension();
+			int ref_dimension = (((ArrayKlass *)ref_klass))->get_dimension();
+			int klass_dimension = (((ArrayKlass *)klass))->get_dimension();
 			assert (ref_dimension == klass_dimension);
 			// 2. judge
 			if (ref_klass->get_type() == ClassType::ObjArrayClass) {
-				auto ref_klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(ref_klass)->get_element_klass();
-				auto klass_inner_type = std::static_pointer_cast<ObjArrayKlass>(klass)->get_element_klass();
-				if (ref_klass_inner_type == klass_inner_type || std::static_pointer_cast<InstanceKlass>(ref_klass_inner_type)->check_parent(std::static_pointer_cast<InstanceKlass>(klass_inner_type))) {
+				auto ref_klass_inner_type = ((ObjArrayKlass *)ref_klass)->get_element_klass();
+				auto klass_inner_type = ((ObjArrayKlass *)klass)->get_element_klass();
+				if (ref_klass_inner_type == klass_inner_type || ((InstanceKlass *)ref_klass_inner_type)->check_parent((InstanceKlass *)klass_inner_type)) {
 					result = true;
 				} else {
 					result = false;
@@ -419,7 +424,7 @@ bool BytecodeEngine::check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Kl
 	return result;
 }
 
-void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thread & thread)
+void BytecodeEngine::initial_clinit(InstanceKlass *new_klass, vm_thread & thread)
 {
 	if (new_klass->get_state() == Klass::KlassState::NotInitialized) {
 #ifdef BYTECODE_DEBUG
@@ -428,7 +433,7 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thre
 		new_klass->set_state(Klass::KlassState::Initializing);		// important.
 		// recursively initialize its parent first !!!!! So java.lang.Object must be the first !!!
 		if (new_klass->get_parent() != nullptr)	// prevent this_klass is the java.lang.Object.
-			BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(new_klass->get_parent()), thread);
+			BytecodeEngine::initial_clinit((InstanceKlass *)new_klass->get_parent(), thread);
 		// if static field has ConstantValue_attribute (final field), then initialize it.
 		new_klass->initialize_final_static_field();
 		// then initialize this_klass, call <clinit>.
@@ -450,7 +455,6 @@ void BytecodeEngine::initial_clinit(shared_ptr<InstanceKlass> new_klass, vm_thre
 void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
 {
 	// TODO: $2.8.3 的 FP_strict 浮点数转换！
-	new_field->if_didnt_parse_then_parse();		// **important!!!**
 	Oop *ref = op_stack.top();	op_stack.pop();
 //	std::wcout << ref->get_klass()->get_name() << " " << new_field->get_name() << " " << new_field->get_descriptor() << std::endl;		// delete
 	assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
@@ -467,7 +471,6 @@ void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & o
 void BytecodeEngine::putField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
 {
 	// TODO: $2.8.3 的 FP_strict 浮点数转换！
-	new_field->if_didnt_parse_then_parse();		// **important!!!**
 	Oop *new_value = op_stack.top();	op_stack.pop();
 	Oop *ref = op_stack.top();	op_stack.pop();
 	assert(ref->get_klass()->get_type() == ClassType::InstanceClass);		// bug !!! 有可能是没有把 this 指针放到上边。
@@ -482,14 +485,13 @@ void BytecodeEngine::putField(shared_ptr<Field_info> new_field, stack<Oop *> & o
 void BytecodeEngine::getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
 {
 	// initialize the new_class... <clinit>
-	shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
+	InstanceKlass *new_klass = new_field->get_klass();
 	initial_clinit(new_klass, thread);
 	// parse the field to RUNTIME!!
-	new_field->if_didnt_parse_then_parse();		// **important!!!**
 	if (new_field->get_type() == Type::OBJECT) {
 		// TODO: <clinit> of the Field object oop......
 		assert(new_field->get_type_klass() != nullptr);
-		initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
+		initial_clinit(((InstanceKlass *)new_field->get_type_klass()), thread);
 	}
 	// get the [static Field] value and save to the stack top
 	Oop *new_top;
@@ -504,14 +506,13 @@ void BytecodeEngine::getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & 
 void BytecodeEngine::putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
 {
 	// initialize the new_class... <clinit>
-	shared_ptr<InstanceKlass> new_klass = new_field->get_klass();
+	InstanceKlass *new_klass = new_field->get_klass();
 	initial_clinit(new_klass, thread);
 	// parse the field to RUNTIME!!
-	new_field->if_didnt_parse_then_parse();		// **important!!!**
 	if (new_field->get_type() == Type::OBJECT) {
 		// TODO: <clinit> of the Field object oop......
 		assert(new_field->get_type_klass() != nullptr);
-		initial_clinit(std::static_pointer_cast<InstanceKlass>(new_field->get_type_klass()), thread);
+		initial_clinit(((InstanceKlass *)new_field->get_type_klass()), thread);
 	}
 	// get the stack top and save to the [static Field]
 	Oop *top = op_stack.top();	op_stack.pop();
@@ -579,7 +580,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 	shared_ptr<Method> target_method;
 	if (*pc == 0xb6){
 		if (ref->get_klass()->get_type() == ClassType::InstanceClass) {
-			target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->search_vtable(signature);
+			target_method = ((InstanceKlass *)ref->get_klass())->search_vtable(signature);
 		} else if (ref->get_klass()->get_type() == ClassType::TypeArrayClass || ref->get_klass()->get_type() == ClassType::ObjArrayClass) {
 			target_method = new_method;		// 那么 new_method 就是那个 target_method。因为数组没有 InstanceKlass，编译器会自动把 Object 的 Method 放上来。直接调用就可以～
 		} else {
@@ -587,7 +588,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 		}
 	} else {
 		assert(ref->get_klass()->get_type() == ClassType::InstanceClass);	// 接口一定是 Instance。
-		target_method = std::static_pointer_cast<InstanceKlass>(ref->get_klass())->get_class_method(signature);
+		target_method = ((InstanceKlass *)ref->get_klass())->get_class_method(signature);
 	}
 
 	if (target_method == nullptr) {
@@ -611,7 +612,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 #endif
 			// 如果是 registerNatives 则啥也不做。因为内部已经做好了。并不打算支持 jni，仅仅打算支持 Natives.
 		} else {
-			shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+			InstanceKlass *new_klass = new_method->get_klass();
 			void *native_method = find_native(new_klass->get_name(), signature);
 			// no need to add a stack frame!
 			if (native_method == nullptr) {
@@ -684,7 +685,7 @@ void BytecodeEngine::invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & 
 		// TODO: 可以有限制条件。
 	}
 	// initialize the new_class... <clinit>
-	shared_ptr<InstanceKlass> new_klass = new_method->get_klass();
+	InstanceKlass *new_klass = new_method->get_klass();
 	initial_clinit(new_klass, thread);
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG)";
@@ -864,14 +865,14 @@ InstanceOop *BytecodeEngine::MethodType_make(const wstring & descriptor, vm_thre
 InstanceOop *BytecodeEngine::MethodType_make_impl(vector<MirrorOop *> & args, MirrorOop *ret, vm_thread & thread)
 {
 	// create [Ljava/lang/Class arr obj.
-	shared_ptr<ObjArrayKlass> class_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
+	ObjArrayKlass * class_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/Class;"));
 	auto class_array_obj = class_arr_klass->new_instance(args.size());
 	for (int i = 0; i < args.size(); i ++) {
 		(*class_array_obj)[i] = args[i];
 	}
 
 	// get MethodType klass.
-	auto method_type_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(METHODTYPE));
+	auto method_type_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(METHODTYPE));
 	assert(method_type_klass != nullptr);
 	auto fake_init_method = method_type_klass->get_this_class_method(L"methodType:(" CLS "[" CLS ")" MT);
 	assert(fake_init_method != nullptr);
@@ -885,7 +886,7 @@ InstanceOop *BytecodeEngine::MethodType_make_impl(vector<MirrorOop *> & args, Mi
 
 InstanceOop *BytecodeEngine::MethodHandles_Lookup_make(vm_thread & thread)
 {
-	auto methodHandles = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandles"));
+	auto methodHandles = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandles"));
 	assert(methodHandles != nullptr);
 	auto lookup_method = methodHandles->get_this_class_method(L"lookup:()Ljava/lang/invoke/MethodHandles$Lookup;");
 	auto lookup_obj = (InstanceOop *)thread.add_frame_and_execute(lookup_method, {});
@@ -909,7 +910,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		case 1:{		// REF_getField
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
 			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-			auto findGetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findGetter:(" CLS STR CLS ")" MH);
+			auto findGetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findGetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findGetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
 			assert(result != nullptr);
@@ -918,7 +919,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		case 2:{		// REF_getStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
 			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-			auto findStaticGetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStaticGetter:(" CLS STR CLS ")" MH);
+			auto findStaticGetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStaticGetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticGetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
 			assert(result != nullptr);
@@ -927,7 +928,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		case 3:{		// REF_puttField
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
 			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-			auto findSetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findSetter:(" CLS STR CLS ")" MH);
+			auto findSetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findSetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
 			assert(result != nullptr);
@@ -936,7 +937,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		case 4:{		// REF_putStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
 			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
-			auto findStaticSetter_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStaticSetter:(" CLS STR CLS ")" MH);
+			auto findStaticSetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStaticSetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticSetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
 			assert(result != nullptr);
@@ -946,7 +947,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->search_vtable(L"findVirtual:(" CLS STR MT ")" MH);
+			auto findVirtual_method = ((InstanceKlass *)lookup_obj->get_klass())->search_vtable(L"findVirtual:(" CLS STR MT ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -956,7 +957,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			auto findStatic_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findStatic:(" CLS STR MT ")" MH);
+			auto findStatic_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStatic:(" CLS STR MT ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStatic_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -967,7 +968,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			assert(false);		// TODO: 且 findSpecial 的参数有误.....
-			auto findSpecial_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道 get_class_method 对不对......
+			auto findSpecial_method = ((InstanceKlass *)lookup_obj->get_klass())->get_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道 get_class_method 对不对......
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSpecial_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -978,7 +979,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() == L"<init>");		// special inner klass!!
 			assert(false);		// TODO: 其实我认为应该是 findConstructor...		// 且 findSpecial 的参数有误.....
-			auto findSpecial_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_this_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道这里对不对......
+			auto findSpecial_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道这里对不对......
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSpecial_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -988,7 +989,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
-			auto findVirtual_method = std::static_pointer_cast<InstanceKlass>(lookup_obj->get_klass())->get_class_method(L"findVirtual:(" CLS STR MT ")" MH);	// 注意：和 REF_invokeVirtual 调用的方法不同。
+			auto findVirtual_method = ((InstanceKlass *)lookup_obj->get_klass())->get_class_method(L"findVirtual:(" CLS STR MT ")" MH);	// 注意：和 REF_invokeVirtual 调用的方法不同。
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -1012,7 +1013,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	stack<Oop *> & op_stack = cur_frame.op_stack;
 	vector<Oop *> & localVariableTable = cur_frame.localVariableTable;
 	uint8_t *code_begin = code_method->get_code()->code;
-	shared_ptr<InstanceKlass> code_klass = code_method->get_klass();
+	InstanceKlass *code_klass = code_method->get_klass();
 	rt_constant_pool & rt_pool = *code_klass->get_rtpool();
 	uint8_t *backup_pc = thread.pc;
 	uint8_t * & pc = thread.pc;
@@ -1211,7 +1212,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	sync_wcout{} << java_lang_string::print_stringOop(stringoop) << std::endl;
 #endif
 				} else if (rt_pool[rtpool_index-1].first == CONSTANT_Class) {
-					auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+					auto klass = boost::any_cast<Klass *>(rt_pool[rtpool_index-1].second);
 					assert(klass->get_mirror() != nullptr);
 					op_stack.push(klass->get_mirror());		// push into [Oop*] type.
 #ifdef BYTECODE_DEBUG
@@ -1518,7 +1519,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(objarray->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				op_stack.push((*objarray)[index]);
 #ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) get ObjArray[" << index << "] which type is <class>" << std::static_pointer_cast<ObjArrayKlass>(objarray->get_klass())->get_element_klass()->get_name()
+	sync_wcout{} << "(DEBUG) get ObjArray[" << index << "] which type is <class>" << ((ObjArrayKlass *)objarray->get_klass())->get_element_klass()->get_name()
 			   << ", and the element address is "<< op_stack.top() << "." << std::endl;
 #endif
 				break;
@@ -1843,10 +1844,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 #ifdef BYTECODE_DEBUG
 	if (real_value == nullptr) {
 		sync_wcout{} << "(DEBUG) put <null> into the index [" << index << "] of the ObjArray of type: ["
-				   << std::static_pointer_cast<ObjArrayKlass>(real_array->get_klass())->get_element_klass() << "]" << std::endl;
+				   << ((ObjArrayKlass *)real_array->get_klass())->get_element_klass() << "]" << std::endl;
 	} else {
 		sync_wcout{} << "(DEBUG) put element of type: [" << real_value->get_klass()->get_name() << "], address :[" << real_value << "] into the index [" << index
-				   << "] of the ObjArray of type: [" << std::static_pointer_cast<ObjArrayKlass>(real_array->get_klass())->get_element_klass() << "]" << std::endl;
+				   << "] of the ObjArray of type: [" << ((ObjArrayKlass *)real_array->get_klass())->get_element_klass() << "]" << std::endl;
 	}
 #endif
 				break;
@@ -3222,8 +3223,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
-						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
-						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+						auto klass = ((InstanceKlass *)top->get_klass());
+						auto throwable_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
 						if (klass == throwable_klass || klass->check_parent(throwable_klass)) {		// 千万别忘了判断此 klass 是不是 throwable !!!!!
 							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
 #ifdef BYTECODE_DEBUG
@@ -3251,8 +3252,8 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				if (cur_frame.has_exception/* && !new_method->is_void()*/) {
 					Oop *top = op_stack.top();
 					if (top != nullptr && top->get_ooptype() != OopType::_BasicTypeOop && top->get_klass()->get_type() == ClassType::InstanceClass) {
-						auto klass = std::static_pointer_cast<InstanceKlass>(top->get_klass());
-						auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+						auto klass = ((InstanceKlass *)top->get_klass());
+						auto throwable_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
 						if (klass == throwable_klass || klass->check_parent(throwable_klass)) {		// 千万别忘了判断此 klass 是不是 throwable !!!!!
 							cur_frame.has_exception = false;		// 清空标记！因为已经找到 handler 了！
 #ifdef BYTECODE_DEBUG
@@ -3315,7 +3316,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 							break;
 						}
 						case CONSTANT_Class:{
-							callsite_args.push_back(boost::any_cast<shared_ptr<Klass>>(_pair.second)->get_mirror());
+							callsite_args.push_back(boost::any_cast<Klass *>(_pair.second)->get_mirror());
 							break;
 						}
 						case CONSTANT_Integer:{
@@ -3352,7 +3353,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 					}
 				}
 				// 6. make all arguments into a Java List<T>!!
-				auto arrayList_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/util/ArrayList"));
+				auto arrayList_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/util/ArrayList"));
 				assert(arrayList_klass != nullptr);
 				auto arrayList_init_method = arrayList_klass->get_this_class_method(L"<init>:()V");
 				auto arrayList_add_method = arrayList_klass->get_this_class_method(L"add:(" OBJ ")Z");
@@ -3367,7 +3368,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				}
 				// 7. get the CallSite obj using `MethodHanle.invokeArguments(List<T>)!!
 				// 7-1. get method `invokeArguments`
-				auto invokeArguments_method = std::static_pointer_cast<InstanceKlass>(method_handle_obj->get_klass())
+				auto invokeArguments_method = ((InstanceKlass *)method_handle_obj->get_klass())
 						->search_vtable(L"invokeWithArguments:(" LST ")" OBJ);		// `method_handle_obj` may be a child of klass `MethodHandle`. so should `search_vtable()`.
 				assert(invokeArguments_method != nullptr);
 				// 8. get the CallSite !!
@@ -3384,7 +3385,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 //				auto real_method_handle_obj = (InstanceOop *)result;
 //				std::wcout << real_method_handle_obj->get_klass()->get_name() << std::endl;
 				// 9-3. change CallSite to a MethodHandle invoker! using `CallSite.dynamicInvoker()`.
-				auto callsite_dynamicInvoker_method = std::static_pointer_cast<InstanceKlass>(callsite->get_klass())
+				auto callsite_dynamicInvoker_method = ((InstanceKlass *)callsite->get_klass())
 						->search_vtable(L"dynamicInvoker:()" MH);		// It is an abstract Method.
 				assert(callsite_dynamicInvoker_method != nullptr);
 				auto final_invoker_MethodHandle = (InstanceOop *)thread.add_frame_and_execute(callsite_dynamicInvoker_method, {callsite});
@@ -3398,7 +3399,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 					size --;
 				}
 				// 12. get the invokeExact Method in MH.
-				auto invokeExact_method = std::static_pointer_cast<InstanceKlass>(final_invoker_MethodHandle->get_klass())
+				auto invokeExact_method = ((InstanceKlass *)final_invoker_MethodHandle->get_klass())
 										->search_vtable(L"invokeExact:([" OBJ ")" OBJ);
 				// 13. Call!!!
 				// 像 native 一样 call 吧。所以最前要加上 this methodhandler，最后要多两个参数。
@@ -3416,10 +3417,10 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 
 				// 15. check return type....
 				if (ret_oop != nullptr) {
-					shared_ptr<InstanceKlass> ret_klass = std::static_pointer_cast<InstanceKlass>(ret_oop->get_klass());
+					InstanceKlass *ret_klass = ((InstanceKlass *)ret_oop->get_klass());
 					MirrorOop *ret_mirror = Method::parse_return_type(Method::return_type(type_descriptor));
 					// 由于 invoke 家族的方法，全是返回装箱的 Object，所以我认为不用担心是 primitive type (以及 void)的情形。
-					shared_ptr<InstanceKlass> ret_klass_should_be = std::static_pointer_cast<InstanceKlass>(ret_mirror->get_mirrored_who());
+					InstanceKlass *ret_klass_should_be = ((InstanceKlass *)ret_mirror->get_mirrored_who());
 					if (!(ret_klass == ret_klass_should_be || ret_klass->check_parent(ret_klass_should_be) || ret_klass->check_interfaces(ret_klass_should_be))) {
 						assert(false);
 					}
@@ -3431,9 +3432,9 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				// TODO: 这里不是很明白。规范中写：new 的后边可能会跟上一个常量池索引，这个索引指向类或接口......接口是什么鬼???? 还能被实例化吗 ???
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
-				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				auto klass = boost::any_cast<Klass *>(rt_pool[rtpool_index-1].second);
 				assert(klass->get_type() == ClassType::InstanceClass);		// TODO: 并不知道对不对...猜的.
-				auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+				auto real_klass = ((InstanceKlass *)klass);
 				// if didnt init then init
 				initial_clinit(real_klass, thread);
 				auto oop = real_klass->new_instance();
@@ -3454,42 +3455,42 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				switch (arr_type) {
 					case T_BOOLEAN:
 						assert(system_classmap.find(L"[Z.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[Z.class"])->new_instance(length));	// 注意！这里的 basic type array oop 内部存放的全是引用，指向 basic type oop！！千万不要搞错！需要对数组元素再一次解引用才能得到真正的值！
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[Z.class"])->new_instance(length));	// 注意！这里的 basic type array oop 内部存放的全是引用，指向 basic type oop！！千万不要搞错！需要对数组元素再一次解引用才能得到真正的值！
 						for_debug = L"[Z";
 						break;
 					case T_CHAR:
 						assert(system_classmap.find(L"[C.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[C.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[C.class"])->new_instance(length));
 						for_debug = L"[C";
 						break;
 					case T_FLOAT:
 						assert(system_classmap.find(L"[F.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[F.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[F.class"])->new_instance(length));
 						for_debug = L"[F";
 						break;
 					case T_DOUBLE:
 						assert(system_classmap.find(L"[D.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[D.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[D.class"])->new_instance(length));
 						for_debug = L"[D";
 						break;
 					case T_BYTE:
 						assert(system_classmap.find(L"[B.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[B.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[B.class"])->new_instance(length));
 						for_debug = L"[B";
 						break;
 					case T_SHORT:
 						assert(system_classmap.find(L"[S.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[S.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[S.class"])->new_instance(length));
 						for_debug = L"[S";
 						break;
 					case T_INT:
 						assert(system_classmap.find(L"[I.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[I.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[I.class"])->new_instance(length));
 						for_debug = L"[I";
 						break;
 					case T_LONG:
 						assert(system_classmap.find(L"[J.class") != system_classmap.end());
-						op_stack.push(std::static_pointer_cast<TypeArrayKlass>(system_classmap[L"[J.class"])->new_instance(length));
+						op_stack.push(((TypeArrayKlass *)system_classmap[L"[J.class"])->new_instance(length));
 						for_debug = L"[J";
 						break;
 					default:{
@@ -3519,35 +3520,35 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 					assert(false);
 				}
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
-				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				auto klass = boost::any_cast<Klass *>(rt_pool[rtpool_index-1].second);
 				if (klass->get_type() == ClassType::InstanceClass) {			// java/lang/Class
-					auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+					auto real_klass = ((InstanceKlass *)klass);
 					// 由于仅仅是创建一维数组：所以仅仅需要把高一维的数组类加载就好。
 					if (real_klass->get_classloader() == nullptr) {
-						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
+						auto arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					} else {
-						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
+						auto arr_klass = ((ObjArrayKlass *)real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					}
 				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// [Ljava/lang/Class
-					auto real_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
+					auto real_klass = ((ObjArrayKlass *)klass);
 					// 创建数组的数组。不过也和 if 中的逻辑相同。
 					// 不过由于数组类没有设置 classloader，需要从 element 中去找。
 					if (real_klass->get_element_klass()->get_classloader() == nullptr) {
-						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
+						auto arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					} else {
-						auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_element_klass()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
+						auto arr_klass = ((ObjArrayKlass *)real_klass->get_element_klass()->get_classloader()->loadClass(L"[" + real_klass->get_name()));
 						assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 						op_stack.push(arr_klass->new_instance(length));
 					}
 				} else if (klass->get_type() == ClassType::TypeArrayClass) {	// [[I --> will new an [[[I. e.g.: int[][][] = { {{1,2,3},{4,5}}, {{1},{2}}, {{1},{2}} };
-					auto real_klass = std::static_pointer_cast<TypeArrayKlass>(klass);
-					auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
+					auto real_klass = ((TypeArrayKlass *)klass);
+					auto arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" + real_klass->get_name()));
 					assert(arr_klass->get_type() == ClassType::TypeArrayClass);
 					op_stack.push(arr_klass->new_instance(length));
 				} else {
@@ -3570,7 +3571,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 			case 0xbf:{		// athrow
 	exception_handler:
 				InstanceOop *exception_obj = (InstanceOop *)op_stack.top();	op_stack.pop();
-				auto excp_klass = std::static_pointer_cast<InstanceKlass>(exception_obj->get_klass());
+				auto excp_klass = ((InstanceKlass *)exception_obj->get_klass());
 
 				// backtrace ONLY this stack.
 				int jump_pc = cur_frame.method->where_is_catch(pc - code_begin, excp_klass);
@@ -3603,7 +3604,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 //						exit(-1);		// 不行......整个进程全部退出，会造成此 thread 析构，把全局的东西析构了......
 						InstanceOop *thread_obj = ThreadTable::get_a_thread(pthread_self());
 						assert(thread_obj != nullptr);
-						auto final_method = std::static_pointer_cast<InstanceKlass>(thread_obj->get_klass())->get_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V", false);
+						auto final_method = ((InstanceKlass *)thread_obj->get_klass())->get_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V", false);
 						assert(final_method != nullptr);
 						thread.add_frame_and_execute(final_method, {thread_obj, exception_obj});
 						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......
@@ -3627,7 +3628,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				// TODO: paper...
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
-				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);		// constant_pool index
+				auto klass = boost::any_cast<Klass *>(rt_pool[rtpool_index-1].second);		// constant_pool index
 				// 1. first get the ref and find if it is null
 				Oop *ref = op_stack.top();
 				if (*pc == 0xc1) {
@@ -3716,7 +3717,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				}
 
 				// lambda to recursively create a multianewarray::
-				function<Oop *(shared_ptr<ArrayKlass>, int)> recursive_create_multianewarray = [&counts, &recursive_create_multianewarray](shared_ptr<ArrayKlass> arr_klass, int index) -> Oop *{
+				function<Oop *(ArrayKlass *, int)> recursive_create_multianewarray = [&counts, &recursive_create_multianewarray](ArrayKlass *arr_klass, int index) -> Oop *{
 					// 1. new an multianewarray, which length is counts[index]!! ( counts[0] first )
 					auto arr_obj = arr_klass->new_instance(counts[index]);
 					// 2-a. if this is the last dimension(1), then return.
@@ -3725,7 +3726,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 						return arr_obj;		// create over.
 					}
 					// 2-b. else, get the inner multianewarray type.
-					auto inner_arr_klass = std::static_pointer_cast<ArrayKlass>(arr_klass->get_lower_dimension());
+					auto inner_arr_klass = ((ArrayKlass *)arr_klass->get_lower_dimension());
 					assert(inner_arr_klass != nullptr);
 					// 3. fill in every element in this `fake multiarray`, which is really one dimension... (java 的多维数组是伪的，众人皆知)
 					for (int i = 0; i < arr_obj->get_length(); i ++) {
@@ -3736,7 +3737,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 
 
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Class);
-				auto klass = boost::any_cast<shared_ptr<Klass>>(rt_pool[rtpool_index-1].second);
+				auto klass = boost::any_cast<Klass *>(rt_pool[rtpool_index-1].second);
 
 				// delete
 //				std::wcout << klass->get_name() << " ";
@@ -3748,18 +3749,18 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 
 				if (klass->get_type() == ClassType::InstanceClass) {			// e.g.: java/lang/Class
 					assert(false);		// TODO:没有碰到过这种情况...先注释掉......以后再补上。	// 其实我感觉规范是不是写错了？？？这根本不可能出现 InstanceKlass 的情况啊...... 毕竟下边注释也说了，给出的 rt_pool 的 klass 是正确的，不用像 anewarray 一样加上一维了......所以感觉 Spec 应该是错的？？因为根本就没有指向 InstanceKlass 的情况？
-//					auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+//					auto real_klass = ((InstanceKlass *)klass);
 //					// 由于仅仅是创建一维数组：所以仅仅需要把高一维的数组类加载就好。
-//					shared_ptr<ObjArrayKlass> arr_klass;
+//					ObjArrayKlass * arr_klass;
 //					if (real_klass->get_classloader() == nullptr) {
-//						arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
+//						arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[L" + real_klass->get_name() + L";"));
 //					} else {
-//						arr_klass = std::static_pointer_cast<ObjArrayKlass>(real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
+//						arr_klass = ((ObjArrayKlass *)real_klass->get_classloader()->loadClass(L"[L" + real_klass->get_name() + L";"));
 //					}
 //					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 //					op_stack.push(arr_klass->new_instance(length));
 				} else if (klass->get_type() == ClassType::ObjArrayClass) {	// e.g.: [[[Ljava/lang/Class	// 注意：这回不用再加上一维了！编译器给出的是真·数组 klass name！直接拿来用就好！
-					auto arr_klass = std::static_pointer_cast<ObjArrayKlass>(klass);
+					auto arr_klass = ((ObjArrayKlass *)klass);
 					assert(arr_klass->get_type() == ClassType::ObjArrayClass);
 					assert(arr_klass->get_dimension() == dimensions);	// I think must be equal here!
 
@@ -3769,7 +3770,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 	sync_wcout{} << "(DEBUG) new an multianewarray: [" << arr_klass->get_name() << "]." << std::endl;
 #endif
 				} else if (klass->get_type() == ClassType::TypeArrayClass) {		// int [3][4][5][6][7][8][9]
-					auto arr_klass = std::static_pointer_cast<TypeArrayKlass>(klass);
+					auto arr_klass = ((TypeArrayKlass *)klass);
 					assert(arr_klass->get_type() == ClassType::TypeArrayClass);
 					assert(arr_klass->get_dimension() == dimensions);	// I think must be equal here!
 

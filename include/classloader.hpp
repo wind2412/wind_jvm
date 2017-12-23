@@ -23,8 +23,8 @@ class ObjArrayOop;
 class ClassLoader {
 public:
 	// the third argument is the Java's ClassLoader, maybe Launcher$AppClassLoader's mirror.
-	virtual shared_ptr<Klass> loadClass(const wstring & classname, ByteStream * = nullptr, MirrorOop * = nullptr,
-										bool = false, shared_ptr<InstanceKlass> hostklass = nullptr, ObjArrayOop *cp_patch = nullptr) = 0;	// load and link class.
+	virtual Klass *loadClass(const wstring & classname, ByteStream * = nullptr, MirrorOop * = nullptr,
+										bool = false, InstanceKlass *hostklass = nullptr, ObjArrayOop *cp_patch = nullptr) = 0;	// load and link class.
 										// the last three arguments are for: Anonymous klass.
 	virtual void print() = 0;
 	virtual ~ClassLoader() {};	// need to be defined!!
@@ -43,8 +43,8 @@ public:
 		static BootStrapClassLoader bootstrap;		// 把这句放到 private 中，然后在 classloader.cpp 加上 static 初始化，然后就和 Mayers 条款 4 一样，static 在模块初始化顺序不确定！！会出现相当诡异的结果！！
 		return bootstrap;
 	}	// singleton
-	shared_ptr<Klass> loadClass(const wstring & classname, ByteStream * = nullptr, MirrorOop * = nullptr,
-								bool = false, shared_ptr<InstanceKlass> = nullptr, ObjArrayOop * = nullptr) override;		// 设计错误。因为还可能 load 数组类以及各种其他，所以必须用 Klass 而不是 InstanceKlass......
+	Klass *loadClass(const wstring & classname, ByteStream * = nullptr, MirrorOop * = nullptr,
+								bool = false, InstanceKlass * = nullptr, ObjArrayOop * = nullptr) override;		// 设计错误。因为还可能 load 数组类以及各种其他，所以必须用 Klass 而不是 InstanceKlass......
 	void print() override;
 };
 
@@ -76,8 +76,8 @@ class MyClassLoader : public ClassLoader {
 private:
 	Lock lock;
 	BootStrapClassLoader & bs = BootStrapClassLoader::get_bootstrap();
-	map<wstring, shared_ptr<Klass>> classmap;
-	vector<shared_ptr<InstanceKlass>> anonymous_klassmap;
+	map<wstring, Klass *> classmap;
+	vector<InstanceKlass *> anonymous_klassmap;
 private:
 	MyClassLoader() {};
 	MyClassLoader(const MyClassLoader &);
@@ -88,10 +88,10 @@ public:
 		static MyClassLoader mloader;
 		return mloader;
 	}	// singleton
-	shared_ptr<Klass> loadClass(const wstring & classname, ByteStream *byte_buf = nullptr, MirrorOop *loader = nullptr,
-								bool is_anonymous = false, shared_ptr<InstanceKlass> hostklass = nullptr, ObjArrayOop *cp_patch = nullptr) override;
+	Klass *loadClass(const wstring & classname, ByteStream *byte_buf = nullptr, MirrorOop *loader = nullptr,
+								bool is_anonymous = false, InstanceKlass *hostklass = nullptr, ObjArrayOop *cp_patch = nullptr) override;
 	void print() override;
-	shared_ptr<Klass> find_in_classmap(const wstring & classname);
+	Klass *find_in_classmap(const wstring & classname);
 };
 
 

@@ -55,7 +55,7 @@ void JVM_NanoTime(list<Oop *> & _stack){				// static
 #endif
 }
 
-//shared_ptr<InstanceKlass> get_real_element_klass(shared_ptr<ObjArrayKlass> obj_arr_klass)		// [x]见下文 ArrayCopy 中的 bug 说明。旨在对泛型擦除引发的 bug 打补丁。	// [x] 替换所有 get_element_klass！！甚至可以钦定此方法替换掉 get_element_klass!!
+//InstanceKlass *get_real_element_klass(ObjArrayKlass * obj_arr_klass)		// [x]见下文 ArrayCopy 中的 bug 说明。旨在对泛型擦除引发的 bug 打补丁。	// [x] 替换所有 get_element_klass！！甚至可以钦定此方法替换掉 get_element_klass!!
 //{
 //		// [x] 设计修改！成为：如果放置元素进去，那么就设置...
 //		// [x] 再改！！因为泛型擦除只对 Object 成立......所以我如果看到 [Object，那就钦定......
@@ -90,9 +90,9 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		ObjArrayOop *objarr1 = (ObjArrayOop *)obj1;
 		ObjArrayOop *objarr2 = (ObjArrayOop *)obj2;
 
-		function<shared_ptr<InstanceKlass>(ObjArrayOop *)> get_ObjArray_real_element_klass_recursive = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> shared_ptr<InstanceKlass> {
+		function<InstanceKlass *(ObjArrayOop *)> get_ObjArray_real_element_klass_recursive = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> InstanceKlass *{
 			int length = objarr->get_length();		// total length
-			shared_ptr<ObjArrayKlass> objarr_klass = std::static_pointer_cast<ObjArrayKlass>(objarr->get_klass());		// this klass is not trusted. because it is the alloced array's obj_array_type, not the inner element type.
+			ObjArrayKlass * objarr_klass = ((ObjArrayKlass *)objarr->get_klass());		// this klass is not trusted. because it is the alloced array's obj_array_type, not the inner element type.
 			if (length == 0) {
 				// 1. if we can't find the inner-element, we can only return the objarr_klass's element-type... but thinking of the recursive function can return `objarr_klass->element_type()`, too, we return nullptr instead, it shows that we can't judge the **REAL** type.
 //				return objarr_klass->get_element_klass();
@@ -107,7 +107,7 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 						// 3. if not null: judge whether it is another ObjectArrayOop / InstanceOop.
 						if (oop->get_ooptype() == OopType::_InstanceOop) {
 							// 3.3. if InstanceOop, return it. This is the **REAL** type.
-							return std::static_pointer_cast<InstanceKlass>(oop->get_klass());
+							return ((InstanceKlass *)oop->get_klass());
 						} else {
 							// 3.6. if ObjectArrayOop, then recursive.
 							assert(oop->get_ooptype() == OopType::_ObjArrayOop);
@@ -125,11 +125,11 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		};
 
 		// an outer aux function.
-		function<shared_ptr<InstanceKlass>(ObjArrayOop *)> get_ObjArray_real_element_klass = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> shared_ptr<InstanceKlass> {
+		function<InstanceKlass *(ObjArrayOop *)> get_ObjArray_real_element_klass = [&get_ObjArray_real_element_klass_recursive](ObjArrayOop *objarr) -> InstanceKlass *{
 			auto real_element_klass = get_ObjArray_real_element_klass_recursive(objarr);
 			if (real_element_klass == nullptr) {
 				// if it is nullptr after recursive, we can only consider it as the `alloc array`'s `objarr->element_type()`......
-				return std::static_pointer_cast<ObjArrayKlass>(objarr->get_klass())->get_element_klass();
+				return ((ObjArrayKlass *)objarr->get_klass())->get_element_klass();
 			} else {
 				return real_element_klass;
 			}
@@ -141,8 +141,8 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		// bug report！！这样，只能得到 alloc 的数组的数组类的 klass！而不能得到真正的内部存放的数值的 klass！！打个比方...比如 ArrayList 类。因为泛型擦除，因此内部有个 Object[] 数组......如果要是使用 get_element，就只能得到 inner 的类型是 Object...但是人家可能向内存放 String...... 唉。考虑不周...
 		// 4. [x] 所以打算如果 src 是 java/lang/Object 的话，就改为检查数组内部的类型，并且加以钦定...
 		// [√] 最终的方案改成了：一上来就得到真正的 element type 类型。
-//		auto src_klass = std::static_pointer_cast<ObjArrayKlass>(objarr1->get_klass())->get_element_klass();
-//		auto dst_klass = std::static_pointer_cast<ObjArrayKlass>(objarr2->get_klass())->get_element_klass();
+//		auto src_klass = ((ObjArrayKlass *)objarr1->get_klass())->get_element_klass();
+//		auto dst_klass = ((ObjArrayKlass *)objarr2->get_klass())->get_element_klass();
 		auto src_klass = get_ObjArray_real_element_klass(objarr1);
 		auto dst_klass = get_ObjArray_real_element_klass(objarr1);
 
@@ -171,13 +171,13 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 //
 //				if (src_klass->get_name() == L"java/lang/Object") {
 //					// get `the most inner` element type!!
-//					shared_ptr<InstanceKlass> real_src_klass;
+//					InstanceKlass *real_src_klass;
 //					if (objarr1->get_dimension() == 1) {
 //						// 如果一维 Object[]，且内部全不是 null，那么取出第一个就好～
 //						if (length == 0) {
 //							assert(false);	// I think it will be false...
 //						} else {
-//							real_src_klass = std::static_pointer_cast<InstanceKlass>((*objarr1)[src_pos]->get_klass());
+//							real_src_klass = ((InstanceKlass *)(*objarr1)[src_pos]->get_klass());
 //							if (real_src_klass == dst_klass || real_src_klass->check_parent(dst_klass) || real_src_klass->check_interfaces(dst_klass)) {
 //								// directly copy
 //								for (int i = 0; i < length; i ++) {
@@ -210,7 +210,7 @@ void JVM_IdentityHashCode(list<Oop *> & _stack){		// static
 void JVM_InitProperties(list<Oop *> & _stack){		// static
 	InstanceOop *prop = (InstanceOop *)_stack.front();	_stack.pop_front();
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
-	shared_ptr<Method> hashtable_put = std::static_pointer_cast<InstanceKlass>(prop->get_klass())->get_class_method(L"put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+	shared_ptr<Method> hashtable_put = ((InstanceKlass *)prop->get_klass())->get_class_method(L"put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 	assert(hashtable_put != nullptr);
 	// add properties: 	// this, key, value		// TODO: 没有设置完！！
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.name"), java_lang_string::intern(L"Java Virtual Machine Specification")});
@@ -271,19 +271,19 @@ void JVM_SetIn0(list<Oop *> & _stack){		// static
 	InstanceOop *inputstream = (InstanceOop *)_stack.front();	_stack.pop_front();
 	auto system = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System");
 	assert(system != nullptr);
-	std::static_pointer_cast<InstanceKlass>(system)->set_static_field_value(L"in:Ljava/io/InputStream;", inputstream);
+	((InstanceKlass *)system)->set_static_field_value(L"in:Ljava/io/InputStream;", inputstream);
 }
 void JVM_SetOut0(list<Oop *> & _stack){		// static
 	InstanceOop *printstream = (InstanceOop *)_stack.front();	_stack.pop_front();
 	auto system = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System");
 	assert(system != nullptr);
-	std::static_pointer_cast<InstanceKlass>(system)->set_static_field_value(L"out:Ljava/io/PrintStream;", printstream);
+	((InstanceKlass *)system)->set_static_field_value(L"out:Ljava/io/PrintStream;", printstream);
 }
 void JVM_SetErr0(list<Oop *> & _stack){		// static
 	InstanceOop *printstream = (InstanceOop *)_stack.front();	_stack.pop_front();
 	auto system = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System");
 	assert(system != nullptr);
-	std::static_pointer_cast<InstanceKlass>(system)->set_static_field_value(L"err:Ljava/io/PrintStream;", printstream);
+	((InstanceKlass *)system)->set_static_field_value(L"err:Ljava/io/PrintStream;", printstream);
 }
 
 // 返回 fnPtr.

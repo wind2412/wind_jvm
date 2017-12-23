@@ -11,7 +11,6 @@
 #include "utils/synchronize_wcout.hpp"
 
 using std::wstring;
-using std::shared_ptr;
 using std::unordered_map;
 
 class MirrorOop;
@@ -23,7 +22,7 @@ class InstanceKlass;
 class Method {
 private:
 	// InstanceKlass
-	shared_ptr<InstanceKlass> klass;
+	InstanceKlass *klass = nullptr;		// 同理。由于是 this 指针生成的 shared_ptr...... 希望不会循环引用......
 	// method basic
 	wstring name;
 	wstring descriptor;
@@ -62,7 +61,7 @@ private:
 
 	Exceptions_attribute *exceptions = nullptr;
 	bool parsed = false;
-	unordered_map<wstring, shared_ptr<Klass>> exceptions_tb;
+	unordered_map<wstring, Klass *> exceptions_tb;
 
 	u2 signature_index = 0;
 	Element_value *ad = nullptr;					// [1]
@@ -129,17 +128,17 @@ public:
 		return this->name == rhs.name && this->descriptor == rhs.descriptor;
 	}
 public:
-	Method(shared_ptr<InstanceKlass> klass, method_info & mi, cp_info **constant_pool);
+	Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool);
 	const wstring & get_name() { return name; }
 	const wstring & get_descriptor() { return descriptor; }
 	const Code_attribute *get_code() { return code; }
-	shared_ptr<InstanceKlass> get_klass() { return klass; }
+	InstanceKlass *get_klass() { return klass; }
 	wstring parse_signature();
 	void print() { sync_wcout{} << name << ":" << descriptor; }
 	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
 	CodeStub *get_rvpa() { if (rvpa) return &this->_rvpa; else return nullptr;}
 	CodeStub *get_ad() { if (ad) return &this->_ad; else return nullptr;}
-	int where_is_catch(int cur_pc, shared_ptr<InstanceKlass> cur_excp);
+	int where_is_catch(int cur_pc, InstanceKlass *cur_excp);
 
 	~Method();
 };

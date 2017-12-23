@@ -47,7 +47,7 @@ void JVM_StartThread(list<Oop *> & _stack){
 	}
 
 	// first, find the `run()` method in `this`.
-	shared_ptr<Method> run = std::static_pointer_cast<InstanceKlass>(_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
+	shared_ptr<Method> run = ((InstanceKlass *)_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
 	assert(run != nullptr && !run->is_abstract());
 	// set and start a thread.
 	vm_thread *new_thread;

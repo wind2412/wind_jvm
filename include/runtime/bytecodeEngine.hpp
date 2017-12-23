@@ -77,8 +77,8 @@ public:
 	static Oop * execute(vm_thread & thread, StackFrame & cur_frame, int thread_no);
 public:	// aux
 	static vector<wstring> parse_arg_list(const wstring & descriptor);
-	static void initial_clinit(shared_ptr<InstanceKlass>, vm_thread & thread);
-	static bool check_instanceof(shared_ptr<Klass> ref_klass, shared_ptr<Klass> klass);
+	static void initial_clinit(InstanceKlass *, vm_thread & thread);
+	static bool check_instanceof(Klass *ref_klass, Klass *klass);
 	static wstring get_real_value(Oop *oop);
 private:		// for invokeDynamic
 	static InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread, bool = false);

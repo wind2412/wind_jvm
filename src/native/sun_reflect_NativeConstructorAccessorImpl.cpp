@@ -23,7 +23,7 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 	Oop *result;
 	// get target InstanceKlass
 	ctor->get_field_value(CONSTRUCTOR L":clazz:Ljava/lang/Class;", &result);
-	shared_ptr<InstanceKlass> target_klass = std::static_pointer_cast<InstanceKlass>(((MirrorOop *)result)->get_mirrored_who());
+	InstanceKlass *target_klass = ((InstanceKlass *)((MirrorOop *)result)->get_mirrored_who());
 	// new an empty object
 	Oop *init = target_klass->new_instance();
 	// get shared_ptr<Method> of <init>

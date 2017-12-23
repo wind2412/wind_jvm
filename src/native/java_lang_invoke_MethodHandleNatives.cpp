@@ -74,7 +74,7 @@ wstring get_full_name(MirrorOop *mirror)
 
 InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type, vm_thread *thread = nullptr)	// vm_thread: for debug
 {
-	auto member_name2 = std::static_pointer_cast<InstanceKlass>(origin_member_name_obj->get_klass())->new_instance();
+	auto member_name2 = ((InstanceKlass *)origin_member_name_obj->get_klass())->new_instance();
 	int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
 	if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
 		new_flag |= 0x100000;
@@ -86,7 +86,7 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 //	// delete all for debug
 //	std::wcout << target_method->get_name() << " " << type << std::endl;
 //	if (thread != nullptr) {
-//		auto toString = std::static_pointer_cast<InstanceKlass>(type->get_klass())->get_this_class_method(L"toString:()" STR);
+//		auto toString = ((InstanceKlass *)type->get_klass())->get_this_class_method(L"toString:()" STR);
 //		assert(toString != nullptr);
 //		InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {type});
 //		std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
@@ -107,11 +107,8 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 
 InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_field, InstanceOop *origin_member_name_obj, int ref_kind)
 {
-	// for target_field->get_type_klass:
-	target_field->if_didnt_parse_then_parse();
-
 	// build the return MemberName obj.
-	auto member_name2 = std::static_pointer_cast<InstanceKlass>(origin_member_name_obj->get_klass())->new_instance();
+	auto member_name2 = ((InstanceKlass *)origin_member_name_obj->get_klass())->new_instance();
 	int new_flag = (target_field->get_flag() & (~ACC_ANNOTATION));
 	if (target_field->is_static()) {
 		new_flag |= 0x40000 | (2 << 24);		// getStatic(2)
@@ -136,7 +133,7 @@ InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_fie
 	return member_name2;
 }
 
-wstring get_member_name_descriptor(shared_ptr<InstanceKlass> real_klass, const wstring & real_name, InstanceOop *type)
+wstring get_member_name_descriptor(InstanceKlass *real_klass, const wstring & real_name, InstanceOop *type)
 {
 	wstring descriptor;
 	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
@@ -189,7 +186,7 @@ wstring get_member_name_descriptor(shared_ptr<InstanceKlass> real_klass, const w
 	return descriptor;
 }
 
-shared_ptr<Method> get_member_name_target_method(shared_ptr<InstanceKlass> real_klass, const wstring & signature, int ref_kind, vm_thread *thread)
+shared_ptr<Method> get_member_name_target_method(InstanceKlass *real_klass, const wstring & signature, int ref_kind, vm_thread *thread)
 {
 	shared_ptr<Method> target_method;
 	if (ref_kind == 6)	{			// invokeStatic
@@ -264,7 +261,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		assert(false);
 	}
 
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass);
+	auto real_klass = ((InstanceKlass *)klass);
 	wstring real_name = java_lang_string::stringOop_to_wstring(name);
 	if (real_name == L"<clinit>" || real_name == L"<init>") {
 		assert(false);		// can't be the two names.
@@ -285,7 +282,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 		if (target_method == nullptr) {		// throw LinkageError !!! Purposely!!!
 
 			// get the exception klass
-			auto excp_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/LinkageError"));
+			auto excp_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/LinkageError"));
 			// make a message
 			std::wstring msg(L"didn't find the target_method: [" + signature + L"], by wind2412");
 			// go!
@@ -336,7 +333,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 	 */
 	assert(member_name_obj != nullptr);
 	assert(target != nullptr);
-	auto klass = std::static_pointer_cast<InstanceKlass>(target->get_klass());
+	auto klass = ((InstanceKlass *)target->get_klass());
 
 
 	if (klass->get_name() == L"java/lang/reflect/Constructor") {
@@ -405,7 +402,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 		// 唉...... 看来是失败了。不过代码还是留下吧。
 
 /*
-		auto method_type_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
+		auto method_type_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
 		assert(method_type_klass != nullptr);
 		auto init_method_type = method_type_klass->get_this_class_method(L"methodType:(" CLS "[" CLS ")" MT);		// static method!!!
 		assert(init_method_type != nullptr);
@@ -416,7 +413,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 			return_mirror = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();
 		}
 
-		auto klass_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[" CLS));
+		auto klass_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" CLS));
 		assert(klass_arr_klass != nullptr);
 		auto klass_arr_obj = klass_arr_klass->new_instance(arg_list_vector.size());		// alloc a [Ljava/lang/Class; for arg list's length.
 
@@ -431,7 +428,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 //		// delete all for debug
 //		std::wcout << target_method->get_name() << " " << method_type_obj << std::endl;
 //		if (thread != nullptr) {
-//			auto toString = std::static_pointer_cast<InstanceKlass>(method_type_obj->get_klass())->get_this_class_method(L"toString:()" STR);
+//			auto toString = ((InstanceKlass *)method_type_obj->get_klass())->get_this_class_method(L"toString:()" STR);
 //			assert(toString != nullptr);
 //			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {method_type_obj});
 //			std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
@@ -473,7 +470,7 @@ void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN
 	assert(type->get_klass()->get_name() == L"java/lang/Class");		// 后边被 Java 设置成了 Class。
 
 	assert(clazz->get_mirrored_who() != nullptr);
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(clazz->get_mirrored_who());		// klass
+	auto real_klass = ((InstanceKlass *)clazz->get_mirrored_who());		// klass
 	wstring real_name = java_lang_string::stringOop_to_wstring(name);							// name
 	wstring fake_descriptor = ((MirrorOop *)type)->get_mirrored_who()->get_name();					// [x] descriptor
 	if (fake_descriptor[0] != L'[') {		// InstanceKlass
@@ -506,7 +503,7 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 	bool search_super_klass = ((match_flag & 0x100000) != 0);
 	bool search_interfaces  = ((match_flag & 0x200000)   != 0);
 
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass->get_mirrored_who());
+	auto real_klass = ((InstanceKlass *)klass->get_mirrored_who());
 	auto caller_klass = caller_mirror != nullptr ? caller_mirror->get_mirrored_who() : nullptr;
 	wstring real_name = match_name == nullptr ? L"" : java_lang_string::stringOop_to_wstring(match_name);
 	wstring real_signature = match_sig == nullptr ? L"" : java_lang_string::stringOop_to_wstring(match_sig);

@@ -1,5 +1,6 @@
 CC := g++
 CPP_FLAGS := -std=c++14 -O4 -pg
+#CPP_FLAGS := -std=c++14 -pg
 #CPP_FLAGS := -std=c++14 -O3 -pg
 #CPP_FLAGS := -std=c++14 -DNDEBUG -O3 -pg
 #CPP_FLAGS := -std=c++14 -DBYTECODE_DEBUG

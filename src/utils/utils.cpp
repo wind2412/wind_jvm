@@ -34,7 +34,7 @@ std::string narrow( const std::wstring& str )
 // toString fast execute
 wstring toString(InstanceOop *oop, vm_thread *thread)		// for debugging
 {
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(oop->get_klass());
+	auto real_klass = ((InstanceKlass *)oop->get_klass());
 	auto toString = real_klass->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
 	assert(toString != nullptr);
 	InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {oop});

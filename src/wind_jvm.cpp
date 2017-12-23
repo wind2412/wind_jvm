@@ -176,11 +176,11 @@ void vm_thread::init_and_do_main()
 		java_lang_class::fixup_mirrors();	// only [basic types] + java.lang.Class + java.lang.Object
 
 		// load String.class
-		auto string_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"));
+		auto string_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"));
 
 
 		// 1. create a [half-completed] Thread obj, using the ThreadGroup obj.(for currentThread(), this must be create first!!)
-		auto thread_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Thread"));
+		auto thread_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Thread"));
 		// TODO: 要不要放到全局？
 		InstanceOop *init_thread = thread_klass->new_instance();
 		BytecodeEngine::initial_clinit(thread_klass, *this);		// first <clinit>!
@@ -192,7 +192,7 @@ void vm_thread::init_and_do_main()
 
 
 		// 2. create a [System] ThreadGroup obj.
-		auto threadgroup_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/ThreadGroup"));
+		auto threadgroup_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/ThreadGroup"));
 		// TODO: 要不要放到全局？
 		InstanceOop *init_threadgroup = threadgroup_klass->new_instance();
 		BytecodeEngine::initial_clinit(threadgroup_klass, *this);		// first <clinit>!
@@ -214,8 +214,8 @@ void vm_thread::init_and_do_main()
 		}
 		assert(this->vm_stack.size() == 0);
 
-		BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(class_klass), *this);
-		std::static_pointer_cast<InstanceKlass>(class_klass)->set_static_field_value(L"useCaches:Z", new IntOop(false));
+		BytecodeEngine::initial_clinit(((InstanceKlass *)class_klass), *this);
+		((InstanceKlass *)class_klass)->set_static_field_value(L"useCaches:Z", new IntOop(false));
 
 		// 3.3 load System.class		// 需要在 Main ThreadGroup 之前执行。因为它的初始化会调用 System。因而会自动触发 <clinit> 的。需要提前把 System.class 设为 initialized.
 		// 这里要 hack 一下。不执行 System.<clinit> 了，而是手动执行。因为 Java 类库当中的 java/lang/System 这个类，在 <clinit> 中由于 putStatic，
@@ -227,14 +227,14 @@ void vm_thread::init_and_do_main()
 		// 然后把 System 中的 static 变量：out, in, err 设成 null。也就是初始化打印设备。
 		// 然而我这里引用默认是 null。所以不用初始化。因此只要执行 <clinit> 原谅三连就行。
 		// 那么就让我们开始吧。仅仅 loadClass 而不 initial_clinit，即仅仅 load class，而不执行 system 的 <clinit>。
-		auto system_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System"));
+		auto system_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System"));
 		system_klass->set_state(Klass::KlassState::Initializing);
 //		BytecodeEngine::initial_clinit(system_klass, *this);
-		auto InputStream_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/InputStream"));
+		auto InputStream_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/InputStream"));
 		BytecodeEngine::initial_clinit(InputStream_klass, *this);
-		auto PrintStream_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/PrintStream"));
+		auto PrintStream_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/io/PrintStream"));
 		BytecodeEngine::initial_clinit(PrintStream_klass, *this);
-		auto SecurityManager_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/SecurityManager"));
+		auto SecurityManager_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/SecurityManager"));
 		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
 
 		// 3.5 COMPLETELY create the [Main] ThreadGroup obj.
@@ -253,7 +253,7 @@ void vm_thread::init_and_do_main()
 		}
 
 		// 3.7 又需要 hack 一波。因为 java.security.util.Debug 这货需要调用 System 的各种东西，甚至是标准输入输出。因此不能初始化它。要延迟。
-		auto Security_DEBUG_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/security/util/Debug"));
+		auto Security_DEBUG_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/security/util/Debug"));
 		Security_DEBUG_klass->set_state(Klass::KlassState::Initializing);
 
 		// 4. [complete] the Thread obj using the [uncomplete] main_threadgroup.
@@ -280,12 +280,12 @@ void vm_thread::init_and_do_main()
 
 	}
 
-	auto Perf_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Perf"));
+	auto Perf_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Perf"));
 	Perf_klass->set_state(Klass::KlassState::Initializing);				// 禁用 Perf.
-	auto PerfCounter_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/PerfCounter"));
+	auto PerfCounter_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/PerfCounter"));
 	PerfCounter_klass->set_state(Klass::KlassState::Initializing);		// 禁用 PerfCounter.
 
-	auto launcher_helper_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
+	auto launcher_helper_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
 	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
 	shared_ptr<Method> load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
 	// new a String.
@@ -296,23 +296,23 @@ void vm_thread::init_and_do_main()
 	assert(main_class_mirror->get_ooptype() == OopType::_InstanceOop);
 
 	// first execute <clinit> if has
-	BytecodeEngine::initial_clinit(std::static_pointer_cast<InstanceKlass>(main_class_mirror->get_mirrored_who()), *this);
+	BytecodeEngine::initial_clinit(((InstanceKlass *)main_class_mirror->get_mirrored_who()), *this);
 	// get the `public static void main()`.
-	auto main_method = std::static_pointer_cast<InstanceKlass>(main_class_mirror->get_mirrored_who())->get_static_void_main();
+	auto main_method = ((InstanceKlass *)main_class_mirror->get_mirrored_who())->get_static_void_main();
 	// new a String[], for the arguments.
-	ObjArrayOop *string_arr_oop = (ObjArrayOop *)std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
+	ObjArrayOop *string_arr_oop = (ObjArrayOop *)((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/String;"))->new_instance(wind_jvm::argv().size());
 	auto iter = system_classmap.find(L"java/lang/String.class");
 	assert(iter != system_classmap.end());
-	auto string_klass = std::static_pointer_cast<InstanceKlass>((*iter).second);
+	auto string_klass = ((InstanceKlass *)(*iter).second);
 	for (int i = 0; i < wind_jvm::argv().size(); i ++) {
 		(*string_arr_oop)[i] = java_lang_string::intern(wind_jvm::argv()[i]);
 	}
 
 	// load some useful klass...
 	{
-		auto methodtype_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
+		auto methodtype_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
 		BytecodeEngine::initial_clinit(methodtype_klass, *this);
-		auto methodhandle_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandle"));
+		auto methodhandle_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodHandle"));
 		BytecodeEngine::initial_clinit(methodhandle_klass, *this);
 
 	}
@@ -324,11 +324,11 @@ void vm_thread::init_and_do_main()
 	// **DO NOT** kill all other running thread except the one should be killed...
 //	ThreadTable::kill_all_except_main_thread(pthread_self());
 
-//	auto klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
+//	auto klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
 //
 //	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
-//	shared_ptr<Klass> main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
-//	shared_ptr<Method> main_method = std::static_pointer_cast<InstanceKlass>(main_class)->get_static_void_main();
+//	Klass *main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
+//	shared_ptr<Method> main_method = ((InstanceKlass *)main_class)->get_static_void_main();
 //	assert(main_method != nullptr);
 //	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
 //
@@ -339,8 +339,8 @@ void vm_thread::init_and_do_main()
 
 ArrayOop * vm_thread::get_stack_trace()
 {
-	auto stack_elem_arr_klass = std::static_pointer_cast<ObjArrayKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/StackTraceElement;"));
-	auto stack_elem_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/StackTraceElement"));
+	auto stack_elem_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[Ljava/lang/StackTraceElement;"));
+	auto stack_elem_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/StackTraceElement"));
 	auto stack_elem_init = stack_elem_klass->get_this_class_method(L"<init>:(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
 	assert(stack_elem_init != nullptr);
 

@@ -103,14 +103,14 @@ wstring java_lang_string::print_stringOop(InstanceOop *stringoop) {
 Oop *java_lang_string::intern_to_oop(const wstring & str) {
 	assert(system_classmap.find(L"[C.class") != system_classmap.end());		// TODO: 多线程需要加锁。
 	// alloc a `char[]` for `value` field
-	TypeArrayOop * charsequence = (TypeArrayOop *)std::static_pointer_cast<TypeArrayKlass>((*system_classmap.find(L"[C.class")).second)->new_instance(str.size());
+	TypeArrayOop * charsequence = (TypeArrayOop *)((TypeArrayKlass *)(*system_classmap.find(L"[C.class")).second)->new_instance(str.size());
 	assert(charsequence->get_klass() != nullptr);
 	// fill in `char[]`
 	for (int pos = 0; pos < str.size(); pos ++) {
 		(*charsequence)[pos] = new IntOop((unsigned short)str[pos]);
 	}
 	// alloc a StringOop.
-	InstanceOop *stringoop = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"))->new_instance();
+	InstanceOop *stringoop = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/String"))->new_instance();
 	assert(stringoop != nullptr);
 	Oop *int_oop_hash;
 	assert(stringoop->get_field_value(STRING L":hash:I", &int_oop_hash) == true);

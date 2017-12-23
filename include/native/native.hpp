@@ -85,6 +85,6 @@ void *find_native(const wstring & klass_name, const wstring & signature);	// get
 
 class vm_thread;
 
-void native_throw_Exception(shared_ptr<InstanceKlass> excp_klass, vm_thread *thread, list<Oop *> & _stack, const std::wstring & msg);
+void native_throw_Exception(InstanceKlass *excp_klass, vm_thread *thread, list<Oop *> & _stack, const std::wstring & msg);
 
 #endif /* INCLUDE_NATIVE_NATIVE_HPP_ */

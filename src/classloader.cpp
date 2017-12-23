@@ -13,8 +13,8 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
-shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *,
-												  bool, shared_ptr<InstanceKlass>, ObjArrayOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
+Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *,
+												  bool, InstanceKlass *, ObjArrayOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
 {
 	// TODO: add lock simply... because it will cause code very ugly...
 //	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
@@ -39,7 +39,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 #endif
 			// convert to a MetaClass (link)
-			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, nullptr);
+			InstanceKlass *newklass = new InstanceKlass(cf, nullptr);
 			system_classmap.insert(make_pair(target, newklass));
 #ifdef KLASS_DEBUG
 	BootStrapClassLoader::get_bootstrap().print();
@@ -61,12 +61,12 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 				// a. load the spliced class
 				wstring temp = classname.substr(layer + 1);		// "Ljava/lang/Object;" --> "java/lang/Object;"
 				wstring _true = temp.substr(0, temp.size()-1);	// "java/lang/Object;" --> "java/lang/Object"
-				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
+				InstanceKlass *inner = ((InstanceKlass *)loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
 				if (layer == 1) {
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr);
+					ObjArrayKlass * newklass = new ObjArrayKlass(inner, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
 #ifdef KLASS_DEBUG
@@ -75,8 +75,8 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 #endif
 				} else {
 					wstring temp_true_inner = classname.substr(1);		// strip one '[' only
-					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
+					ObjArrayKlass * last_dimension_array = ((ObjArrayKlass *)loadClass(temp_true_inner));		// get last dimension array klass
+					ObjArrayKlass * newklass = new ObjArrayKlass(inner, layer, nullptr, last_dimension_array, nullptr);	// use for this dimension array klass
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
@@ -94,7 +94,7 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 
 				// c. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
 				if (layer == 1) {
-					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
+					TypeArrayKlass *newklass = new TypeArrayKlass(type, layer, nullptr, nullptr, nullptr);
 					system_classmap.insert(make_pair(target, newklass));
 					return newklass;
 #ifdef KLASS_DEBUG
@@ -103,8 +103,8 @@ shared_ptr<Klass> BootStrapClassLoader::loadClass(const wstring & classname, Byt
 #endif
 				} else {
 					wstring temp_inner = classname.substr(1);
-					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
-					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, last_dimension_array, nullptr);
+					TypeArrayKlass *last_dimension_array = ((TypeArrayKlass *)loadClass(temp_inner));
+					TypeArrayKlass *newklass = new TypeArrayKlass(type, layer, nullptr, last_dimension_array, nullptr);
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					system_classmap.insert(make_pair(target, newklass));
@@ -133,11 +133,11 @@ void BootStrapClassLoader::print()
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
-shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror,
-										   bool is_anonymous, shared_ptr<InstanceKlass> hostklass, ObjArrayOop *cp_patch)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
+Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror,
+										   bool is_anonymous, InstanceKlass *hostklass, ObjArrayOop *cp_patch)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
 {
 //	LockGuard lg(this->lock);
-	shared_ptr<InstanceKlass> result;
+	InstanceKlass *result;
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
 #endif
@@ -187,7 +187,7 @@ shared_ptr<Klass> MyClassLoader::loadClass(const wstring & classname, ByteStream
 		}
 
 		// convert to a MetaClass (link)
-		shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this /*nullptr*/, loader_mirror);	// [x] I think nullptr maybe good choice?? 反正是对所有 loader 都不可见... [√] 不行！因为在这些 VM Anonymous class 的常量池中，在 invokeDynamic 生成的这些类里，会有用户类的常量池句柄！这样就没法加载了！必须把 loader 传进去。
+		InstanceKlass *newklass = new InstanceKlass(cf, this /*nullptr*/, loader_mirror);	// [x] I think nullptr maybe good choice?? 反正是对所有 loader 都不可见... [√] 不行！因为在这些 VM Anonymous class 的常量池中，在 invokeDynamic 生成的这些类里，会有用户类的常量池句柄！这样就没法加载了！必须把 loader 传进去。
 		// 拦截：在这里可以拦截一些 VM Anonymous Klass，截获字节码。
 //		if (newklass->get_name() == L"xxxxx") {
 //			std::wcout << "success!!" << std::endl;
@@ -208,7 +208,7 @@ MyClassLoader::get_loader().print();
 //		classmap.insert(make_pair(classname, newklass));			// 不插入！！！Anonymous 对于各种 loader 不可见！
 		anonymous_klassmap.push_back(newklass);					// bug report: 然而不插入的话...... shared_ptr 的特性...... 引用计数会消失......然后 ub... 所以只能强行插入一波了... 反正我也不会对 klass GC（逃
 		return newklass;
-	} else if((result = std::static_pointer_cast<InstanceKlass>(bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
+	} else if((result = ((InstanceKlass *)bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
 	} else if (!boost::starts_with(classname, L"[")) {	// not '[[Lcom/zxl/Haha'.
 		// TODO: 可以加上 classpath。
@@ -247,7 +247,7 @@ MyClassLoader::get_loader().print();
 			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 #endif
 			// convert to a MetaClass (link)
-			shared_ptr<InstanceKlass> newklass = make_shared<InstanceKlass>(cf, this, loader_mirror);	// set the Java ClassLoader's mirror!!!
+			InstanceKlass *newklass = new InstanceKlass(cf, this, loader_mirror);	// set the Java ClassLoader's mirror!!!
 			classmap.insert(make_pair(target, newklass));
 #ifdef KLASS_DEBUG
 BootStrapClassLoader::get_bootstrap().print();
@@ -270,12 +270,12 @@ MyClassLoader::get_loader().print();
 				// a. load the spliced class
 				wstring temp = classname.substr(layer+1);		// java/lang/Object;
 				wstring _true = temp.substr(0, temp.size()-1);
-				shared_ptr<InstanceKlass> inner = std::static_pointer_cast<InstanceKlass>(loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
+				InstanceKlass *inner = ((InstanceKlass *)loadClass(_true));		// delete start symbol 'L' like 'Ljava/lang/Object'.
 				if (inner == nullptr)	return nullptr;		// **attention**!! if bootstrap can't load this class, the array must be loaded by myclassloader!!!
 
 				// b. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
 				if (layer == 1) {
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, nullptr, nullptr, loader_mirror);	// set the Java ClassLoader's mirror!!!
+					ObjArrayKlass * newklass = new ObjArrayKlass(inner, layer, nullptr, nullptr, nullptr, loader_mirror);	// set the Java ClassLoader's mirror!!!
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
 #ifdef KLASS_DEBUG
@@ -285,8 +285,8 @@ MyClassLoader::get_loader().print();
 				} else {
 					wstring temp_inner = classname.substr(1);		// strip one '[' only
 					wstring temp_true_inner = temp_inner.substr(0, temp_inner.size()-1);
-					shared_ptr<ObjArrayKlass> last_dimension_array = std::static_pointer_cast<ObjArrayKlass>(loadClass(temp_true_inner));		// get last dimension array klass
-					shared_ptr<ObjArrayKlass> newklass = make_shared<ObjArrayKlass>(inner, layer, nullptr, last_dimension_array, nullptr, loader_mirror);	// use for this dimension array klass
+					ObjArrayKlass * last_dimension_array = ((ObjArrayKlass *)loadClass(temp_true_inner));		// get last dimension array klass
+					ObjArrayKlass * newklass = new ObjArrayKlass(inner, layer, nullptr, last_dimension_array, nullptr, loader_mirror);	// use for this dimension array klass
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
@@ -305,7 +305,7 @@ MyClassLoader::get_loader().print();
 
 				// c. recursively load the [, [[, [[[ ... until this, maybe [[[[[.
 				if (layer == 1) {
-					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, nullptr, nullptr);
+					TypeArrayKlass *newklass = new TypeArrayKlass(type, layer, nullptr, nullptr, nullptr);
 					classmap.insert(make_pair(target, newklass));
 					return newklass;
 #ifdef KLASS_DEBUG
@@ -314,8 +314,8 @@ MyClassLoader::get_loader().print();
 #endif
 				} else {
 					wstring temp_inner = classname.substr(1);
-					shared_ptr<TypeArrayKlass> last_dimension_array = std::static_pointer_cast<TypeArrayKlass>(loadClass(temp_inner));
-					shared_ptr<TypeArrayKlass> newklass = make_shared<TypeArrayKlass>(type, layer, nullptr, last_dimension_array, nullptr);
+					TypeArrayKlass *last_dimension_array = ((TypeArrayKlass *)loadClass(temp_inner));
+					TypeArrayKlass *newklass = new TypeArrayKlass(type, layer, nullptr, last_dimension_array, nullptr);
 					assert(last_dimension_array->get_higher_dimension() == nullptr);
 					last_dimension_array->set_higher_dimension(newklass);
 					classmap.insert(make_pair(target, newklass));
@@ -340,7 +340,7 @@ void MyClassLoader::print()
 	sync_wcout{} <<  "===------------------------------------------------------------------------===" << std::endl;
 }
 
-shared_ptr<Klass> MyClassLoader::find_in_classmap(const wstring & classname)
+Klass *MyClassLoader::find_in_classmap(const wstring & classname)
 {
 	auto iter = this->classmap.find(classname);
 	if (iter == this->classmap.end()) {

@@ -57,16 +57,16 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 		编译运行之后会发现 Generic$1.class 内部类中，含有两个同样签名为 `run()` 的方法。
 		而 `run() OBJ` 自动转调用了 `run() STR`。
 	 */
-	shared_ptr<Method> method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" VOD);
+	shared_ptr<Method> method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" VOD);
 	if (method == nullptr) {
-//		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" STR);
+//		method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" STR);
 //		if (method == nullptr) {
-//			method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" FLD);
+//			method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" FLD);
 //			if (method == nullptr) {
-//				method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()Lsun/reflect/ReflectionFactory;");
+//				method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()Lsun/reflect/ReflectionFactory;");
 //			}
 //		}
-		method = std::static_pointer_cast<InstanceKlass>(pa->get_klass())->get_this_class_method(L"run:()" OBJ);
+		method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" OBJ);
 	}
 	assert(method != nullptr);
 
@@ -76,8 +76,8 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 																// 应当捕获所有 Exception，并且变成 PrivilegeException 抛出！！
 	bool substitute = false;
 	if (result != nullptr && result->get_ooptype() != OopType::_BasicTypeOop && result->get_klass()->get_type() == ClassType::InstanceClass) {	// same as `(Bytecode)invokeVirtual` 's exception judge.
-		auto klass = std::static_pointer_cast<InstanceKlass>(result->get_klass());
-		auto throwable_klass = std::static_pointer_cast<InstanceKlass>(BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
+		auto klass = ((InstanceKlass *)result->get_klass());
+		auto throwable_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Throwable"));
 		if (klass == throwable_klass || klass->check_parent(throwable_klass)) {
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name() << "]. will goto exception_handler!" << std::endl;

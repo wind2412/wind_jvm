@@ -80,7 +80,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	wstring descriptor = name + L":";
 
 	// get the Type of this member variable.	// maybe: BasicType, InstanceType, ArrayType{ObjArrayType, BasicArrayType}.
-	shared_ptr<Klass> mirrored_who = mirror->get_mirrored_who();
+	Klass *mirrored_who = mirror->get_mirrored_who();
 	if (mirrored_who) {	// not primitive type
 		if (mirrored_who->get_type() == ClassType::InstanceClass) {
 			descriptor += (L"L" + mirrored_who->get_name() + L";");
@@ -100,7 +100,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	field->get_field_value(FIELD L":clazz:Ljava/lang/Class;", &oop);
 	MirrorOop *outer_klass_mirror = (MirrorOop *)oop;
 	assert(outer_klass_mirror->get_mirrored_who()->get_type() == ClassType::InstanceClass);	// outer must be InstanceType.
-	shared_ptr<InstanceKlass> outer_klass = std::static_pointer_cast<InstanceKlass>(outer_klass_mirror->get_mirrored_who());
+	InstanceKlass *outer_klass = ((InstanceKlass *)outer_klass_mirror->get_mirrored_who());
 
 	wstring BIG_signature = outer_klass->get_name() + L":" + descriptor;
 
@@ -123,12 +123,12 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) [dangerous] will get an int from obj oop:[" << obj << "], which klass_name is: [" <<
-			std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_name() << "], offset: [" << offset << "]: " << std::endl;
+			((InstanceKlass *)obj->get_klass())->get_name() << "], offset: [" << offset << "]: " << std::endl;
 #endif
 	Oop *target;
-	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
-		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
-		target = std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+	if (((InstanceKlass *)obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
+		offset -= ((InstanceKlass *)obj->get_klass())->non_static_field_num();	// decode
+		target = ((InstanceKlass *)obj->get_klass())->get_static_fields_addr()[offset];
 	} else {		// it's in non-static field.
 		target = obj->get_fields_addr()[offset];
 	}
@@ -146,9 +146,9 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 Oop **get_inner_oop_from_instance_oop_of_static_or_non_static_fields(InstanceOop *obj, long offset)
 {
 	Oop **target;
-	if (std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
-		offset -= std::static_pointer_cast<InstanceKlass>(obj->get_klass())->non_static_field_num();	// decode
-		target = &std::static_pointer_cast<InstanceKlass>(obj->get_klass())->get_static_fields_addr()[offset];
+	if (((InstanceKlass *)obj->get_klass())->non_static_field_num() <= offset) {		// it's encoded static field offset.
+		offset -= ((InstanceKlass *)obj->get_klass())->non_static_field_num();	// decode
+		target = &((InstanceKlass *)obj->get_klass())->get_static_fields_addr()[offset];
 	} else {		// it's in non-static field.
 		target = &obj->get_fields_addr()[offset];
 	}
@@ -350,9 +350,9 @@ void JVM_DefineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp
 	ByteStream byte_buf(buf, len);
 
 	// host_klass
-	shared_ptr<InstanceKlass> host_klass = std::static_pointer_cast<InstanceKlass>(host_klass_mirror->get_mirrored_who());
+	InstanceKlass *host_klass = ((InstanceKlass *)host_klass_mirror->get_mirrored_who());
 	// host_klass's java loader.
-	MirrorOop *host_klass_loader = (host_klass == nullptr) ? nullptr : std::static_pointer_cast<InstanceKlass>(host_klass)->get_java_loader();
+	MirrorOop *host_klass_loader = (host_klass == nullptr) ? nullptr : ((InstanceKlass *)host_klass)->get_java_loader();
 
 	auto anonymous_klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, host_klass_loader,
 																 true, host_klass, cp_patch);
@@ -369,7 +369,7 @@ void JVM_EnsureClassInitialized(list<Oop *> & _stack){
 	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 
 	assert(klass->get_mirrored_who()->get_type() == ClassType::InstanceClass);
-	auto real_klass = std::static_pointer_cast<InstanceKlass>(klass->get_mirrored_who());
+	auto real_klass = ((InstanceKlass *)klass->get_mirrored_who());
 	assert(real_klass != nullptr);
 	BytecodeEngine::initial_clinit(real_klass, *thread);
 }
@@ -400,9 +400,9 @@ void JVM_DefineClass(list<Oop *> & _stack){
 //	assert(loader != nullptr);
 	// 嗯。看来唯一的不同就是，这里的 loader 可以是 nullptr....
 
-	shared_ptr<Klass> klass;
+	Klass *klass;
 	if (loader != nullptr) {
-		klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, std::static_pointer_cast<InstanceKlass>(loader->get_klass())->get_java_loader());
+		klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, ((InstanceKlass *)loader->get_klass())->get_java_loader());
 	} else {
 		klass = MyClassLoader::get_loader().loadClass(klass_name, &byte_buf, nullptr);
 	}

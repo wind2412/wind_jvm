@@ -10,4 +10,4 @@
 
 Lock system_classmap_lock;
 
-unordered_map<wstring, shared_ptr<Klass>> system_classmap;
+unordered_map<wstring, Klass *> system_classmap;

@@ -35,7 +35,7 @@ public:
 	static void init();		// must execute this method before jvm!!!
 	static void fixup_mirrors();	// must execute this after java.lang.Class load!!!
 	static MirrorOop *get_basic_type_mirror(const wstring & signature);	// "I", "Z", "D", "J" ......	// must execute this after `fixup_mirrors()` called !!
-	static void if_Class_didnt_load_then_delay(shared_ptr<Klass> klass, MirrorOop *loader_mirror);
+	static void if_Class_didnt_load_then_delay(Klass *klass, MirrorOop *loader_mirror);
 };
 
 void JVM_GetClassName(list<Oop *> & _stack);
