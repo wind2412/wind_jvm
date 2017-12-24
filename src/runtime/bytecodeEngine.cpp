@@ -548,16 +548,16 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 	}
 
 	// 用于调试：在特定的方法中，得到某个对象中的某个类的 hack.
-	if (new_method->get_name() == L"handleGetObject") {	// 调试 System.out.printf 的 bug: java/util/ResourceBundle
-		assert(ref != nullptr);
-		// 得到 this 下的 lookup 成员并用 toString 打印出来.
-		Oop *oop;
-		((InstanceOop *)ref)->get_field_value(L"sun/util/resources/ParallelListResourceBundle:lookup:Ljava/util/concurrent/ConcurrentMap;", &oop);
-		auto toString = ((InstanceKlass *)ref->get_klass())->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
-		assert(toString != nullptr);
-		InstanceOop *str = (InstanceOop *)thread.add_frame_and_execute(toString, {ref});
-		std::wcout << "[concurrentHashMap]: [\"" << java_lang_string::stringOop_to_wstring(str) << "\"]" << std::endl;
-	}
+//	if (new_method->get_name() == L"handleGetObject") {	// 调试 System.out.printf 的 bug: java/util/ResourceBundle
+//		assert(ref != nullptr);
+//		// 得到 this 下的 lookup 成员并用 toString 打印出来.
+//		Oop *oop;
+//		((InstanceOop *)ref)->get_field_value(L"sun/util/resources/ParallelListResourceBundle:lookup:Ljava/util/concurrent/ConcurrentMap;", &oop);
+//		auto toString = ((InstanceKlass *)ref->get_klass())->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
+//		assert(toString != nullptr);
+//		InstanceOop *str = (InstanceOop *)thread.add_frame_and_execute(toString, {ref});
+//		std::wcout << "[concurrentHashMap]: [\"" << java_lang_string::stringOop_to_wstring(str) << "\"]" << std::endl;
+//	}
 
 	// 这里用作魔改。比如，禁用 Perf 类。
 	if (new_method->get_klass()->get_name() == L"sun/misc/Perf" || new_method->get_klass()->get_name() == L"sun/misc/PerfCounter") {
@@ -1185,14 +1185,14 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0x10: {		// bipush
-				op_stack.push(new IntOop(pc[1]));
+				op_stack.push(new IntOop((int8_t)pc[1]));		// bug report: 注意！！这里是“带符号扩展”！！也就是说，比如 pc[1] 是 uint8_t 的 254，而带符号扩展变成 int 应该是 -2。不过 C 语言保证强转后值不变性，如果直接变成 int，就会变成 int 的 254！！想要变成 -2，就只能让它强行溢出！必须强转为 int8_t！！
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) push byte " << ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
 #endif
 				break;
 			}
 			case 0x11:{		// sipush
-				short val = ((pc[1] << 8) | pc[2]);
+				short val = ((pc[1] << 8) | pc[2]);		// 带符号扩展得非常正确～
 				op_stack.push(new IntOop(val));
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) push short " << ((IntOop *)op_stack.top())->value << " on stack." << std::endl;
@@ -1548,7 +1548,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && (op_stack.top()->get_klass()->get_name() == L"[B" || op_stack.top()->get_klass()->get_name() == L"[Z"));		// assert byte[]/boolean[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				op_stack.push(new IntOop(((IntOop *)((*charsequence)[index]))->value));
+				op_stack.push(new IntOop((int8_t)((IntOop *)((*charsequence)[index]))->value));		// 注意是带符号扩展！！
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) get byte/boolean[" << index << "] which is the byte/boolean: [" << ((IntOop *)op_stack.top())->value << "]" << std::endl;
 #endif
@@ -2804,7 +2804,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0x91:{		// i2b
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
-				op_stack.push(new IntOop((char)val));
+				op_stack.push(new IntOop((int8_t)val));		// (signed_extended) 带符号扩展得很对。
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) convert int: [" << val << "] to byte: [" << std::dec << ((IntOop *)op_stack.top())->value << "]." << std::endl;
 #endif
@@ -2813,7 +2813,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0x92:{		// i2c
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val = ((IntOop*)op_stack.top())->value; op_stack.pop();
-				op_stack.push(new IntOop((unsigned short)val));
+				op_stack.push(new IntOop((unsigned short)val));	// (zero-extended) 零扩展也很对。
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) convert int: [" << val << "] to char: [" << (wchar_t)((IntOop *)op_stack.top())->value << "]." << std::endl;
 #endif
@@ -3056,7 +3056,17 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				// jump begin~
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int key = ((IntOop *)op_stack.top())->value;
-				if (key > jump_tbl.size() - 1 + lowbyte || key < lowbyte) {
+				if (key > (int)jump_tbl.size() - 1 + lowbyte || key < lowbyte) {		// bug report: 留作纪念吧。我一直没有想过会真的犯这种错误。
+																				// jump_tbl.size() 是 unsigned。这个的一开始，它是 unsigned int 4.
+																				// 然后 -1，变成 unsigned int 3.
+																				// lowbyte 是 -2。右手边的结果是 unsigned(1)。
+																				// 然而！！int 和 unsigned 比较的时候，居然是左手边的 int 被变成了 unsigned！！
+																				// 于是 key 瞬间从 int(-2) 变成了 unsigned(254)，攻无不克......QAQ
+																				// 解决方法就是：打开警告....... -Wall......（大雾
+																				// [√] 我在 size() 前边加上了个 (int) 强转了。虽然有些丑。
+																				// TODO: 求更好的解法 QAQ
+//					std::wcout << jump_tbl.size() - 1 + lowbyte << " " << lowbyte << " " << key << std::endl;		// delete
+//					std::wcout << std::boolalpha << (key > jump_tbl.size() - 1 + lowbyte) << " " << (key < lowbyte) << std::endl;		// delete
 					// goto default
 					pc = (code_begin + jump_tbl.back());
 					pc -= occupied;

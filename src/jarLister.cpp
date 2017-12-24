@@ -171,14 +171,25 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 
 JarLister::JarLister() : rjd(L"root")
 {
+	wstring rtjar_folder;
 #if (defined (__APPLE__))
-	rtjar_pos = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/rt.jar";
+	rtjar_folder = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/";
 #elif (defined (__linux__))
-	rtjar_pos = L"/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar";
+	rtjar_folder = L"/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/";
 #else
 	std::cerr << "do not support for windows!" << std::endl;
 	assert(false);
 #endif
+	rtjar_pos = rtjar_folder + L"rt.jar";
+
+	// copy lib/currency.data to ./lib/currency.data ......
+	wstringstream ss;
+	ss << "cp " << rtjar_folder << "currency.data" << " lib/";
+	int status = system(wstring_to_utf8(ss.str()).c_str());
+	if (status == -1) {  	// http://blog.csdn.net/cheyo/article/details/6595955 [shell 命令是否执行成功的判定]
+		std::cerr << "system error!" << endl;
+	}
+
 	bool success = this->getjarlist(rtjar_pos);
 	if (!success)	exit(-1);
 

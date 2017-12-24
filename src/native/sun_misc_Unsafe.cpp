@@ -246,8 +246,9 @@ void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)		// obj 可能是
 		// 也是通过 vector 相对偏移来取值～
 		Oop **target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields((InstanceOop *)obj, offset);
 		// 非常危险...
-		if (*target != nullptr)
-			assert((*target)->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
+		if (*target != nullptr) {
+//			assert((*target)->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
+		}
 		addr = (void *)target;
 	} else {
 		assert(false);
