@@ -26,6 +26,10 @@ struct temp {		// pthread aux struct...
 	std::list<Oop *> *arg;
 	InstanceOop *cur_thread_obj;
 	bool should_be_stop_first = false;		// 使用 start0() 开启一个新的子线程的时候需要指定此变量为 true！！其他情况不用。这是防止 gc 的时候和 start0() 产生冲突的情况。
+	volatile bool the_first_wait_executed = false;	// 一个补丁...... 为了处理由于开启线程 start0 之后，子线程一定会 wait。但是 wait 的时机不一定，如果轮到 main，
+											// main 由于运行完毕直接退出，就会无限阻塞了。这样，由于子线程被分配时间片的时机未知，即 执行 wait 的时机未知，因此采用 dalvik 的方法，
+											// 即：创建子线程的父进程一定要等到子线程真正执行了 wait 之后才退出 start0.
+											// 不过，我又不想使用锁。于是就只能采用多一个变量的方式了。
 };
 
 extern Lock thread_num_lock;
@@ -76,6 +80,7 @@ public:
 	void monitor_inc() { this->monitor_num ++; }
 	void monitor_dec() { this->monitor_num --; }
 	int get_monitor_num() { return this->monitor_num; }
+    bool is_waited_for_child() { return p.the_first_wait_executed; }
 };
 
 class wind_jvm {
@@ -112,6 +117,7 @@ extern pthread_cond_t _all_thread_wait_cond;
 
 // 此函数用于唤醒所有线程。(GC)
 void wait_cur_thread();
+void wait_cur_thread_and_set_bit(volatile bool *);
 void signal_all_thread();
 
 

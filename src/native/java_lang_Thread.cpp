@@ -60,6 +60,10 @@ void JVM_StartThread(list<Oop *> & _stack){
 
 	// start!
 	new_thread->launch(_this);
+
+	while(!new_thread->is_waited_for_child());		// wait until the new_thread wait.
+
+	std::wcout << "wait over!!" << std::endl;		// delete
 }
 
 void JVM_StopThread(list<Oop *> & _stack){

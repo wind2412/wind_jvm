@@ -28,13 +28,26 @@ void * scapegoat (void *pp) {
 
 	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
 		sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
+		real->the_first_wait_executed = true;
 		real->thread->set_state(Waiting);
-		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
+//		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
+		wait_cur_thread_and_set_bit(&real->the_first_wait_executed);
 		real->thread->set_state(Running);
 		sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
 	}
 
 	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
+
+	// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立调用点。
+	//	if (thread.get_monitor_num() == 0) {
+	GC::set_safepoint_here(real->thread);
+	//	}
+
+	if (real->should_be_stop_first) {		// if it is main thread:
+		// wait for all detached sub threads over
+		pthread_exit(nullptr);
+	}
+
 	return nullptr;
 };
 
@@ -59,9 +72,10 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 		pthread_join(tid, nullptr);
 
 #ifdef DEBUG
-		sync_wcout{} << "run over!!!" << std::endl;		// delete
+		sync_wcout{} << pthread_self() << " run over!!!" << std::endl;		// delete
 #endif
 	}
+
 }
 
 void vm_thread::start(list<Oop *> & arg)
@@ -416,6 +430,14 @@ pthread_cond_t _all_thread_wait_cond;
 void wait_cur_thread()
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
+	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	pthread_mutex_unlock(&_all_thread_wait_mutex);
+}
+
+void wait_cur_thread_and_set_bit(volatile bool *bit)
+{
+	pthread_mutex_lock(&_all_thread_wait_mutex);
+	*bit = true;
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }

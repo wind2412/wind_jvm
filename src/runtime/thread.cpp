@@ -32,7 +32,7 @@ void ThreadTable::add_a_thread(pthread_t tid, InstanceOop *_thread)
 	if (get_thread_table().insert(make_pair(tid, make_pair(get_thread_table().size(), _thread))).second == false) {	// 如果原先已经插入了的话，那么就复用原先的 thread_no.
 		number = get_thread_table()[tid].first;
 	}
-	get_thread_table()[tid] = make_pair(get_thread_table().size(), _thread);		// Override!!!! because tid maybe the same...?
+	get_thread_table()[tid] = make_pair(number, _thread);		// Override!!!! because tid maybe the same...?
 					// 已解决： 这里有可能会出故障的。因为设置的时候是设置 size，所以如果要是重复插入了两次，就不好弄了(因为 pthread 会复用原来的线程 pthread_t)。size 就会不准确。不过 size 仅仅用于输出，所以没有别的用处。
 					// 不过 fix 了这个问题带来的小代价就是，线程的 thread_no 可能不按照顺序了。没准最新插入的线程因为 pthread_t 复用，而复用了原来的 thread_no。所以这样的话，
 					// 可能原先那个 thread_no 是 0，而这个本来应该是 3，但是复用之后还是 0。因此，输出的颜色只能作为分辨 “不同线程” 来用，
