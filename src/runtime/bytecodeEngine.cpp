@@ -2330,15 +2330,31 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
-				op_stack.push(new IntOop(val1 / val2));
+				if (val1 == INT_MIN && val2 == -1) {
+					op_stack.push(new IntOop(val1));
+				} else {
+					op_stack.push(new IntOop(val1 / val2));
+				}
 #ifdef BYTECODE_DEBUG
-	sync_wcout{} << "(DEBUG) sub int value from stack: "<< val1 << " / " << val2 << "(on top) and put " << (val1 / val2) << " on stack." << std::endl;
+	sync_wcout{} << "(DEBUG) div int value from stack: "<< val1 << " / " << val2 << "(on top) and put " << (val1 / val2) << " on stack." << std::endl;
 #endif
 				break;
 			}
-
-
-
+			case 0x6d:{		// ldiv
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val2 = ((LongOop*)op_stack.top())->value; op_stack.pop();		// 不 delete。由 GC 一块来。
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
+				if (val1 == LONG_MIN && val2 == -1) {
+					op_stack.push(new LongOop(val1));
+				} else {
+					op_stack.push(new LongOop(val1 / val2));
+				}
+#ifdef BYTECODE_DEBUG
+	sync_wcout{} << "(DEBUG) div long value from stack: "<< val1 << " / " << val2 << "(on top) and put " << (val1 / val2) << " on stack." << std::endl;
+#endif
+				break;
+			}
 			case 0x6e:{		// fdiv
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::FLOAT);
 				float val2 = ((FloatOop*)op_stack.top())->value; op_stack.pop();

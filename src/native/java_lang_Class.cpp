@@ -872,7 +872,7 @@ void JVM_GetClassConstantPool(list<Oop *> & _stack){
 
 void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	_stack.push_back(new IntOop(true));		// 虚拟机内部全使用 Int！！
+	_stack.push_back(new IntOop(false));		// 虚拟机内部全使用 Int！！		// TODO: 默认是关闭的。不过如果发现了虚拟机有 bug，可以打开它使用 java 类库的 assert 来调试。
 }
 
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){

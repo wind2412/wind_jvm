@@ -22,8 +22,7 @@ public class Test13 {
 		JJ<Integer> iii = (new CC())::impl;
 		System.out.println(iii);
 //		JJ<Float> r = (new CC())::impl;
-		System.out.println(iii.foo(44));
-//		System.out.printf(">>> %s\n", iii.foo(44));
+		System.out.printf(">>> %s\n", iii.foo(44));
 //		System.out.printf(">>> %s\n", iii.foo(3.5));		// 并不能运作？？？
 	}
 	
