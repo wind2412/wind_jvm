@@ -236,6 +236,7 @@ void JVM_GetClassName(list<Oop *> & _stack){
 	sync_wcout{} << "(DEBUG) native method [java/lang/Class.getName0()] get `this` classname: [" << java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.back()) << "]." << std::endl;
 #endif
 }
+
 void JVM_ForClassName(list<Oop *> & _stack){		// static
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
 	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
@@ -260,6 +261,7 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 		_stack.push_back(klass->get_mirror());
 	}
 }
+
 void JVM_GetSuperClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 
@@ -285,14 +287,17 @@ void JVM_GetSuperClass(list<Oop *> & _stack){
 		}
 	}
 }
+
 void JVM_GetClassInterfaces(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_GetClassLoader(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_IsInterface(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(_this != nullptr);
@@ -311,6 +316,7 @@ void JVM_IsInterface(list<Oop *> & _stack){
 	sync_wcout{} << "(DEBUG) this klass: [" << name << "] is an interface ? [" << std::boolalpha << (bool)((IntOop *)_stack.back())->value << "]." << std::endl;
 #endif
 }
+
 void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *obj = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -330,6 +336,7 @@ void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	sync_wcout{} << "is [" << obj_klass->get_name() << "]'s oop is also [" << this_klass->get_name() << "]'s instance? [" << std::boolalpha << (bool)(((IntOop *)_stack.back())->value) << "]." << std::endl;
 #endif
 }
+
 void JVM_IsAssignableFrom(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	MirrorOop *_that = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -370,14 +377,17 @@ void JVM_IsAssignableFrom(list<Oop *> & _stack){
 	}
 
 }
+
 void JVM_GetClassSigners(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_SetClassSigners(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_IsArrayClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	auto klass = _this->get_mirrored_who();
@@ -395,6 +405,7 @@ void JVM_IsArrayClass(list<Oop *> & _stack){
 		sync_wcout{} << "(DEBUG) klass: [" << _this->get_extra() << "] is not a array klass." << std::endl;
 #endif
 }
+
 void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	if (_this->get_mirrored_who()) {
@@ -410,6 +421,7 @@ void JVM_IsPrimitiveClass(list<Oop *> & _stack){
 #endif
 	}
 }
+
 void JVM_GetComponentType(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	auto klass = _this->get_mirrored_who();
@@ -453,6 +465,7 @@ void JVM_GetComponentType(list<Oop *> & _stack){
 	}
 #endif
 }
+
 void JVM_GetClassModifiers(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 
@@ -469,6 +482,7 @@ void JVM_GetClassModifiers(list<Oop *> & _stack){
 	}
 
 }
+
 void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
@@ -578,6 +592,7 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 
 	_stack.push_back(field_arr);
 }
+
 void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	bool public_only = (bool)((IntOop *)_stack.front())->value;	_stack.pop_front();
@@ -778,6 +793,7 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 
 	_stack.push_back(ctor_arr);
 }
+
 void JVM_GetProtectionDomain(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
@@ -785,10 +801,12 @@ void JVM_GetProtectionDomain(list<Oop *> & _stack){
 
 	_stack.push_back(nullptr);		// 都不知道对不对...	// TODO: emmmm.... 非常害怕这里出错。
 }
+
 void JVM_GetDeclaredClasses(list<Oop *> & _stack){		// return the mirror's inner: public/protected/private inner classes.
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用，返回这个内部类的 outer。
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	if (_this == nullptr) {
@@ -836,24 +854,27 @@ void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用�
 	return;
 
 }
+
 void JVM_GetClassSignature(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_GetClassAnnotations(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_GetClassConstantPool(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	// TODO: 我默认禁止了断言！！ assert 是没有用的。默认是不加 -ea （逃
-	// TODO: 关于 assert 字节码的生成，还没有搞清楚。搞清楚了之后立马加上。也可以参见 hotspot: vm/prims/jvm.cpp:2230 --> JVM_DesiredAssertionStatus.
-	_stack.push_back(new IntOop(false));		// 虚拟机内部全使用 Int！！
+	_stack.push_back(new IntOop(true));		// 虚拟机内部全使用 Int！！
 }
+
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	if (_this == nullptr) {
@@ -909,10 +930,12 @@ void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
 	_stack.push_back(obj_arr);
 
 }
+
 void JVM_GetClassTypeAnnotations(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	assert(false);
 }
+
 void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	wstring basic_type_klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 #ifdef DEBUG

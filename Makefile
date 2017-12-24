@@ -1,10 +1,10 @@
 CC := g++
-CPP_FLAGS := -std=c++14 -O4 -pg
+#CPP_FLAGS := -std=c++14 -O4 -pg
 #CPP_FLAGS := -std=c++14 -pg
 #CPP_FLAGS := -std=c++14 -O3 -pg
 #CPP_FLAGS := -std=c++14 -DNDEBUG -O3 -pg
 #CPP_FLAGS := -std=c++14 -DBYTECODE_DEBUG
-#CPP_FLAGS := -std=c++14 -DBYTECODE_DEBUG -DDEBUG
+CPP_FLAGS := -std=c++14 -DBYTECODE_DEBUG -DDEBUG
 LINK_FLAGS := -std=c++14
 LINK_FLAGS := -std=c++14 -pg
 #CPP_FLAGS := -std=c++14 -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG	-DSTRING_DEBUG

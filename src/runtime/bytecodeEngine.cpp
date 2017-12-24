@@ -78,7 +78,9 @@ StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame
 		// 在这里，会把 localVariableTable 按照规范，long 和 double 会自动占据两位。
 		localVariableTable.at(i++) = value;	// 检查越界。
 //#ifdef BYTECODE_DEBUG		// bug report: 忽略了...... print_arg_msg 会造成无限循环......
-//	sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value, thread) << std::endl;
+//	if (method->get_name() != L"toString") {	// 即便能在这里取消，也没法保证 toString 里边没有调用别的函数......
+//		sync_wcout{} << "the "<< i-1 << " argument of [" << method->get_name() << "] is " << print_arg_msg(value, thread) << std::endl;
+//	}
 //#endif
 		if (value != nullptr && value->get_ooptype() == OopType::_BasicTypeOop
 				&& ((((BasicTypeOop *)value)->get_type() == Type::LONG) || (((BasicTypeOop *)value)->get_type() == Type::DOUBLE))) {
@@ -526,6 +528,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 {
 	// 因此，得到此方法的目的只有一个，得到方法签名。
 	wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
+
 	// TODO: 可以 verify 一下。按照 Spec
 	// 1. 先 parse 参数。因为 ref 在最下边。
 	int size = new_method->parse_argument_list().size() + 1;		// don't forget `this`!!!
@@ -542,6 +545,18 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 		arg_list.push_front(op_stack.top());
 		op_stack.pop();
 		size --;
+	}
+
+	// 用于调试：在特定的方法中，得到某个对象中的某个类的 hack.
+	if (new_method->get_name() == L"handleGetObject") {	// 调试 System.out.printf 的 bug: java/util/ResourceBundle
+		assert(ref != nullptr);
+		// 得到 this 下的 lookup 成员并用 toString 打印出来.
+		Oop *oop;
+		((InstanceOop *)ref)->get_field_value(L"sun/util/resources/ParallelListResourceBundle:lookup:Ljava/util/concurrent/ConcurrentMap;", &oop);
+		auto toString = ((InstanceKlass *)ref->get_klass())->search_vtable(L"toString:()Ljava/lang/String;");	// don't use `find_in_this_klass()..."
+		assert(toString != nullptr);
+		InstanceOop *str = (InstanceOop *)thread.add_frame_and_execute(toString, {ref});
+		std::wcout << "[concurrentHashMap]: [\"" << java_lang_string::stringOop_to_wstring(str) << "\"]" << std::endl;
 	}
 
 	// 这里用作魔改。比如，禁用 Perf 类。
@@ -1497,7 +1512,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[J");		// assert long[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
-				op_stack.push(new LongOop(((IntOop *)((*charsequence)[index]))->value));
+				op_stack.push(new LongOop(((LongOop *)((*charsequence)[index]))->value));
 #ifdef BYTECODE_DEBUG
 	sync_wcout{} << "(DEBUG) get long[" << index << "] which is the long: [" << ((LongOop *)op_stack.top())->value << "]." << std::endl;
 #endif
@@ -2502,7 +2517,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int val2 = ((IntOop*)op_stack.top())->value; op_stack.pop();
 				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::LONG);
-				long val1 = ((IntOop*)op_stack.top())->value; op_stack.pop();
+				long val1 = ((LongOop*)op_stack.top())->value; op_stack.pop();
 				int s = (val2 & 0x3F);
 				op_stack.push(new LongOop(val1 << s));
 #ifdef BYTECODE_DEBUG
