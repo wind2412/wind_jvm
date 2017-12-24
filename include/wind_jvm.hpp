@@ -81,6 +81,7 @@ public:
 	void monitor_dec() { this->monitor_num --; }
 	int get_monitor_num() { return this->monitor_num; }
     bool is_waited_for_child() { return p.the_first_wait_executed; }
+    pthread_t get_tid() { return tid; }
 };
 
 class wind_jvm {

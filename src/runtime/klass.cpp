@@ -589,7 +589,7 @@ wstring InstanceKlass::parse_signature()
 
 wstring InstanceKlass::get_source_file_name()
 {
-	assert(this->sourceFile != L"");
+//	assert(this->sourceFile != L"");
 	return this->sourceFile;
 }
 

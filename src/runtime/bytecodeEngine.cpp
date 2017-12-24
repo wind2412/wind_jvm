@@ -1859,7 +1859,8 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 					// TODO: should throw NullpointerException
 					assert(false);
 				}
-				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop && op_stack.top()->get_klass()->get_name() == L"[B");		// assert byte[] array
+				assert(op_stack.top()->get_ooptype() == OopType::_TypeArrayOop &&
+					   (op_stack.top()->get_klass()->get_name() == L"[B" || op_stack.top()->get_klass()->get_name() == L"[Z"));	// assert byte[]/boolean[] array
 				TypeArrayOop * charsequence = (TypeArrayOop *)op_stack.top();	op_stack.pop();
 				assert(charsequence->get_length() > index && index >= 0);	// TODO: should throw ArrayIndexOutofBoundException
 				(*charsequence)[index] = new IntOop((int)((char)(byte->value)));
@@ -3408,7 +3409,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				arg_list.push_back((Oop *)&thread);
 				JVM_InvokeExact(arg_list);		// TODO: invoke(...) 也不完全。只有 invokeExact(...) 还好。
 				// invoke 方法必然有返回值。
-				assert(arg_list.size() == 1);		// 做一个可能不对的检查......
+//				assert(arg_list.size() == 1);		// 做一个可能不对的检查......
 				InstanceOop *ret_oop = (InstanceOop *)arg_list.back();
 				// [x] PS: 我在 invokeExact native 方法中自动拆包了 [Object... 应该不能有问题把...
 

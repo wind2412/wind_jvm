@@ -368,18 +368,26 @@ ArrayOop * vm_thread::get_stack_trace()
 		shared_ptr<Method> m = it->method;
 		auto klass_name = java_lang_string::intern(m->get_klass()->get_name());
 		auto method_name = java_lang_string::intern(m->get_name());
-		auto file_name = java_lang_string::intern(m->get_klass()->get_source_file_name());
+		wstring java_file_name = m->get_klass()->get_source_file_name();
+		auto file_name = java_lang_string::intern(java_file_name);
+
 		int line_num;
 		int last_pc_debug = 0;
-		if (last_frame_pc == 0)
+		if (java_file_name == L"") {		// must be VM Anonymous Klass...
 			line_num = 0;
-		else {
-			last_pc_debug = last_frame_pc - m->get_code()->code;
-			line_num = m->get_java_source_lineno(last_frame_pc - m->get_code()->code);
+		} else {
+			if (last_frame_pc == 0)
+				line_num = 0;
+			else {
+				last_pc_debug = last_frame_pc - m->get_code()->code;
+				line_num = m->get_java_source_lineno(last_frame_pc - m->get_code()->code);
+			}
+
 		}
 
 		// set next frame's pc
 		last_frame_pc = it->return_pc;
+
 
 		// inject
 		(*arr)[i] = stack_elem_klass->new_instance();
@@ -437,7 +445,7 @@ void wait_cur_thread()
 void wait_cur_thread_and_set_bit(volatile bool *bit)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
-	*bit = true;
+	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }

@@ -5,6 +5,7 @@
 #include "utils/utils.hpp"
 #include "utils/synchronize_wcout.hpp"
 #include "runtime/oop.hpp"
+#include "wind_jvm.hpp"
 
 using std::ifstream;
 using std::shared_ptr;
@@ -192,11 +193,16 @@ Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf,
 //		if (newklass->get_name() == L"xxxxx") {
 //			std::wcout << "success!!" << std::endl;
 //		}
-		// reset the Anonymous Klass's name.
-		std::wstringstream ss;
-		ss << newklass->get_name() << L"/" << newklass;			// 这里的 bug，在于看到注释了解到 Anonymous Klass 不属于任何一个 classloader......于是就没放进 classloader 中......结果 shared_ptr 由于引用计数变成0 自动析构了 .... 各种ub...
-		newklass->set_name(ss.str());
 
+		// 拦截：VM Anonymous Klass 的字节码。
+//		if (newklass->get_name() == L"Test13$$Lambda$1") {
+//			byte_buf->print(',', true);		// 输出某一个特定类的字节码。此类是直接注入的，因此没有 .class 文件。
+//		}
+
+		// reset the Anonymous Klass's name. 但是这里，由于我内部的常量池会通过 name 来 parse...... 所以只能取消掉了......
+//		std::wstringstream ss;
+//		ss << newklass->get_name() << L"/" << newklass;			// 这里的 bug，在于看到注释了解到 Anonymous Klass 不属于任何一个 classloader......于是就没放进 classloader 中......结果 shared_ptr 由于引用计数变成0 自动析构了 .... 各种ub...
+//		newklass->set_name(ss.str());
 
 //		std::wcout << newklass->get_name() << std::endl;		// delete
 		// set the hostklass.
@@ -221,8 +227,29 @@ MyClassLoader::get_loader().print();
 			if (byte_buf == nullptr) {
 				ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);		// use `ifstream`
 				if(!f.is_open()) {
-					std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
-					exit(-1);
+//					for (auto iter : wind_jvm::threads()) {		// get now pthread_t's vm_thread.
+//						if (iter.get_tid() == pthread_self()) {
+//							iter.get_stack_trace();
+//						}
+//					}
+
+					// 这里，如果要是复用之前的 VM Anonymous Klass 的话，也会走到这里......
+					// 先检测之前有无 VM Anonymous Klass.
+					auto iter = std::find_if(anonymous_klassmap.begin(), anonymous_klassmap.end(), [&classname](InstanceKlass *anonymous_klass) {
+						if (anonymous_klass->get_name() == classname) {		// 加上一个 / 来保证是 VM Anonymous klass. 因为原本的名称已经被我改变成了 ..../0x38343 这种地址形式。
+							return true;
+						} else {
+							return false;
+						}
+					});
+
+					if (iter == anonymous_klassmap.end()) {
+						std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
+						exit(-1);
+					} else {
+						return *iter;
+					}
+
 				}
 #ifdef DEBUG
 				sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
@@ -231,7 +258,7 @@ MyClassLoader::get_loader().print();
 			} else {		// use ByteBuffer:
 				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
 
-				// 拦截：
+				// 拦截：lambda 中的非匿名类，但是字节码是隐式注入的那种：即 jdk 为了隐藏实现而使用的字节码序列集。
 //				if (classname == L"java/lang/invoke/BoundMethodHandle$Species_LL") {
 //					byte_buf->print(',', true);		// 输出某一个特定类的字节码。此类是直接注入的，因此没有 .class 文件。
 //				}
