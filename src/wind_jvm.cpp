@@ -27,26 +27,26 @@ void * scapegoat (void *pp) {
 //	}
 
 	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
-		sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
-		real->the_first_wait_executed = true;
 		real->thread->set_state(Waiting);
 //		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
 		wait_cur_thread_and_set_bit(&real->the_first_wait_executed);
 		real->thread->set_state(Running);
-		sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
 	}
 
 	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
 
-	// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立调用点。
-	//	if (thread.get_monitor_num() == 0) {
-	GC::set_safepoint_here(real->thread);
-	//	}
+	signal_all_thread();
 
-	if (real->should_be_stop_first) {		// if it is main thread:
-		// wait for all detached sub threads over
-		pthread_exit(nullptr);
-	}
+//	if (!real->should_be_stop_first) {		// if it is main thread:
+//		// wait for all detached sub threads over
+//		pthread_exit(nullptr);		// bug report: 由于我的虚拟机的真·主线程启动了一个线程main线程来跑 public static void main()，结果我在这个 main 线程写了 pthread_exit......
+									// 造成了直接崩溃...... 因为，pthread_exit 放在对等线程(子线程)中，就是直接结束子线程，直接退出；
+									// 如果写在主线程(不是 main 线程，main 线程在我的 vm 中也是一个对等线程。)中，就会等待所有子线程结束之后自己才退出。
+									// 写错在这里了，造成了 main 线程不会等待其他线程停止，而跑完了 main，所以整个虚拟机都结束了......结果还有线程使用 UB 的资源在运行......
+									// 把 pthread_exit() 放到真·主线程中就好了。
+									// 另：很棒的一点！无论是主线程创建的子线程，还是子线程创建的子线程，对于主线程来说，都是“对等线程”～！
+									// 所以，在主线程中 pthread_exit()，直接就能收下真·所有的线程！包括子线程创建的！
+//	}
 
 	return nullptr;
 };
@@ -69,7 +69,12 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
 
-		pthread_join(tid, nullptr);
+		pthread_join(tid, nullptr);	// 等待 main 线程结束...
+
+		// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立调用点。
+//		signal_all_thread();
+
+		pthread_exit(nullptr);		// 这里才是真·主线程......即开启 main 线程的线程......
 
 #ifdef DEBUG
 		sync_wcout{} << pthread_self() << " run over!!!" << std::endl;		// delete
@@ -446,7 +451,9 @@ void wait_cur_thread_and_set_bit(volatile bool *bit)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
 	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
+	sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 

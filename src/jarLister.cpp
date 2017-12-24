@@ -140,19 +140,26 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	wstringstream cmd;
 	cmd << L"jar tf " << rtjar_pos << L" > " << this->rtlist;
 	int status =  system(wstring_to_utf8(cmd.str()).c_str());
+	if (status == -1) {
+		exit(-1);
+	}
 	// TODO: judge whether mkdir is exist?
 	if (bf::exists(uncompressed_dir)) {	// 如果存在
 		return true;
 	}
 	cmd.str(L"");
 	cmd << L"mkdir " << uncompressed_dir << L" > /dev/null 2>&1";
-	system(wstring_to_utf8(cmd.str()).c_str());
+	status = system(wstring_to_utf8(cmd.str()).c_str());
+	if (status == -1) {
+		exit(-1);
+	}
 	cmd.str(L"");
 	std::wcout << "unzipping rt.jar from: [" << rtjar_pos << "] ... please wait.\n";
 	cmd << L"unzip " << rtjar_pos << L" -d " << uncompressed_dir << L" > /dev/null 2>&1";
-	system(wstring_to_utf8(cmd.str()).c_str());
+	status = system(wstring_to_utf8(cmd.str()).c_str());
 	if (status == -1) {  	// http://blog.csdn.net/cheyo/article/details/6595955 [shell 命令是否执行成功的判定]
 		std::cerr << "system error!" << endl;
+		exit(-1);
 	} else {  
 		if (WIFEXITED(status)) {  
 			if (0 == WEXITSTATUS(status)) {  
