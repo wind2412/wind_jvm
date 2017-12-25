@@ -46,6 +46,7 @@ public:
 	static void set_safepoint_here(vm_thread *);
 	static void signal_all_patch();
 	static void print_table();
+	static void cancel_gc_thread();
 };
 
 

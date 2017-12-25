@@ -3643,25 +3643,59 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 						// TODO: 好好看看 openjdk 怎么实现的？多线程的异常？
 
 //						ThreadTable::kill_all_except_main_thread(pthread_self());
-//						exit(-1);		// 不行......整个进程全部退出，会造成此 thread 析构，把全局的东西析构了......
+//						exit(-1);		// 不行......整个进程全部退出，但是会 SIGSEGV...... 很神奇......
 						InstanceOop *thread_obj = ThreadTable::get_a_thread(pthread_self());
 						assert(thread_obj != nullptr);
 						auto final_method = ((InstanceKlass *)thread_obj->get_klass())->get_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V", false);
 						assert(final_method != nullptr);
 						thread.add_frame_and_execute(final_method, {thread_obj, exception_obj});
 
-						wind_jvm::lock().lock();
-						{
-							wind_jvm::thread_num() --;
-							assert(wind_jvm::thread_num() >= 0);
+						if (thread.p.should_be_stop_first) {		// this is a thread with start by `start0`.
+
+							wind_jvm::lock().lock();
+							{
+								wind_jvm::thread_num() --;
+								assert(wind_jvm::thread_num() >= 0);
+							}
+							wind_jvm::lock().unlock();
+
+							pthread_mutex_lock(&_all_thread_wait_mutex);
+							thread.state = Death;
+							pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+							pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......		// TODO: 如果主线程也在这里异常退出......
+
+						} else {									// else, this is the `main thread`. need to recycle resources...
+
+							pthread_mutex_lock(&_all_thread_wait_mutex);
+							thread.state = Death;
+							pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+							// cancel all running thread.
+							wind_jvm::lock().lock();
+							{
+								for (auto & thread : wind_jvm::threads()) {
+									bool status;
+									pthread_mutex_lock(&_all_thread_wait_mutex);
+									thread_state state = thread.state;
+									pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+									if (state == Death)	continue;			// 防止 pthread_cancel 的 SIGSEGV
+
+									if (thread.tid != pthread_self()) {		// not itself
+										pthread_cancel(thread.tid);			// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
+									}
+								}
+							}
+							wind_jvm::lock().unlock();
+
+							// force cancel gc thread?
+							pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
+
+							// 回收资源
+
+							exit(-1);
 						}
-						wind_jvm::lock().unlock();
-
-						pthread_mutex_lock(&_all_thread_wait_mutex);
-						thread.state = Death;
-						pthread_mutex_unlock(&_all_thread_wait_mutex);
-
-						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......		// TODO: 如果主线程也在这里异常退出......
 
 					} else {
 						auto iter = thread.vm_stack.rbegin();

@@ -170,6 +170,20 @@ void GC::signal_all_patch()
 	gc_lock().unlock();
 }
 
+void GC::cancel_gc_thread()
+{
+	while(true) {
+		LockGuard lg(GC::gc_lock());
+		if (GC::gc()) {
+			continue;
+		} else {
+			pthread_cancel(wind_jvm::gc_thread());
+			std::wcout << "canceled gc..." << std::endl;
+			break;
+		}
+	}
+}
+
 void GC::print_table()
 {
 //#ifdef DEBUG

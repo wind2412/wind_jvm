@@ -88,18 +88,11 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 		}
 
 		// 最后，cancel 掉 gc 线程。于是世界只剩下了此真·主线程。
-		while(true) {
-			LockGuard lg(GC::gc_lock());
-			if (GC::gc()) {
-				continue;
-			} else {
-				pthread_cancel(wind_jvm::gc_thread());
-				std::wcout << "cancelled gc..." << std::endl;
-				break;
-			}
-		}
+		GC::cancel_gc_thread();
 
 		// 回收资源......
+
+
 
 #ifdef DEBUG
 		sync_wcout{} << pthread_self() << " run over!!!" << std::endl;		// delete
