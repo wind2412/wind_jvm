@@ -2695,8 +2695,13 @@ ClassFile::~ClassFile() {
 	delete[] constant_pool;
 	delete[] interfaces;
 	delete[] fields;
-		
-	// todo: delete others memory !!!!!!!!!!!
+	delete[] methods;
+	if (attributes != nullptr) {
+		for (int i = 0; i < attributes_count-1; i ++) {
+			delete attributes[i];
+		}
+	}
+	delete[] attributes;
 }
 
 void ClassFile::parse_header(std::istream & f) {

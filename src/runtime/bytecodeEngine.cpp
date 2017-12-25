@@ -1021,7 +1021,7 @@ void cleanup(void *)
 	wind_jvm::lock().unlock();
 }
 
-void BytecodeEngine::main_thread_exception()		// dummy is use for BytecodeEngine::excute / SIGINT_handler.
+void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for BytecodeEngine::excute / SIGINT_handler.
 {
 	// cancel all running thread.
 	wind_jvm::lock().lock();
@@ -1055,8 +1055,9 @@ void BytecodeEngine::main_thread_exception()		// dummy is use for BytecodeEngine
 	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
 
 	// 回收资源
+	wind_jvm::end();
 
-	exit(-1);
+	exit(exitcode);
 }
 
 

@@ -5,7 +5,7 @@
 #include <locale>
 #include "runtime/oop.hpp"
 #include "wind_jvm.hpp"
-#include "native/java_lang_string.hpp"
+#include "native/java_lang_String.hpp"
 
 // from Stack Overflow
 std::string wstring_to_utf8 (const std::wstring& str)			// 这东西有时候不准。像是我的 JVM_GetBooleanAttributes0 这个函数，wstring 文件路径转为 char* 经常变成 "x"。。。都不知道为啥....

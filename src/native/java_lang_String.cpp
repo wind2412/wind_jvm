@@ -26,7 +26,7 @@ size_t java_string_hash::operator()(Oop* const & ptr) const noexcept		// TODO: �
 
 	// get string oop's `value` field's `TypeArrayOop` and calculate hash value	// using **Openjdk8 string hash algorithm!!**
 	Oop *value_field;
-	((InstanceOop *)ptr)->get_field_value(STRING L":value:[C", &value_field) == true;
+	((InstanceOop *)ptr)->get_field_value(STRING L":value:[C", &value_field);
 	int length = ((TypeArrayOop *)value_field)->get_length();
 	int hash_val = 0;		// bug report: 在 java 中我使用的 hash 值是 int 型，而这里使用了 unsigned int 型... 造成了溢出之后值不正确的情况...
 	for (int i = 0; i < length; i ++) {
@@ -46,9 +46,9 @@ bool java_string_equal_to::operator() (Oop* const & lhs, Oop* const & rhs) const
 
 	// get `value` field's `char[]` and compare every char.
 	Oop *value_field_lhs;
-	((InstanceOop *)lhs)->get_field_value(STRING L":value:[C", &value_field_lhs) == true;
+	((InstanceOop *)lhs)->get_field_value(STRING L":value:[C", &value_field_lhs);
 	Oop *value_field_rhs;
-	((InstanceOop *)rhs)->get_field_value(STRING L":value:[C", &value_field_rhs) == true;
+	((InstanceOop *)rhs)->get_field_value(STRING L":value:[C", &value_field_rhs);
 
 	int length_lhs = ((TypeArrayOop *)value_field_lhs)->get_length();
 	int length_rhs = ((TypeArrayOop *)value_field_rhs)->get_length();

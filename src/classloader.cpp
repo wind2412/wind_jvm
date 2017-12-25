@@ -46,9 +46,9 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 				std::wcerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				exit(-1);
 			}
-#ifdef DEBUG
+//#ifdef DEBUG
 			sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
-#endif
+//#endif
 			shared_ptr<ClassFile> cf(new ClassFile);
 			f >> *cf;
 #ifdef DEBUG
@@ -141,16 +141,20 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 void BootStrapClassLoader::print()
 {
 	sync_wcout{} << "===------------ ( BootStrapClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
+	LockGuard lg(system_classmap_lock);
 	sync_wcout{} << "total Classes num: " << system_classmap.size() << std::endl;
 	for (auto iter : system_classmap) {
 		sync_wcout{} << "  " << iter.first << std::endl;
 	}
-	sync_wcout{} <<  "===----------------------------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===----------------------------------------------------------------------------===" << std::endl;
 }
 
 void BootStrapClassLoader::cleanup()
 {
-
+	LockGuard lg(system_classmap_lock);
+	for (auto iter : system_classmap) {
+		delete iter.second;
+	}
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
@@ -380,15 +384,17 @@ MyClassLoader::get_loader().print();
 void MyClassLoader::print()
 {
 	sync_wcout{} << "===--------------- ( MyClassLoader ) Debug TotalClassesPool ---------------===" << std::endl;
+	LockGuard lg(this->lock);
 	sync_wcout{} << "total Classes num: " << this->classmap.size() << std::endl;
 	for (auto iter : this->classmap) {
 		sync_wcout{} << "  " << iter.first << std::endl;
 	}
-	sync_wcout{} <<  "===------------------------------------------------------------------------===" << std::endl;
+	sync_wcout{} << "===------------------------------------------------------------------------===" << std::endl;
 }
 
 Klass *MyClassLoader::find_in_classmap(const wstring & classname)
 {
+	LockGuard lg(this->lock);
 	auto iter = this->classmap.find(classname);
 	if (iter == this->classmap.end()) {
 		return nullptr;
@@ -399,5 +405,11 @@ Klass *MyClassLoader::find_in_classmap(const wstring & classname)
 
 void MyClassLoader::cleanup()
 {
-
+	LockGuard lg(this->lock);
+	for (auto iter : classmap) {
+		delete iter.second;
+	}
+	for (auto iter : anonymous_klassmap) {
+		delete iter;
+	}
 }

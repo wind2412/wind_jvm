@@ -80,7 +80,7 @@ public:	// aux
 	static void initial_clinit(InstanceKlass *, vm_thread & thread);
 	static bool check_instanceof(Klass *ref_klass, Klass *klass);
 	static wstring get_real_value(Oop *oop);
-	static void main_thread_exception();
+	static void main_thread_exception(int exitcode = -1);
 private:		// for invokeDynamic
 	static InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread, bool = false);
 	static InstanceOop *MethodType_make(shared_ptr<Method> target_method, vm_thread & thread);

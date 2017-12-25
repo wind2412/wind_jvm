@@ -22,7 +22,7 @@ void JVM_Halt0(list<Oop *> & _stack){		// static
 
 	// TODO: fully gc.
 
-	exit(exitcode);		// 直接退出！！
+	BytecodeEngine::main_thread_exception(exitcode);		// 直接退出！！
 
 }
 

@@ -92,7 +92,7 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 		GC::cancel_gc_thread();
 
 		// 回收资源......
-
+		wind_jvm::end();
 
 
 #ifdef DEBUG
@@ -527,13 +527,15 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 	// 在这里，启动虚拟机线程。
 	init_thread->launch();		// begin this thread.
 
-	// finally! delete all allocated memory!!
-	for (auto iter : Mempool::oop_handler_pool()) {
-		delete iter;
-	}
 }
 
 void wind_jvm::end()
 {
+	BootStrapClassLoader::get_bootstrap().cleanup();
+	MyClassLoader::get_loader().cleanup();
 
+	// finally! delete all allocated memory!!
+	MemAlloc::cleanup();
+
+	std::wcout << "world ends..." << std::endl;
 }

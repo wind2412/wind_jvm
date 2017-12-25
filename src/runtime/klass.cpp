@@ -642,6 +642,11 @@ InstanceKlass::~InstanceKlass() {
 		destructor(&rvta[i]);
 	}
 	free(rvta);
+
+	for (int i = 0; i < constant_pool_count; i ++) {
+		delete constant_pool[i];
+	}
+	delete[] constant_pool;
 };
 
 vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()

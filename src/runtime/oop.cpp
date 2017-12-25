@@ -57,6 +57,13 @@ void MemAlloc::operator delete[](void *ptr)
 	return deallocate(ptr);
 }
 
+void MemAlloc::cleanup() {
+	LockGuard lg(mem_lock());
+	for (auto iter : Mempool::oop_handler_pool()) {
+		delete iter;
+	}
+}
+
 /*===----------------  InstanceOop  -----------------===*/
 InstanceOop::InstanceOop(InstanceKlass *klass) : Oop(klass, OopType::_InstanceOop) {
 	// alloc non-static-field memory.

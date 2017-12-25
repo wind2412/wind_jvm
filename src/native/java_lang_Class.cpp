@@ -817,7 +817,7 @@ void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用�
 		_stack.push_back(nullptr);
 		return;
 	}
-	if (!_this->get_mirrored_who()->get_type() == ClassType::InstanceClass) {
+	if (_this->get_mirrored_who()->get_type() != ClassType::InstanceClass) {
 		_stack.push_back(nullptr);
 		return;
 	}
