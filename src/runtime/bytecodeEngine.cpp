@@ -1016,6 +1016,50 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 	}
 }
 
+void cleanup(void *)
+{
+	wind_jvm::lock().unlock();
+}
+
+void BytecodeEngine::main_thread_exception()		// dummy is use for BytecodeEngine::excute / SIGINT_handler.
+{
+	// cancel all running thread.
+	wind_jvm::lock().lock();
+	{
+		for (auto & thread : wind_jvm::threads()) {
+			pthread_mutex_lock(&_all_thread_wait_mutex);
+			thread_state state = thread.state;
+			pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+			if (state == Death) {					// pthread_cancel SIGSEGV bug 解决：
+				std::wcout << thread.tid << " is ignored because of [DEATH]" << std::endl;
+				continue;			// 防止 pthread_cancel 的 SIGSEGV
+			}
+
+			pthread_cleanup_push(cleanup, nullptr);
+			if (thread.tid != pthread_self()) {		// TODO: cannot be the thread itself: 取消自己有可能死锁????
+				std::wcout << "cancelling: [" << thread.tid << "]" << std::endl;
+				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
+				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
+													// http://tonybai.com/2010/04/09/be-careful-about-thread-cancellation/
+													// https://www.cnblogs.com/lijunamneg/archive/2013/01/25/2877211.html
+					assert(false);		// 那就肯定是错的。
+				}
+			}
+			pthread_cleanup_pop(0);
+		}
+	}
+	wind_jvm::lock().unlock();
+
+	// force cancel gc thread?
+	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
+
+	// 回收资源
+
+	exit(-1);
+}
+
+
 	Lock init_lock;		// delete
 
 // TODO: 注意！每个指令 pc[1] 如果是 byte，可能指向常量池第几位什么的，本来应该是一个无符号数，但是我全用 int 承接的！所以有潜在的风险！！！
@@ -3667,34 +3711,8 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 
 						} else {									// else, this is the `main thread`. need to recycle resources...
 
-							pthread_mutex_lock(&_all_thread_wait_mutex);
-							thread.state = Death;
-							pthread_mutex_unlock(&_all_thread_wait_mutex);
+							BytecodeEngine::main_thread_exception();
 
-							// cancel all running thread.
-							wind_jvm::lock().lock();
-							{
-								for (auto & thread : wind_jvm::threads()) {
-									bool status;
-									pthread_mutex_lock(&_all_thread_wait_mutex);
-									thread_state state = thread.state;
-									pthread_mutex_unlock(&_all_thread_wait_mutex);
-
-									if (state == Death)	continue;			// 防止 pthread_cancel 的 SIGSEGV
-
-									if (thread.tid != pthread_self()) {		// not itself
-										pthread_cancel(thread.tid);			// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
-									}
-								}
-							}
-							wind_jvm::lock().unlock();
-
-							// force cancel gc thread?
-							pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
-
-							// 回收资源
-
-							exit(-1);
 						}
 
 					} else {

@@ -467,7 +467,7 @@ void vm_thread::set_exception_at_last_second_frame() {
 pthread_mutex_t _all_thread_wait_mutex;
 pthread_cond_t _all_thread_wait_cond;
 
-// 不设置信号了。那样太糟糕了。
+// 不采用信号来实现 stop-the-world 了。那样太糟糕了。
 void wait_cur_thread()
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
@@ -494,8 +494,14 @@ void signal_all_thread()		// 垃圾回收之后，就可以调用它，把所有
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
+void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是只要一 ctrl+c 就会产生 segmentation fault 的问题......虽然我也不知道为什么...... 不过这里还是要进行退出处理的......
+{
+	BytecodeEngine::main_thread_exception();
+}
+
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
+	signal(SIGINT, SIGINT_handler);
 
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
