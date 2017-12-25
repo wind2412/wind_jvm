@@ -118,6 +118,7 @@ public:
 		return threads;
 	};
 	static void run(const wstring & main_class_name, const vector<wstring> & argv);		// TODO: can only run for one time ????
+	static void end();
 };
 
 

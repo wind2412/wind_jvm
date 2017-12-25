@@ -2,13 +2,12 @@ class Test17 extends Thread{
 	
 	@Override
 	public synchronized void run() {
-//		for (int i = 90; i < 95; i ++) {
-//			System.out.println(i);
-//			if (i == 93)
-//				Thread.yield();
-//		}
-//		System.out.println(Thread.currentThread());
-		System.out.println("...");
+		for (int i = 90; i < 95; i ++) {
+			System.out.println(i);
+			if (i == 93)
+				Thread.yield();
+		}
+		System.out.println(Thread.currentThread());
 	}
 	
 	public static void main(String[] args) {

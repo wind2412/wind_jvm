@@ -14,11 +14,26 @@ using std::make_shared;
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
+/**
+ * bug report:
+ * 调试最恶心的 bug，没有之一。线程安全问题。
+ * 这应该是一个月前的坑......当时懒没有加锁......结果在把 GC 的线程模型弄好之后，一直在 PrintWriter 那里报 ref == nullptr 的 assertion fault......
+ * 无论怎样就是看不出来错，真·绝望了QAQ
+ * 这里跟报错没有半毛钱关系......讲真
+ * 最后实在不行，用了 valgrind，结果改了一个没注意到的 ub bug。当时比较高兴，以为解决了......
+ * 结果运行还是同样错误......真·绝望
+ * 后来想着不行啊......起码我这不能有泄漏啊。于是来到了这里打算写卸载类的方法。。。
+ * 突然看到上边把锁注释掉了......
+ * 然后也没当回事......毕竟是毫不相关的地方......随手把注释去掉......
+ * 一运行居然好了！！！居然好了！！！居然好了！！！心情激动QAQQAQQAQQAQ
+ * 多线程玄学......一定要谨慎再谨慎......最恶心的地方，目前。没有之一
+ * 内心受到了 1w 点暴击
+ */
 Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *,
 												  bool, InstanceKlass *, ObjArrayOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
 {
 	// TODO: add lock simply... because it will cause code very ugly...
-//	LockGuard lg(system_classmap_lock);		// 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
+	LockGuard lg(system_classmap_lock);		// [x] 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
 	assert(jl.find_file(L"java/lang/Object.class")==1);	// 这句是上边 static 模块之间初始化顺序不定实验的残留物。留着吧。
 	wstring target = classname + L".class";
 	if (jl.find_file(target)) {	// 在 rt.jar 中，BootStrap 可以 load。
@@ -133,11 +148,16 @@ void BootStrapClassLoader::print()
 	sync_wcout{} <<  "===----------------------------------------------------------------------------===" << std::endl;
 }
 
+void BootStrapClassLoader::cleanup()
+{
+
+}
+
 /*===-------------------  My ClassLoader -------------------===*/
 Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror,
 										   bool is_anonymous, InstanceKlass *hostklass, ObjArrayOop *cp_patch)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
 {
-//	LockGuard lg(this->lock);
+	LockGuard lg(this->lock);
 	InstanceKlass *result;
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
@@ -375,4 +395,9 @@ Klass *MyClassLoader::find_in_classmap(const wstring & classname)
 	} else {
 		return iter->second;
 	}
+}
+
+void MyClassLoader::cleanup()
+{
+
 }

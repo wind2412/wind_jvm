@@ -16,6 +16,7 @@
 #include <regex>
 #include "utils/synchronize_wcout.hpp"
 #include <pthread.h>
+#include <signal.h>
 
 Lock thread_num_lock;
 int all_thread_num;
@@ -496,6 +497,7 @@ void signal_all_thread()		// 垃圾回收之后，就可以调用它，把所有
 
 void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是只要一 ctrl+c 就会产生 segmentation fault 的问题......虽然我也不知道为什么...... 不过这里还是要进行退出处理的......
 {
+	std::wcout << "called!!!!!!" << std::endl;
 	BytecodeEngine::main_thread_exception();
 }
 
@@ -529,4 +531,9 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 	for (auto iter : Mempool::oop_handler_pool()) {
 		delete iter;
 	}
+}
+
+void wind_jvm::end()
+{
+
 }

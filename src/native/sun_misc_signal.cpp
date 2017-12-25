@@ -131,8 +131,13 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 			_stack.push_back(new LongOop(-1));		// wrong. can't modify these signals!
 			return;
 		}
+
+		case SIGINT:{
+			_stack.push_back(new LongOop(2));		// 魔改：用我自己的 handler 了......
+			return;
+		}
+
 		case SIGHUP:
-		case SIGINT:
 		case SIGTERM:{
 			// detect whether the sig is `ignored`. if not, set the handler. if yes, return 1.
 			struct sigaction oact;

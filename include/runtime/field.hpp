@@ -81,7 +81,7 @@ public:
 	const wstring & get_name() { return name; }						// TODO: 重要！！......忘了给 父类的 fields 留空间了......子类肯定要继承的啊！！！QAQQAQQAQ
 	const wstring & get_descriptor() { return descriptor; }
 	InstanceKlass *get_klass() { return klass; }
-	Type get_type() { return type; }
+	Type get_type() { if_didnt_parse_then_parse(); return type; }
 	Klass *get_type_klass() { if_didnt_parse_then_parse(); return true_type; }	// small lock to keep safe.		// **MUST PARSE HERE**!!!!!
 	u2 get_flag() { return access_flags; }
 	CodeStub *get_rva() { if (rva) return &rva->stub; else return nullptr;}
