@@ -191,7 +191,6 @@ JarLister::JarLister() : rjd(L"root")
 
 	// copy lib/currency.data to ./lib/currency.data ......
 	wstringstream ss;
-	std::wcout << ss.str() << std::endl;
 	int status = system(wstring_to_utf8(ss.str()).c_str());
 	if (status == -1) {  	// http://blog.csdn.net/cheyo/article/details/6595955 [shell 命令是否执行成功的判定]
 		std::cerr << "system error!" << endl;

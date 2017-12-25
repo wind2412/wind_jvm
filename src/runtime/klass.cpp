@@ -643,8 +643,10 @@ InstanceKlass::~InstanceKlass() {
 	}
 	free(rvta);
 
-	for (int i = 0; i < constant_pool_count; i ++) {
+	for (int i = 0; i < constant_pool_count-1; i ++) {		// must -1!!
+		int tag = constant_pool[i]->tag;
 		delete constant_pool[i];
+		if(tag == CONSTANT_Long || tag == CONSTANT_Double)	i ++;
 	}
 	delete[] constant_pool;
 };
