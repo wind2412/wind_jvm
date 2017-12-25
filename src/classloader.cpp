@@ -46,9 +46,9 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 				std::wcerr << "wrong! --- at BootStrapClassLoader::loadClass" << std::endl;
 				exit(-1);
 			}
-//#ifdef DEBUG
+#ifdef DEBUG
 			sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
-//#endif
+#endif
 			shared_ptr<ClassFile> cf(new ClassFile);
 			f >> *cf;
 #ifdef DEBUG
