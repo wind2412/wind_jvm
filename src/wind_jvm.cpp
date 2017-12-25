@@ -67,10 +67,39 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 
 		pthread_join(tid, nullptr);	// 等待 main 线程结束...
 
-		// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立调用点。
-		signal_all_thread();
+		// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立一个 patch。
+		// 不过，必须在不是 GC 的时候才能执行此 signal ！
+		GC::signal_all_patch();
 
-		pthread_exit(nullptr);		// 这里才是真·主线程......即开启 main 线程的线程......
+//		pthread_exit(nullptr);		// 这里才是真·主线程......即开启 main 线程的线程......	// 可惜它还会把主线程退出。要不然用做等待所有 detach 线程结束是非常好的主意啊...... 因为等待 exit 之后还需要回收资源呢，不能退得这么快啊......
+
+		int remain_thread_num;
+		while(true) {				// 等待所有 start0 创建的子线程退出。
+			wind_jvm::lock().lock();
+			{
+				remain_thread_num = wind_jvm::thread_num();
+			}
+			wind_jvm::lock().unlock();
+
+			assert(remain_thread_num >= 0);
+			if (remain_thread_num == 0) {
+				break;
+			}
+		}
+
+		// 最后，cancel 掉 gc 线程。于是世界只剩下了此真·主线程。
+		while(true) {
+			LockGuard lg(GC::gc_lock());
+			if (GC::gc()) {
+				continue;
+			} else {
+				pthread_cancel(wind_jvm::gc_thread());
+				std::wcout << "cancelled gc..." << std::endl;
+				break;
+			}
+		}
+
+		// 回收资源......
 
 #ifdef DEBUG
 		sync_wcout{} << pthread_self() << " run over!!!" << std::endl;		// delete
@@ -88,13 +117,20 @@ void vm_thread::start(list<Oop *> & arg)
 		wind_jvm::inited() = true;			// important!
 		vm_thread::init_and_do_main();		// init global variables and execute `main()` function.
 	} else {
-		// if this is not the thread[0], detach itself is okay because no one will pthread_join it.
-		pthread_detach(pthread_self());
+		// [x] if this is not the thread[0], detach itself is okay because no one will pthread_join it.
+		pthread_detach(pthread_self());		// 很可惜 pthread_exit()，如果只有“等待所有对等线程的退出”而不退出主线程的语义就好了...还要自己实现。一个一个 join 太丑了。决定使用计数器: wind_jvm::thread_num()
 		assert(this->vm_stack.size() == 0);	// check
 		assert(arg.size() == 1);				// run() only has one argument `this`.
 
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
+
+		wind_jvm::lock().lock();				// 对于 start0 启动的线程：
+		{
+			wind_jvm::thread_num() --;
+			assert(wind_jvm::thread_num() >= 0);		// 一定要 >= 0。否则是线程不安全的。
+		}
+		wind_jvm::lock().unlock();
 	}
 
 	pthread_mutex_lock(&_all_thread_wait_mutex);
@@ -482,6 +518,12 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 	// 在这里，需要初始化全局变量。线程还没有开启。
 	init_native();
 
+	// 在这里，启动 GC 线程。
+	pthread_t gc_tid;
+	pthread_create(&gc_tid, nullptr, GC::gc_thread, nullptr);		// TODO: 这里可以直接转换为 C 指针！和 system_gc 是 static 函数以及 这个调用在 GC 类内调用应该有关系？
+	gc_thread() = gc_tid;
+
+	// 在这里，启动虚拟机线程。
 	init_thread->launch();		// begin this thread.
 
 	// finally! delete all allocated memory!!

@@ -54,6 +54,7 @@ void JVM_StartThread(list<Oop *> & _stack){
 	wind_jvm::lock().lock();
 	{
 		wind_jvm::threads().push_back(vm_thread(run, {_this}));		// 1. create a thread obj.
+		wind_jvm::thread_num() ++;
 		new_thread = &wind_jvm::threads().back();
 	}
 	wind_jvm::lock().unlock();

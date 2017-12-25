@@ -1037,7 +1037,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
 	static bool inited = false;
 	init_lock.lock();		// 可耻地设置了这里是仅仅 gc 一次，测出了 stop-the-world 应该完成了...??
-	if (!inited && ThreadTable::size() >= 5) {	// delete
+	if (!inited && ThreadTable::size() >= 3) {	// delete
 		sync_wcout{} << pthread_self() << " triggered gc!!" << std::endl;
 		GC::init_gc();
 		inited = true;
@@ -3649,7 +3649,19 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 						auto final_method = ((InstanceKlass *)thread_obj->get_klass())->get_class_method(L"dispatchUncaughtException:(Ljava/lang/Throwable;)V", false);
 						assert(final_method != nullptr);
 						thread.add_frame_and_execute(final_method, {thread_obj, exception_obj});
-						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......
+
+						wind_jvm::lock().lock();
+						{
+							wind_jvm::thread_num() --;
+							assert(wind_jvm::thread_num() >= 0);
+						}
+						wind_jvm::lock().unlock();
+
+						pthread_mutex_lock(&_all_thread_wait_mutex);
+						thread.state = Death;
+						pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+						pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......		// TODO: 如果主线程也在这里异常退出......
 
 					} else {
 						auto iter = thread.vm_stack.rbegin();

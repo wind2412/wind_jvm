@@ -101,6 +101,14 @@ private:
 		return argv;
 	};
 public:
+	static pthread_t & gc_thread() {
+		static pthread_t gc_thread;
+		return gc_thread;
+	}
+	static int & thread_num() {
+		static int thread_num = 0;		// 不包括 main 线程和 gc 线程，甚至是真·主线程！即，它仅仅包含了通过 start0 创建的线程数目！
+		return thread_num;
+	}
 	static Lock & lock() {
 		static Lock lock;
 		return lock;
