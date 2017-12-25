@@ -27,15 +27,11 @@ void * scapegoat (void *pp) {
 //	}
 
 	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
-		real->thread->set_state(Waiting);
-//		wait_cur_thread();					// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
-		wait_cur_thread_and_set_bit(&real->the_first_wait_executed);
-		real->thread->set_state(Running);
+		// it will be hung up at the `global pthread_cond`. and will be wake up by `signal_all_thread()`.
+		wait_cur_thread_and_set_bit(&real->the_first_wait_executed, real->thread);
 	}
 
 	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
-
-	signal_all_thread();
 
 //	if (!real->should_be_stop_first) {		// if it is main thread:
 //		// wait for all detached sub threads over
@@ -72,7 +68,7 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 		pthread_join(tid, nullptr);	// 等待 main 线程结束...
 
 		// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立调用点。
-//		signal_all_thread();
+		signal_all_thread();
 
 		pthread_exit(nullptr);		// 这里才是真·主线程......即开启 main 线程的线程......
 
@@ -100,7 +96,10 @@ void vm_thread::start(list<Oop *> & arg)
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
 	}
+
+	pthread_mutex_lock(&_all_thread_wait_mutex);
 	this->state = Death;
+	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
 Oop *vm_thread::execute()
@@ -447,13 +446,15 @@ void wait_cur_thread()
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
-void wait_cur_thread_and_set_bit(volatile bool *bit)
+void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
 	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
+	thread->set_state(Waiting);
 	sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
+	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 

@@ -24,7 +24,11 @@ void GC::init_gc()	// 设置标志位以及目标 vm_threads
 	for (auto & thread : thread_list) {			// [√] target_threads 这个快照，不一定是完整的。因为建立完这个快照之后，也有可能多个线程被创建出来。保证这个快照的正确性的方法，就是让后出现的线程上来就直接自动停止，和 dalvik vm 一样，这样才能够解决两边不一致的缺陷。
 		// detect the vm_stack is alive?
 		// in fact, `thread.vm_stack.size() == 0` can judge: 1. the vm_thread is waiting (create by `start0`) 2. the thread is dead. Because these two conditions are both: vm_thread.stack().size() == 0.
-		if (thread.state == Waiting || thread.state == Death /*thread.vm_stack.size() == 0*/) {		// the vm_thread is waiting (create by `start0`) / end already.
+		pthread_mutex_lock(&_all_thread_wait_mutex);
+		thread_state state = thread.state;
+		pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+		if (state == Waiting || state == Death /*thread.vm_stack.size() == 0*/) {		// the vm_thread is waiting (create by `start0`) / end already.
 			sync_wcout{} << "ignore [" << thread.tid << "] because of: [" << (thread.state == Waiting ? "waiting]" : "death]") << std::endl;
 			continue;
 		}
@@ -63,9 +67,14 @@ bool GC::receive_signal(vm_thread *thread) 	// vm_thread 发送一个 ready 信�
 
 	int total_ready_num = 0;
 	for (auto iter : target_threads()) {
+
+		pthread_mutex_lock(&_all_thread_wait_mutex);
+		thread_state state = iter.first->state;
+		pthread_mutex_unlock(&_all_thread_wait_mutex);
+
 		if (iter.second == true) {
 			total_ready_num ++;
-		} else if (iter.second == false && iter.first->vm_stack.size() == 0) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
+		} else if (state == Waiting || state == Death/*iter.second == false && iter.first->vm_stack.size() == 0*/) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
 			target_threads()[iter.first] = true;
 			total_ready_num ++;
 		} else {

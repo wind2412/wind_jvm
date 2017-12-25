@@ -118,7 +118,7 @@ extern pthread_cond_t _all_thread_wait_cond;
 
 // 此函数用于唤醒所有线程。(GC)
 void wait_cur_thread();
-void wait_cur_thread_and_set_bit(volatile bool *);
+void wait_cur_thread_and_set_bit(volatile bool *, vm_thread *);
 void signal_all_thread();
 
 
