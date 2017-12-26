@@ -72,7 +72,7 @@ wstring get_full_name(MirrorOop *mirror)
 	}
 }
 
-InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type, vm_thread *thread = nullptr)	// vm_thread: for debug
+InstanceOop *fill_in_MemberName_with_Method(Method *target_method, InstanceOop *origin_member_name_obj, int ref_kind, Oop *type, vm_thread *thread = nullptr)	// vm_thread: for debug
 {
 	auto member_name2 = ((InstanceKlass *)origin_member_name_obj->get_klass())->new_instance();
 	int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
@@ -105,7 +105,7 @@ InstanceOop *fill_in_MemberName_with_Method(shared_ptr<Method> target_method, In
 	return member_name2;
 }
 
-InstanceOop *fill_in_MemberName_with_Fieldinfo(shared_ptr<Field_info> target_field, InstanceOop *origin_member_name_obj, int ref_kind)
+InstanceOop *fill_in_MemberName_with_Fieldinfo(Field_info *target_field, InstanceOop *origin_member_name_obj, int ref_kind)
 {
 	// build the return MemberName obj.
 	auto member_name2 = ((InstanceKlass *)origin_member_name_obj->get_klass())->new_instance();
@@ -186,9 +186,9 @@ wstring get_member_name_descriptor(InstanceKlass *real_klass, const wstring & re
 	return descriptor;
 }
 
-shared_ptr<Method> get_member_name_target_method(InstanceKlass *real_klass, const wstring & signature, int ref_kind, vm_thread *thread)
+Method *get_member_name_target_method(InstanceKlass *real_klass, const wstring & signature, int ref_kind, vm_thread *thread)
 {
-	shared_ptr<Method> target_method;
+	Method *target_method;
 	if (ref_kind == 6)	{			// invokeStatic
 //		std::wcout << real_klass->get_name() << " " << signature << std::endl;	// delete
 		target_method = real_klass->get_this_class_method(signature);
@@ -277,7 +277,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	if (flags & 0x10000) {		// Method:
 
 		wstring signature = real_name + L":" + descriptor;
-		shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind, thread);
+		Method *target_method = get_member_name_target_method(real_klass, signature, ref_kind, thread);
 
 		if (target_method == nullptr) {		// throw LinkageError !!! Purposely!!!
 
@@ -340,7 +340,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 		Oop *oop;
 		target->get_field_value(CONSTRUCTOR L":slot:I", &oop);
 		int slot = ((IntOop *)oop)->value;
-		shared_ptr<Method> target_method = klass->search_method_in_slot(slot);
+		Method *target_method = klass->search_method_in_slot(slot);
 
 		int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
 		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
@@ -372,7 +372,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 		Oop *oop;
 		target->get_field_value(METHOD L":slot:I", &oop);
 		int slot = ((IntOop *)oop)->value;
-		shared_ptr<Method> target_method = klass->search_method_in_slot(slot);
+		Method *target_method = klass->search_method_in_slot(slot);
 
 		int new_flag = (target_method->get_flag() & (~ACC_ANNOTATION));
 		if (target_method->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
@@ -515,7 +515,7 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 			assert(_pair.second != nullptr);
 			fill_in_MemberName_with_Fieldinfo(_pair.second, (InstanceOop*)(*member_name_arr)[0], 0);	// 第三个参数只要小于 2 即可。即定义为 getField / getStatic，而不是 put。
 		} else {
-			vector<shared_ptr<Field_info>> v;
+			vector<Field_info *> v;
 			if (!search_super_klass && !search_interfaces) {
 				for (auto field : real_klass->get_field_layout()) {
 					v.push_back(field.second.second);

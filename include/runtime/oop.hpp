@@ -16,18 +16,18 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <unordered_set>
+#include <list>
 
 using std::shared_ptr;
-using std::unordered_set;
+using std::list;
 
 // [x] 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
 // [√] 不对吧。这些 field 全是通过 setField 字节码设置的。所以本体肯定再外边，用不着回收了吧。
 
 class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
 public:
-	static unordered_set<Oop *> & oop_handler_pool() {
-		static unordered_set<Oop *> oop_handler_pool;		// 存放所有的对象，以备日后的 delete。
+	static list<Oop *> & oop_handler_pool() {
+		static list<Oop *> oop_handler_pool;		// 存放所有的对象，以备日后的 delete。
 		return oop_handler_pool;
 	}
 };
@@ -83,12 +83,12 @@ public:
 	InstanceOop(InstanceKlass *klass);
 	InstanceOop(const InstanceOop & rhs);		// shallow copy
 public:		// 以下 8 个方法全部用来赋值。
-	bool get_field_value(shared_ptr<Field_info> field, Oop **result);
-	void set_field_value(shared_ptr<Field_info> field, Oop *value);
+	bool get_field_value(Field_info *field, Oop **result);
+	void set_field_value(Field_info *field, Oop *value);
 	bool get_field_value(const wstring & BIG_signature, Oop **result);				// use for forging String Oop at parsing constant_pool.
 	void set_field_value(const wstring & BIG_signature, Oop *value);					// BIG_signature is: <classname + ':' + name + ':' + descriptor>...
-	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result) { return ((InstanceKlass *)klass)->get_static_field_value(field, result); }
-	void set_static_field_value(shared_ptr<Field_info> field, Oop *value) { ((InstanceKlass *)klass)->set_static_field_value(field, value); }
+	bool get_static_field_value(Field_info *field, Oop **result) { return ((InstanceKlass *)klass)->get_static_field_value(field, result); }
+	void set_static_field_value(Field_info *field, Oop *value) { ((InstanceKlass *)klass)->set_static_field_value(field, value); }
 	bool get_static_field_value(const wstring & signature, Oop **result) { return ((InstanceKlass *)klass)->get_static_field_value(signature, result); }
 	void set_static_field_value(const wstring & signature, Oop *value) { ((InstanceKlass *)klass)->set_static_field_value(signature, value); }
 public:

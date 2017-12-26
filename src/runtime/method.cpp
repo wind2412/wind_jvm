@@ -7,6 +7,25 @@
 #include "classloader.hpp"
 #include "utils/synchronize_wcout.hpp"
 
+Lock & Method_Pool::method_pool_lock(){
+	static Lock method_pool_lock;
+	return method_pool_lock;
+}
+list<Method *> & Method_Pool::method_pool() {
+	static list<Method *> method_pool;		// 存放所有的对象，以备日后的 delete。
+	return method_pool;
+}
+void Method_Pool::put(Method *method) {
+	LockGuard lg(method_pool_lock());
+	method_pool().push_back(method);
+}
+void Method_Pool::cleanup() {
+	LockGuard lg(method_pool_lock());
+	for (auto iter : method_pool()) {
+		delete iter;
+	}
+}
+
 Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) : klass(klass) {
 	assert(constant_pool[mi.name_index-1]->tag == CONSTANT_Utf8);
 	name = ((CONSTANT_Utf8_info *)constant_pool[mi.name_index-1])->convert_to_Unicode();

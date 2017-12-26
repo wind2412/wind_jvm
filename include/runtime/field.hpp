@@ -17,11 +17,16 @@
 #include <boost/any.hpp>
 #include "runtime/klass.hpp"
 #include "annotation.hpp"
+#include "utils/lock.hpp"
+#include <list>
 
 using std::wstring;
 using std::vector;
+using std::list;
 
 class InstanceKlass;
+class Field_info;
+
 
 /**
  * all non-static fields [values]. save in oop object.
@@ -35,6 +40,16 @@ class InstanceKlass;
 ////		for (int i = 0; i < klass->cf->)
 //	}
 //};
+
+class Field_Pool {
+private:
+	static Lock & field_pool_lock();
+private:
+	static list<Field_info *> & field_pool();
+public:
+	static void put(Field_info *field);
+	static void cleanup();
+};
 
 /**
  * all non-static/static fields [properties in field_info]. save in klass.cpp.

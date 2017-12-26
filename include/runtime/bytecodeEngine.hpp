@@ -38,16 +38,16 @@ public:
 	bool valid_frame = true;				// is this frame valid/used ?
 	stack<Oop *> op_stack;			// the inner opcode stack.		// ignore Method::max_stack_size...
 	vector<Oop *> localVariableTable;	// this StackFrame's lvt.		// ignore Method::max_local_size...
-	shared_ptr<Method> method;			// the method will be executed in this StackFrame.
+	Method *method;			// the method will be executed in this StackFrame.
 	uint8_t *return_pc;					// return_pc to return to the caller's code segment
 	StackFrame *prev;					// the caller's StackFrame	// the same as `rbp`
 	bool has_exception = false;
 public:
-	StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, vm_thread *thread, bool is_native = false);
+	StackFrame(Method *method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & list, vm_thread *thread, bool is_native = false);
 	bool is_valid() { return valid_frame; }
 	void set_invalid() { valid_frame = false; }
 	void clear_all();
-	void reset_method(shared_ptr<Method> new_method) { this->method = new_method; }
+	void reset_method(Method *new_method) { this->method = new_method; }
 	void reset_return_pc(uint8_t *return_pc) { this->return_pc = return_pc; }
 	wstring print_arg_msg(Oop *value, vm_thread *thread);
 };
@@ -83,17 +83,17 @@ public:	// aux
 	static void main_thread_exception(int exitcode = -1);
 private:		// for invokeDynamic
 	static InstanceOop *MethodHandle_make(rt_constant_pool & rt_pool, int method_handle_real_index, vm_thread & thread, bool = false);
-	static InstanceOop *MethodType_make(shared_ptr<Method> target_method, vm_thread & thread);
+	static InstanceOop *MethodType_make(Method *target_method, vm_thread & thread);
 	static InstanceOop *MethodType_make(const wstring & descriptor, vm_thread & thread);
 	static InstanceOop *MethodType_make_impl(vector<MirrorOop *> & args, MirrorOop *ret, vm_thread & thread);
 	static InstanceOop *MethodHandles_Lookup_make(vm_thread & thread);
 private:
-	static void getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack);
-	static void getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread);
-	static void putField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack);
-	static void putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread);
-	static void invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeStatic and invokeSpecial
-	static void invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeVirtual and invokeInterface
+	static void getField(Field_info *new_field, stack<Oop *> & op_stack);
+	static void getStatic(Field_info *new_field, stack<Oop *> & op_stack, vm_thread & thread);
+	static void putField(Field_info *new_field, stack<Oop *> & op_stack);
+	static void putStatic(Field_info *new_field, stack<Oop *> & op_stack, vm_thread & thread);
+	static void invokeStatic(Method *new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeStatic and invokeSpecial
+	static void invokeVirtual(Method *new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc);	// invokeVirtual and invokeInterface
 };
 
 

@@ -11,6 +11,25 @@
 #include "runtime/constantpool.hpp"
 #include "utils/synchronize_wcout.hpp"
 
+Lock & Field_Pool::field_pool_lock(){
+	static Lock field_pool_lock;
+	return field_pool_lock;
+}
+list<Field_info *> & Field_Pool::field_pool() {
+	static list<Field_info *> field_pool;		// 存放所有的对象，以备日后的 delete。
+	return field_pool;
+}
+void Field_Pool::put(Field_info *field) {
+	LockGuard lg(field_pool_lock());
+	field_pool().push_back(field);
+}
+void Field_Pool::cleanup() {
+	LockGuard lg(field_pool_lock());
+	for (auto iter : field_pool()) {
+		delete iter;
+	}
+}
+
 Field_info::Field_info(InstanceKlass *klass, field_info & fi, cp_info **constant_pool) : klass(klass) {	// must be 0, 6, 7, 13, 14, 15, 18, 19
 	this->access_flags = fi.access_flags;
 	assert(constant_pool[fi.name_index-1]->tag == CONSTANT_Utf8 && constant_pool[fi.descriptor_index-1]->tag == CONSTANT_Utf8);

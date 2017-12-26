@@ -9,12 +9,26 @@
 #include "class_parser.hpp"
 #include "annotation.hpp"
 #include "utils/synchronize_wcout.hpp"
+#include <list>
+#include "utils/lock.hpp"
 
 using std::wstring;
 using std::unordered_map;
+using std::list;
 
 class MirrorOop;
 class InstanceKlass;
+class Method;
+
+class Method_Pool {
+private:
+	static Lock & method_pool_lock();
+private:
+	static list<Method *> & method_pool();
+public:
+	static void put(Method *method);
+	static void cleanup();
+};
 
 /**
  * single Method. save in InstanceKlass.

@@ -131,8 +131,8 @@ private:
 	// should add message to recode whether this field is parent klass's field, for java/lang/Class.getDeclaredFields0()...
 	unordered_map<int, bool> is_this_klass_field;		// don't use vector<bool>...		// use fields_layout.second.first as index.
 	// layouts.		// bug of fields_layout: 由于父类可能有和子类一样名字+描述符的变量，因此会冲突...... 不得不加上了 klass 的命名空间来解决这个问题......悲伤。变成了历史遗留问题......
-	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> fields_layout;			// non-static field layout. [values are in oop]. <classname+':'+name+':'+descriptor, <fields' offset, Field_info>>
-	unordered_map<wstring, pair<int, shared_ptr<Field_info>>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
+	unordered_map<wstring, pair<int, Field_info *>> fields_layout;			// non-static field layout. [values are in oop]. <classname+':'+name+':'+descriptor, <fields' offset, Field_info>>
+	unordered_map<wstring, pair<int, Field_info *>> static_fields_layout;	// static field layout.	<name+':'+descriptor, <static_fields' offset, Field_info>>
 	int total_non_static_fields_num = 0;
 	int total_static_fields_num = 0;
 //	Oop **static_fields = nullptr;												// static field values. [non-static field values are in oop].
@@ -141,8 +141,8 @@ private:
 									// Fields 直接挂在此类的后边...
 	// static methods + vtable + itable
 	// TODO: miranda Method !!				// I cancelled itable. I think it will copy from parents' itable and all interface's itable, very annoying... And it's efficiency in my spot based on looking up by wstring, maybe lower than directly looking up...
-	unordered_map<wstring, shared_ptr<Method>> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
-	unordered_map<wstring, pair<int, shared_ptr<Method>>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !! [the `pair<int, ...>` 's int is the slot number. for: sun/reflect/NativeConstructorAccessorImpl-->newInstance0]
+	unordered_map<wstring, Method *> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
+	unordered_map<wstring, pair<int, Method *>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !! [the `pair<int, ...>` 's int is the slot number. for: sun/reflect/NativeConstructorAccessorImpl-->newInstance0]
 	// constant pool
 	shared_ptr<rt_constant_pool> rt_pool;
 
@@ -174,7 +174,7 @@ private:
 public:
 	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
 public:
-	shared_ptr<Method> get_static_void_main();
+	Method *get_static_void_main();
 	void initialize_final_static_field();
 	wstring parse_signature();
 	wstring get_source_file_name();
@@ -183,21 +183,21 @@ public:
 public:
 	vector<Oop *> & get_static_fields_addr() { return static_fields; }
 private:
-	void initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
+	void initialize_field(unordered_map<wstring, pair<int, Field_info *>> & fields_layout, vector<Oop *> & fields);		// initializer for parse_fields() and InstanceOop's Initialization
 public:
 	InstanceKlass *get_hostklass() { return host_klass; }
 	void set_hostklass(InstanceKlass *hostklass) { host_klass = hostklass; }
 	MirrorOop *get_java_loader() { return this->java_loader; }
-	pair<int, shared_ptr<Field_info>> get_field(const wstring & descriptor);	// [name + ':' + descriptor]
-	shared_ptr<Method> get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
-	shared_ptr<Method> get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
-	shared_ptr<Method> get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
+	pair<int, Field_info *> get_field(const wstring & descriptor);	// [name + ':' + descriptor]
+	Method *get_class_method(const wstring & signature, bool search_interfaces = true);	// [name + ':' + descriptor]		// not only search in `this`, but also in `interfaces` and `parent`!! // You shouldn't use it except pasing rt_pool and ByteCode::invokeInterface !!
+	Method *get_this_class_method(const wstring & signature);		// [name + ':' + descriptor]		// we should usually use this method. Because when when we find `<clinit>`, the `get_class_method` can get parent's <clinit> !!! if this has a <clinit>, too, Will go wrong.
+	Method *get_interface_method(const wstring & signature);		// [name + ':' + descriptor]
 	int non_static_field_num() { return total_non_static_fields_num; }
-	bool get_static_field_value(shared_ptr<Field_info> field, Oop **result);		// self-maintain a ptr to pass in...
-	void set_static_field_value(shared_ptr<Field_info> field, Oop *value);
+	bool get_static_field_value(Field_info *field, Oop **result);		// self-maintain a ptr to pass in...
+	void set_static_field_value(Field_info *field, Oop *value);
 	bool get_static_field_value(const wstring & signature, Oop **result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
 	void set_static_field_value(const wstring & signature, Oop *value);		// as above.
-	shared_ptr<Method> search_vtable(const wstring & signature);
+	Method *search_vtable(const wstring & signature);
 	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
 	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
@@ -215,7 +215,7 @@ public:
 		return success1 || success2;
 	}
 	InstanceOop* new_instance();
-	shared_ptr<Method> search_method_in_slot(int slot);
+	Method *search_method_in_slot(int slot);
 private:		// for Unsafe
 	int get_static_field_offset(const wstring & signature);
 public:		// for Unsafe
@@ -223,10 +223,10 @@ public:		// for Unsafe
 public:
 	bool is_interface() { return (this->access_flags & ACC_INTERFACE) == ACC_INTERFACE; }
 public:		// for reflection.
-	vector<pair<int, shared_ptr<Method>>> get_constructors();
-	vector<pair<int, shared_ptr<Method>>> get_declared_methods();
+	vector<pair<int, Method *>> get_constructors();
+	vector<pair<int, Method *>> get_declared_methods();
 public:		// for invokedynamic.
-	bool is_in_vtable(shared_ptr<Method> m) { wstring signature = m->get_name() + L":" + m->get_descriptor(); return vtable.find(signature) != vtable.end(); }
+	bool is_in_vtable(Method *m) { wstring signature = m->get_name() + L":" + m->get_descriptor(); return vtable.find(signature) != vtable.end(); }
 	const auto & get_field_layout() { return this->fields_layout; }
 	const auto & get_static_field_layout() { return this->static_fields_layout; }
 	BootstrapMethods_attribute *get_bm() { return this->bm; }
@@ -269,8 +269,8 @@ private:
 	ArrayKlass(const ArrayKlass &);
 public:
 	MirrorOop *get_java_loader() { return this->java_loader; }
-	shared_ptr<Method> get_class_method(const wstring & signature) {	// 这里其实就是直接去 java.lang.Object 中去查找。
-		shared_ptr<Method> target = ((InstanceKlass *)parent)->get_class_method(signature);
+	Method *get_class_method(const wstring & signature) {	// 这里其实就是直接去 java.lang.Object 中去查找。
+		Method *target = ((InstanceKlass *)parent)->get_class_method(signature);
 		assert(target != nullptr);
 		return target;
 	}

@@ -95,14 +95,14 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				sync_wcout{} << "find field ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
-				shared_ptr<Field_info> target = ((InstanceKlass *)new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
+				Field_info *target = ((InstanceKlass *)new_class)->get_field(name + L":" + descriptor).second;		// 这里才是不可能得到数组类。因为数组类 和 Object 都没有 field 把。所以可以直接强转了。
 				assert(target != nullptr);		// TODO: 在这里我的程序正确性还需要验证。正常情况下应该抛出异常。不过我默认所有的 class 文件全是 **完全正确** 的，因此没有做 verify。这些细枝末节留到全写完之后回来在增加吧。
-				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Field_info>
+				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// Field_info *
 			} else if (target->tag == CONSTANT_Methodref) {
 #ifdef DEBUG
 				sync_wcout{} << "find class method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
-				shared_ptr<Method> target;
+				Method *target;
 				// 这里要 hack 一下...... 要对 MethodHandle 的 invoke... 各种进行特化一下。
 				// 因为常量池中的 NameAndType attribute 是真的类型，而 invoke... 的参数和返回值标记分别是 Object[] 和 Object. (@PolymorphicSignature)
 				// 不过肯定会产生信息的丢失......也就是真实的参数会被丢弃......我没有其他的地方去存放真实的 Args 和 Return type...
@@ -131,7 +131,7 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 					assert(false);
 				}
 				assert(target != nullptr);
-				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
+				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// Method *
 
 				if (real_descriptor != L"") {	// MethodHandle.invoke(...), the `real_descriptor` now holds the **REAL** descriptor!!
 					target->set_real_descriptor(real_descriptor);
@@ -142,9 +142,9 @@ const pair<int, boost::any> & rt_constant_pool::if_didnt_parse_then_parse(int i)
 				sync_wcout{} << "find interface method ===> " << "<" << class_name << ">" << name + L":" + descriptor << std::endl;
 #endif
 				assert(new_class->get_type() == ClassType::InstanceClass);
-				shared_ptr<Method> target = ((InstanceKlass *)new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
+				Method *target = ((InstanceKlass *)new_class)->get_interface_method(name + L":" + descriptor);		// 这里应该只有可能是普通类吧。应该不是未实现的接口方法。因为 java.lang.Object 是一个 Class。所以选择直接强转了。
 				assert(target != nullptr);
-				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// shared_ptr<Method>
+				this->pool[i] = (make_pair(bufs[i]->tag, boost::any(target)));				// Method *
 			}
 			break;
 		}

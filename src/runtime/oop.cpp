@@ -21,7 +21,7 @@ void *MemAlloc::allocate(size_t size)
 	memset(ptr, 0, size);		// default bzero!
 
 	// add it to the Mempool
-	Mempool::oop_handler_pool().insert((Oop *)ptr);
+	Mempool::oop_handler_pool().push_back((Oop *)ptr);
 
 	return ptr;
 }
@@ -86,13 +86,13 @@ InstanceOop::InstanceOop(const InstanceOop & rhs) : Oop(rhs), field_length(rhs.f
 //	memcpy(this->fields, rhs.fields, sizeof(Oop *) * this->field_length);		// shallow copy
 }
 
-bool InstanceOop::get_field_value(shared_ptr<Field_info> field, Oop **result)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。由于 namespace 不同，因此会用多级父类的名字在 field_layout 中进行查找。
+bool InstanceOop::get_field_value(Field_info *field, Oop **result)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。由于 namespace 不同，因此会用多级父类的名字在 field_layout 中进行查找。
 {
 	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();
 	return this->get_field_value(BIG_signature, result);
 }
 
-void InstanceOop::set_field_value(shared_ptr<Field_info> field, Oop *value)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。
+void InstanceOop::set_field_value(Field_info *field, Oop *value)		// 这里最终改成了专门给 getField，setField 字节码使用的函数。
 {
 	wstring BIG_signature = field->get_klass()->get_name() + L":" + field->get_name() + L":" + field->get_descriptor();		// bug report: 本来就应该这么调才对...原先写得是什么玩意啊.....搞什么递归... 直接通过 BIG_signature 查不就得了....
 	this->set_field_value(BIG_signature, value);

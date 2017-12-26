@@ -50,14 +50,14 @@ private:
 	thread_state state = Running;
 	int monitor_num = 0;				// 此线程在多少个管程之内
 
-	shared_ptr<Method> method;
+	Method *method;
 	std::list<Oop *> arg;
 //	const std::list<Oop *> & arg;		// 卧槽我是白痴.....又一次用错了引用...start0 里边是局部变量...我竟然直接通过引用把局部变量引了过来......QAQ
 	list<StackFrame> vm_stack;	// 改成了 list...... 因为 vector 的扩容会导致内部迭代器失效......把 vector 作为栈的话，扩容是经常性的...... 故而选用伸缩性更好的 list......
 	uint8_t *pc;		// pc, pointing to the code segment: inside the Method->code.
 	int thread_no;
 public:
-	vm_thread(shared_ptr<Method> method, const std::list<Oop *> & arg) 	// usually `main()` or `run()` method.
+	vm_thread(Method *method, const std::list<Oop *> & arg) 	// usually `main()` or `run()` method.
 																: method(method), arg(arg), pc(0), tid(0) {
 		LockGuard lg(thread_num_lock);
 #ifdef DEBUG
@@ -69,7 +69,7 @@ public:
 	void launch(InstanceOop * = nullptr);
 	void start(std::list<Oop *> & arg);
 	Oop *execute();
-	Oop *add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list);
+	Oop *add_frame_and_execute(Method *new_method, const std::list<Oop *> & list);
 	MirrorOop *get_caller_class_CallerSensitive();
 	void init_and_do_main();
 	ArrayOop *get_stack_trace();

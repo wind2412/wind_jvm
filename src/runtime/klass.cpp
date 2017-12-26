@@ -95,7 +95,8 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 	wstringstream ss;
 	// set up Runtime Field_info to transfer Non-Dynamic field_info
 	for (int i = 0; i < cf->fields_count; i ++) {
-		shared_ptr<Field_info> metaField = make_shared<Field_info>(this, cf->fields[i], cf->constant_pool);
+		Field_info *metaField = new Field_info(this, cf->fields[i], cf->constant_pool);
+		Field_Pool::put(metaField);		// put it into global area
 		if (!metaField->is_static()) {
 			ss << metaField->get_klass()->get_name() << L":";		// for fixing bug: must have the namespace in field_layout... !!!
 		}
@@ -206,13 +207,14 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 	// traverse all this.Methods
 	wstringstream ss;
 	for(int i = 0; i < cf->methods_count; i ++) {
-		shared_ptr<Method> method = make_shared<Method>(this, cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
+		Method *method = new Method(this, cf->methods[i], cf->constant_pool);	// 采取把 cf.methods[i] 中的 attribute “移动语义” 移动到 Method 中的策略。这样 ClassFile 析构也不会影响到内部 Attributes 了。
+		Method_Pool::put(method);		// put it into global area
 		ss << method->get_name() << L":" << method->get_descriptor();		// save way: [name + ':' + descriptor]
 		wstring signature = ss.str();
 		// add method into [all methods]
 		this->methods.insert(make_pair(signature, make_pair(i, method)));
 		// override method into [vtable]
-//		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](shared_ptr<Method> lhs){ return *method == *lhs; });	// 这个 lambda 还挺好看，留下了。
+//		auto iter = std::find_if(vtable.begin(), vtable.end(), [method](Method *lhs){ return *method == *lhs; });	// 这个 lambda 还挺好看，留下了。
 		auto iter = vtable.find(signature);
 		if (iter == vtable.end()) {
 			if (!method->is_static()/* && !method->is_private()*/)		// bug report: private 也是 vtable 的方法！！
@@ -352,9 +354,9 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Mirr
 
 }
 
-pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descriptor)		// 字段解析时的查找
+pair<int, Field_info *> InstanceKlass::get_field(const wstring & descriptor)		// 字段解析时的查找
 {
-	pair<int, shared_ptr<Field_info>> target = std::make_pair(-1, nullptr);
+	pair<int, Field_info *> target = std::make_pair(-1, nullptr);
 	InstanceKlass *instance_klass = this;
 	while (instance_klass != nullptr) {
 		wstring BIG_signature = instance_klass->get_name() + L":" + descriptor;
@@ -390,13 +392,13 @@ pair<int, shared_ptr<Field_info>> InstanceKlass::get_field(const wstring & descr
 	return target;
 }
 
-bool InstanceKlass::get_static_field_value(shared_ptr<Field_info> field, Oop **result)
+bool InstanceKlass::get_static_field_value(Field_info *field, Oop **result)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	return get_static_field_value(signature, result);
 }
 
-void InstanceKlass::set_static_field_value(shared_ptr<Field_info> field, Oop *value)
+void InstanceKlass::set_static_field_value(Field_info *field, Oop *value)
 {
 	wstring signature = field->get_name() + L":" + field->get_descriptor();
 	set_static_field_value(signature, value);
@@ -433,7 +435,7 @@ void InstanceKlass::set_static_field_value(const wstring & signature, Oop *value
 	this->static_fields[offset] = value;
 }
 
-shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signature)
+Method *InstanceKlass::get_this_class_method(const wstring & signature)
 {
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	{
@@ -442,10 +444,10 @@ shared_ptr<Method> InstanceKlass::get_this_class_method(const wstring & signatur
 		return nullptr;
 }
 
-shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bool search_interfaces)
+Method *InstanceKlass::get_class_method(const wstring & signature, bool search_interfaces)
 {
 	assert(this->is_interface() == false);		// TODO: 此处的 verify 应该改成抛出异常。
-	shared_ptr<Method> target;
+	Method *target;
 	// search in this->methods
 //		std::wcout << "finding at: " << this->name << " find: " << signature << " and get method: " << std::endl;	// delete
 //		std::cout << &this->methods << "  size:" << this->methods.size() << std::endl;
@@ -466,11 +468,11 @@ shared_ptr<Method> InstanceKlass::get_class_method(const wstring & signature, bo
 	return nullptr;
 }
 
-shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature)
+Method *InstanceKlass::get_interface_method(const wstring & signature)
 {
 	if (this->name != L"java/lang/Object")			// 如果此类是 Object 类的话，默认也算作接口。	// 注意内部的分隔符变成了 '/' ！！
 		assert(this->is_interface() == true);		// TODO: 此处的 verify 应该改成抛出异常。
-	shared_ptr<Method> target;
+	Method *target;
 	// search in this->methods
 	auto iter = this->methods.find(signature);
 	if (iter != this->methods.end())	return (*iter).second.second;
@@ -490,7 +492,7 @@ shared_ptr<Method> InstanceKlass::get_interface_method(const wstring & signature
 	return nullptr;
 }
 
-shared_ptr<Method> InstanceKlass::get_static_void_main()
+Method *InstanceKlass::get_static_void_main()
 {
 	for (auto iter : this->methods) {
 		if (iter.second.second->is_main()) {
@@ -500,7 +502,7 @@ shared_ptr<Method> InstanceKlass::get_static_void_main()
 	assert(false);
 }
 
-void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, shared_ptr<Field_info>>> & fields_layout, vector<Oop *> & fields)
+void InstanceKlass::initialize_field(unordered_map<wstring, pair<int, Field_info *>> & fields_layout, vector<Oop *> & fields)
 {
 	for (auto & iter : fields_layout) {
 		// ** 如果是 static 的 get_field，那么需要根据 signature 去 parent 去找。不过这里只是初始化，parent 的 static 域会被自己初始化，不用此子类管。 **
@@ -616,7 +618,7 @@ bool InstanceKlass::check_interfaces(const wstring & signature)		// 查看此 In
 	return false;
 }
 
-shared_ptr<Method> InstanceKlass::search_vtable(const wstring & signature)
+Method *InstanceKlass::search_vtable(const wstring & signature)
 {
 	auto iter = this->vtable.find(signature);
 	if (iter == this->vtable.end()) {
@@ -651,9 +653,9 @@ InstanceKlass::~InstanceKlass() {
 	delete[] constant_pool;
 };
 
-vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()
+vector<pair<int, Method *>> InstanceKlass::get_constructors()
 {
-	vector<pair<int, shared_ptr<Method>>> v;
+	vector<pair<int, Method *>> v;
 	for (auto iter : this->methods) {
 		if (iter.second.second->get_name() == L"<init>") {
 			v.push_back(iter.second);
@@ -663,9 +665,9 @@ vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_constructors()
 	return v;
 }
 
-vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_declared_methods()
+vector<pair<int, Method *>> InstanceKlass::get_declared_methods()
 {
-	vector<pair<int, shared_ptr<Method>>> v;
+	vector<pair<int, Method *>> v;
 	for (auto iter : this->methods) {
 		if (iter.second.second->get_name() == L"<clinit>") {
 			continue;
@@ -677,7 +679,7 @@ vector<pair<int, shared_ptr<Method>>> InstanceKlass::get_declared_methods()
 	return v;
 }
 
-shared_ptr<Method> InstanceKlass::search_method_in_slot(int slot)
+Method *InstanceKlass::search_method_in_slot(int slot)
 {
 	for (auto iter : this->methods) {
 		if (iter.second.first == slot) {

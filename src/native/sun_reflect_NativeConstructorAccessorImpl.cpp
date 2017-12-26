@@ -26,9 +26,9 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 	InstanceKlass *target_klass = ((InstanceKlass *)((MirrorOop *)result)->get_mirrored_who());
 	// new an empty object
 	Oop *init = target_klass->new_instance();
-	// get shared_ptr<Method> of <init>
+	// get Method *of <init>
 	ctor->get_field_value(CONSTRUCTOR L":slot:I", &result);
-	shared_ptr<Method> target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
+	Method *target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
 	assert(target_method->get_name() == L"<init>");
 	// get arg lists types
 //	assert(ctor->get_field_value(CONSTRUCTOR L":parameterTypes:[Ljava/lang/Class;", &result));

@@ -23,7 +23,7 @@ void *java_lang_invoke_methodHandle_search_method(const wstring & str);
 class vm_thread;
 
 // aux function
-void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args);
+void argument_unboxing(Method *method, list<Oop *> & args);
 InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wstring & return_type);
 
 

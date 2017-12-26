@@ -164,7 +164,7 @@ Oop *vm_thread::execute()
 	return all_jvm_return_value;
 }
 
-Oop * vm_thread::add_frame_and_execute(shared_ptr<Method> new_method, const std::list<Oop *> & list) {
+Oop * vm_thread::add_frame_and_execute(Method *new_method, const std::list<Oop *> & list) {
 	// for defense:
 	int frame_num = this->vm_stack.size();
 	uint8_t *backup_pc = this->pc;
@@ -181,7 +181,7 @@ MirrorOop *vm_thread::get_caller_class_CallerSensitive()
 	// back-trace. this method is called from: sun_reflect_Reflection.cpp:JVM_GetCallerClass()
 	int level = 0;
 	int total_levelnum = this->vm_stack.size();
-	shared_ptr<Method> m;
+	Method *m;
 	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it, ++level) {
 		m = it->method;
 		if (level == 0 || level == 1) {
@@ -249,7 +249,7 @@ void vm_thread::init_and_do_main()
 			std::list<Oop *> list;
 			list.push_back(init_threadgroup);	// $0 = this
 			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!
-			shared_ptr<Method> target_method = threadgroup_klass->get_this_class_method(L"<init>:()V");
+			Method *target_method = threadgroup_klass->get_this_class_method(L"<init>:()V");
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);
 		}
@@ -295,7 +295,7 @@ void vm_thread::init_and_do_main()
 			list.push_back(java_lang_string::intern(L"main"));	// $3 = L"main"
 			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!		// 直接调用私有方法！为了避过狗日的 java/lang/SecurityManager 的检查......我也是挺拼的......QAQ
 			// TODO: 因为这里是直接调用了私方法，所以有可能是不可移植的。因为它私方法有可能变。
-			shared_ptr<Method> target_method = threadgroup_klass->get_this_class_method(L"<init>:(Ljava/lang/Void;Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
+			Method *target_method = threadgroup_klass->get_this_class_method(L"<init>:(Ljava/lang/Void;Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);
 		}
@@ -311,14 +311,14 @@ void vm_thread::init_and_do_main()
 			list.push_back(main_threadgroup);	// $1 = [main_threadGroup]
 			list.push_back(java_lang_string::intern(L"main"));	// $2 = L"main"
 			// execute method: java/lang/Thread.<init>:(ThreadGroup, String)V --> public Method.
-			shared_ptr<Method> target_method = thread_klass->get_this_class_method(L"<init>:(Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
+			Method *target_method = thread_klass->get_this_class_method(L"<init>:(Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);
 		}
 
 		// 3.3 Complete! invoke the method...
 		// java/lang/System::initializeSystemClass(): "Initialize the system class.  Called after thread initialization." So it must be created after the thread.
-		shared_ptr<Method> _initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
+		Method *_initialize_system_class = system_klass->get_this_class_method(L"initializeSystemClass:()V");
 		this->add_frame_and_execute(_initialize_system_class, {});
 		system_klass->set_state(Klass::KlassState::Initialized);		// set state.
 
@@ -335,7 +335,7 @@ void vm_thread::init_and_do_main()
 
 	auto launcher_helper_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
 	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
-	shared_ptr<Method> load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
+	Method *load_main_method = launcher_helper_klass->get_this_class_method(L"checkAndLoadMain:(ZILjava/lang/String;)Ljava/lang/Class;");
 	// new a String.
 	InstanceOop *main_klass = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
 
@@ -376,7 +376,7 @@ void vm_thread::init_and_do_main()
 //
 //	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
 //	Klass *main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
-//	shared_ptr<Method> main_method = ((InstanceKlass *)main_class)->get_static_void_main();
+//	Method *main_method = ((InstanceKlass *)main_class)->get_static_void_main();
 //	assert(main_method != nullptr);
 //	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
 //
@@ -399,7 +399,7 @@ ArrayOop * vm_thread::get_stack_trace()
 	uint8_t *last_frame_pc = this->pc;		// 先设置成 pc。下边会修改。
 	int i = 0;
 	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it) {
-		shared_ptr<Method> m = it->method;
+		Method *m = it->method;
 		auto klass_name = java_lang_string::intern(m->get_klass()->get_name());
 		auto method_name = java_lang_string::intern(m->get_name());
 		wstring java_file_name = m->get_klass()->get_source_file_name();
@@ -536,6 +536,8 @@ void wind_jvm::end()
 
 	// finally! delete all allocated memory!!
 	MemAlloc::cleanup();
+	Method_Pool::cleanup();
+	Field_Pool::cleanup();
 
 	std::wcout << "world ends..." << std::endl;
 }

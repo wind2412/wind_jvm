@@ -27,7 +27,7 @@ static unordered_map<wstring, void*> methods = {
 // 此函数原本意义在于：默认 args 全是包装类。因为 invoke(...) 方法全是 Object... 为变长参数。
 // 不过后来发现实在是有意思...... invokeExact 这种，虽然参数签名是 Object...，不过编译器会区别对待它...... 所以，最后出现在 jvm 中的签名格式，其实可以是 primitive type!!
 // 因此把意义改成了：如果是包装类，且 mirror 是 primitive type，就降级成 primitive type；否则不动就可以了。只要符合签名，即便不 unboxing 也没问题。
-void argument_unboxing(shared_ptr<Method> method, list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, [automatically] etc.
+void argument_unboxing(Method *method, list<Oop *> & args)		// Unboxing args for Integer, Double ... to int, double, [automatically] etc.
 {
 	vector<MirrorOop *> real_arg_mirrors = method->parse_argument_list();
 	// check
@@ -106,7 +106,7 @@ InstanceOop *return_val_boxing(Oop *basic_type_oop, vm_thread *thread, const wst
 	if (basic_type_oop->get_ooptype() != OopType::_BasicTypeOop)	return (InstanceOop *)basic_type_oop;		// it is an InstanceOop......	// bug report... 我是白痴......
 
 
-	shared_ptr<Method> target_method;
+	Method *target_method;
 	switch (((BasicTypeOop *)basic_type_oop)->get_type()) {
 		case Type::BOOLEAN: {
 			auto box_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(BOOLEAN0));
@@ -212,7 +212,7 @@ Oop *invoke(InstanceOop *member_name_obj, list<Oop *> & _stack, vm_thread *threa
 	// 1. get the signature
 	wstring signature = real_name + L":" + descriptor;
 	// 2. get the target method
-	shared_ptr<Method> target_method = get_member_name_target_method(real_klass, signature, ref_kind);
+	Method *target_method = get_member_name_target_method(real_klass, signature, ref_kind);
 
 	// simple check
 	int size = target_method->parse_argument_list().size();

@@ -29,7 +29,7 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 	InstanceKlass *target_klass = ((InstanceKlass *)((MirrorOop *)result)->get_mirrored_who());
 	// get the real method:
 	method->get_field_value(METHOD L":slot:I", &result);
-	shared_ptr<Method> target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
+	Method *target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
 
 	// get the real arg:
 	list<Oop *> arg;

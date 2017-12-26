@@ -68,7 +68,7 @@ using std::make_pair;
  */
 
 /*===----------- StackFrame --------------===*/
-StackFrame::StackFrame(shared_ptr<Method> method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, vm_thread *thread, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
+StackFrame::StackFrame(Method *method, uint8_t *return_pc, StackFrame *prev, const list<Oop *> & args, vm_thread *thread, bool is_native) : method(method), return_pc(return_pc), prev(prev) {	// va_args is: Method's argument. 所有的变长参数的类型全是有类型的 Oop。因此，在**执行 code**的时候就会有类型检查～
 	if (is_native) {
 		return;
 	}
@@ -442,7 +442,7 @@ void BytecodeEngine::initial_clinit(InstanceKlass *new_klass, vm_thread & thread
 #ifdef BYTECODE_DEBUG
 		sync_wcout{} << "(DEBUG) " << new_klass->get_name() << "::<clinit>" << std::endl;
 #endif
-		shared_ptr<Method> clinit = new_klass->get_this_class_method(L"<clinit>:()V");		// **IMPORTANT** only search in this_class for `<clinit>` !!!
+		Method *clinit = new_klass->get_this_class_method(L"<clinit>:()V");		// **IMPORTANT** only search in this_class for `<clinit>` !!!
 		if (clinit != nullptr) {		// TODO: 这里 clinit 不知道会如何执行。
 			thread.add_frame_and_execute(clinit, {});		// no return value
 		} else {
@@ -454,7 +454,7 @@ void BytecodeEngine::initial_clinit(InstanceKlass *new_klass, vm_thread & thread
 	}
 }
 
-void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
+void BytecodeEngine::getField(Field_info *new_field, stack<Oop *> & op_stack)
 {
 	// TODO: $2.8.3 的 FP_strict 浮点数转换！
 	Oop *ref = op_stack.top();	op_stack.pop();
@@ -470,7 +470,7 @@ void BytecodeEngine::getField(shared_ptr<Field_info> new_field, stack<Oop *> & o
 #endif
 }
 
-void BytecodeEngine::putField(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack)
+void BytecodeEngine::putField(Field_info *new_field, stack<Oop *> & op_stack)
 {
 	// TODO: $2.8.3 的 FP_strict 浮点数转换！
 	Oop *new_value = op_stack.top();	op_stack.pop();
@@ -484,7 +484,7 @@ void BytecodeEngine::putField(shared_ptr<Field_info> new_field, stack<Oop *> & o
 #endif
 }
 
-void BytecodeEngine::getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
+void BytecodeEngine::getStatic(Field_info *new_field, stack<Oop *> & op_stack, vm_thread & thread)
 {
 	// initialize the new_class... <clinit>
 	InstanceKlass *new_klass = new_field->get_klass();
@@ -505,7 +505,7 @@ void BytecodeEngine::getStatic(shared_ptr<Field_info> new_field, stack<Oop *> & 
 #endif
 }
 
-void BytecodeEngine::putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & op_stack, vm_thread & thread)
+void BytecodeEngine::putStatic(Field_info *new_field, stack<Oop *> & op_stack, vm_thread & thread)
 {
 	// initialize the new_class... <clinit>
 	InstanceKlass *new_klass = new_field->get_klass();
@@ -524,7 +524,7 @@ void BytecodeEngine::putStatic(shared_ptr<Field_info> new_field, stack<Oop *> & 
 #endif
 }
 
-void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
+void BytecodeEngine::invokeVirtual(Method *new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
 {
 	// 因此，得到此方法的目的只有一个，得到方法签名。
 	wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
@@ -592,7 +592,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 	}
 	sync_wcout{} << " " << ref->get_klass()->get_name() << "::" << signature << std::endl;
 #endif
-	shared_ptr<Method> target_method;
+	Method *target_method;
 	if (*pc == 0xb6){
 		if (ref->get_klass()->get_type() == ClassType::InstanceClass) {
 			target_method = ((InstanceKlass *)ref->get_klass())->search_vtable(signature);
@@ -692,7 +692,7 @@ sync_wcout{} << "then push invoke method's return value " << op_stack.top() << "
 
 }
 
-void BytecodeEngine::invokeStatic(shared_ptr<Method> new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
+void BytecodeEngine::invokeStatic(Method *new_method, stack<Oop *> & op_stack, vm_thread & thread, StackFrame & cur_frame, uint8_t * & pc)
 {
 	wstring signature = new_method->get_name() + L":" + new_method->get_descriptor();
 	if (*pc == 0xb8) {
@@ -862,7 +862,7 @@ sync_wcout{} << "then push invoke method's return value " << op_stack.top() << "
 	}
 }
 
-InstanceOop *BytecodeEngine::MethodType_make(shared_ptr<Method> target_method, vm_thread & thread)
+InstanceOop *BytecodeEngine::MethodType_make(Method *target_method, vm_thread & thread)
 {
 	auto args = target_method->parse_argument_list();		// vector<MirrorOop *>
 	auto ret = target_method->parse_return_type();		// MirrorOop *
@@ -925,7 +925,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 	switch(ref_kind) {
 		case 1:{		// REF_getField
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto field = boost::any_cast<Field_info *>(rt_pool[ref_index-1].second);
 			auto findGetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findGetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findGetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
@@ -934,7 +934,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 2:{		// REF_getStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto field = boost::any_cast<Field_info *>(rt_pool[ref_index-1].second);
 			auto findStaticGetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStaticGetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticGetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
@@ -943,7 +943,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 3:{		// REF_puttField
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto field = boost::any_cast<Field_info *>(rt_pool[ref_index-1].second);
 			auto findSetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findSetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findSetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
@@ -952,7 +952,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 4:{		// REF_putStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
-			auto field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[ref_index-1].second);
+			auto field = boost::any_cast<Field_info *>(rt_pool[ref_index-1].second);
 			auto findStaticSetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStaticSetter:(" CLS STR CLS ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticSetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
@@ -961,7 +961,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 5:{		// REF_invokeVirtual
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
-			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			auto findVirtual_method = ((InstanceKlass *)lookup_obj->get_klass())->search_vtable(L"findVirtual:(" CLS STR MT ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
@@ -971,7 +971,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 6:{		// REF_invokeStatic
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			auto findStatic_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStatic:(" CLS STR MT ")" MH);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStatic_method,
@@ -981,7 +981,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 7:{		// REF_invokeSpecial
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			assert(false);		// TODO: 且 findSpecial 的参数有误.....
 			auto findSpecial_method = ((InstanceKlass *)lookup_obj->get_klass())->get_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道 get_class_method 对不对......
@@ -992,7 +992,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 8:{		// REF_newInvokeSpecial
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref);
-			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() == L"<init>");		// special inner klass!!
 			assert(false);		// TODO: 其实我认为应该是 findConstructor...		// 且 findSpecial 的参数有误.....
 			auto findSpecial_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findSpecial:(" CLS STR MT ")" MH);	// TODO: 也不知道这里对不对......
@@ -1003,7 +1003,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 		}
 		case 9:{		// REF_invokeInterface
 			assert(rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
-			auto method = boost::any_cast<shared_ptr<Method>>(rt_pool[ref_index-1].second);
+			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			auto findVirtual_method = ((InstanceKlass *)lookup_obj->get_klass())->get_class_method(L"findVirtual:(" CLS STR MT ")" MH);	// 注意：和 REF_invokeVirtual 调用的方法不同。
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
@@ -1069,7 +1069,7 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int thread_no) {		// 卧槽......vector 由于扩容，会导致内部的引用全部失效...... 改成 list 吧......却是忽略了这点。
 
 	assert(&cur_frame == &thread.vm_stack.back());
-	shared_ptr<Method> code_method = cur_frame.method;
+	Method *code_method = cur_frame.method;
 	uint32_t code_length = code_method->get_code()->code_length;
 	stack<Oop *> & op_stack = cur_frame.op_stack;
 	vector<Oop *> & localVariableTable = cur_frame.localVariableTable;
@@ -3262,7 +3262,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0xb2:{		// getStatic
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
-				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				auto new_field = boost::any_cast<Field_info *>(rt_pool[rtpool_index-1].second);
 
 				getStatic(new_field, op_stack, thread);
 
@@ -3271,7 +3271,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0xb3:{		// putStatic
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
-				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				auto new_field = boost::any_cast<Field_info *>(rt_pool[rtpool_index-1].second);
 
 				putStatic(new_field, op_stack, thread);
 
@@ -3280,7 +3280,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0xb4:{		// getField
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
-				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				auto new_field = boost::any_cast<Field_info *>(rt_pool[rtpool_index-1].second);
 
 				getField(new_field, op_stack);
 
@@ -3289,7 +3289,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 			case 0xb5:{		// putField
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Fieldref);
-				auto new_field = boost::any_cast<shared_ptr<Field_info>>(rt_pool[rtpool_index-1].second);
+				auto new_field = boost::any_cast<Field_info *>(rt_pool[rtpool_index-1].second);
 
 				putField(new_field, op_stack);
 
@@ -3303,7 +3303,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				} else {
 					assert(rt_pool[rtpool_index-1].first == CONSTANT_InterfaceMethodref);
 				}
-				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);		// 这个方法，在我的常量池中解析的时候是按照子类同名方法优先的原则。也就是，如果最子类有同样签名的方法，父类的不会被 parse。这在 invokeStatic 和 invokeSpecial 是成立的，不过在 invokeVirtual 和 invokeInterface 中是不准的。因为后两者是动态绑定。
+				auto new_method = boost::any_cast<Method *>(rt_pool[rtpool_index-1].second);		// 这个方法，在我的常量池中解析的时候是按照子类同名方法优先的原则。也就是，如果最子类有同样签名的方法，父类的不会被 parse。这在 invokeStatic 和 invokeSpecial 是成立的，不过在 invokeVirtual 和 invokeInterface 中是不准的。因为后两者是动态绑定。
 
 				invokeVirtual(new_method, op_stack, thread, cur_frame, pc);
 
@@ -3332,7 +3332,7 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 			case 0xb8:{		// invokeStatic
 				int rtpool_index = ((pc[1] << 8) | pc[2]);
 				assert(rt_pool[rtpool_index-1].first == CONSTANT_Methodref);
-				auto new_method = boost::any_cast<shared_ptr<Method>>(rt_pool[rtpool_index-1].second);
+				auto new_method = boost::any_cast<Method *>(rt_pool[rtpool_index-1].second);
 
 				invokeStatic(new_method, op_stack, thread, cur_frame, pc);
 

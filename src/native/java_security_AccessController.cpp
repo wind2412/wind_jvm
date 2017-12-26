@@ -57,7 +57,7 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 		编译运行之后会发现 Generic$1.class 内部类中，含有两个同样签名为 `run()` 的方法。
 		而 `run() OBJ` 自动转调用了 `run() STR`。
 	 */
-	shared_ptr<Method> method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" VOD);
+	Method *method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" VOD);
 	if (method == nullptr) {
 //		method = ((InstanceKlass *)pa->get_klass())->get_this_class_method(L"run:()" STR);
 //		if (method == nullptr) {

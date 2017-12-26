@@ -210,7 +210,7 @@ void JVM_IdentityHashCode(list<Oop *> & _stack){		// static
 void JVM_InitProperties(list<Oop *> & _stack){		// static
 	InstanceOop *prop = (InstanceOop *)_stack.front();	_stack.pop_front();
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
-	shared_ptr<Method> hashtable_put = ((InstanceKlass *)prop->get_klass())->get_class_method(L"put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+	Method *hashtable_put = ((InstanceKlass *)prop->get_klass())->get_class_method(L"put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 	assert(hashtable_put != nullptr);
 	// add properties: 	// this, key, value		// TODO: 没有设置完！！
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.name"), java_lang_string::intern(L"Java Virtual Machine Specification")});

@@ -508,10 +508,10 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 	auto Byte_arr_klass = ((TypeArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[B"));
 	assert(Byte_arr_klass != nullptr);
 
-	// create [Java] java/lang/reflect/Field[] from [C++] shared_ptr<Field_info>.
+	// create [Java] java/lang/reflect/Field[] from [C++] Field_info *.
 	vector<InstanceOop *> v;		// temp save, because we don't know the Field[]'s length now. We should make a traverse.
 	for (const auto & iter : all_fields) {
-		const shared_ptr<Field_info> & field = iter.second.second;
+		Field_info *field = iter.second.second;
 		if (field->is_static() || _this->is_the_field_owned_by_this(iter.second.first)) {
 			if (public_only && !field->is_public()) continue;
 
@@ -609,14 +609,14 @@ void JVM_GetClassDeclaredMethods(list<Oop *> & _stack){
 	assert(Byte_arr_klass != nullptr);
 
 	// get all this_klass_methods except <clinit>.	// see JDK API.
-	vector<pair<int, shared_ptr<Method>>> methods = ((InstanceKlass *)_this->get_mirrored_who())->get_declared_methods();
+	vector<pair<int, Method *>> methods = ((InstanceKlass *)_this->get_mirrored_who())->get_declared_methods();
 
 	vector<InstanceOop *> v;
 
 	// become java/lang/reflect/Constructor
 	for (auto iter : methods) {
 		if (public_only && !iter.second->is_public())		continue;
-		shared_ptr<Method> method = iter.second;
+		Method *method = iter.second;
 		auto method_oop = klass->new_instance();
 
 		method_oop->set_field_value(METHOD L":clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
@@ -717,14 +717,14 @@ void JVM_GetClassDeclaredConstructors(list<Oop *> & _stack){
 	assert(Byte_arr_klass != nullptr);
 
 	// get all ctors
-	vector<pair<int, shared_ptr<Method>>> ctors = ((InstanceKlass *)_this->get_mirrored_who())->get_constructors();
+	vector<pair<int, Method *>> ctors = ((InstanceKlass *)_this->get_mirrored_who())->get_constructors();
 
 	vector<InstanceOop *> v;
 
 	// become java/lang/reflect/Constructor
 	for (auto iter : ctors) {
 		if (public_only && !iter.second->is_public())		continue;
-		shared_ptr<Method> method = iter.second;
+		Method *method = iter.second;
 		auto ctor_oop = klass->new_instance();
 
 		ctor_oop->set_field_value(CONSTRUCTOR L":clazz:Ljava/lang/Class;", method->get_klass()->get_mirror());
