@@ -178,7 +178,6 @@ void GC::cancel_gc_thread()
 			continue;
 		} else {
 			pthread_cancel(wind_jvm::gc_thread());
-			std::wcout << "canceled gc..." << std::endl;
 			break;
 		}
 	}

@@ -76,14 +76,12 @@ Annotation::Annotation(cp_info **constant_pool, const annotation & v)
 		 : type(((CONSTANT_Utf8_info *)constant_pool[v.type_index-1])->convert_to_Unicode()), stub(v.stub),
 		   num_element_value_pairs(v.num_element_value_pairs), element_value_pairs((Element_value_pairs_t *)malloc(sizeof(Element_value_pairs_t) * num_element_value_pairs)/*::new Element_value_pairs_t[num_element_value_pairs] 报错。貌似 Ele..._t 类中必须重载 ::new 才行？？难道不是自动检测的吗...*/){		// TODO: 这里 new，但是并不在 GC 管辖范围内。甚至包括了 class_parser 的各种new......
 	assert(constant_pool[v.type_index-1]->tag == CONSTANT_Utf8);
-	std::wcout << "ohhhhh0" << std::endl;		// delete 分配了这么多......
 	for (int i = 0; i < num_element_value_pairs; i ++) {
 		constructor(&element_value_pairs[i], constant_pool, v.element_value_pairs[i]);
 	}
 }
 
 Annotation::~Annotation() {
-	std::wcout << "ohhhhh" << std::endl;			// delete 竟然没释放......
 	for (int i = 0; i < num_element_value_pairs; i ++) {
 		destructor(&element_value_pairs[i]);
 	}
