@@ -66,8 +66,27 @@ Type get_type(const wstring & name)
 	return type;
 }
 
+Lock & Rt_Pool::rt_pool_lock(){
+	static Lock rt_pool_lock;
+	return rt_pool_lock;
+}
+list<rt_constant_pool *> & Rt_Pool::rt_pool() {
+	static list<rt_constant_pool *> rt_pool;		// 存放所有的对象，以备日后的 delete。
+	return rt_pool;
+}
+void Rt_Pool::put(rt_constant_pool *pool) {
+	LockGuard lg(rt_pool_lock());
+	rt_pool().push_back(pool);
+}
+void Rt_Pool::cleanup() {
+	LockGuard lg(rt_pool_lock());
+	for (auto iter : rt_pool()) {
+		delete iter;
+	}
+}
+
 /*===----------------  InstanceKlass  ------------------===*/
-void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
+void InstanceKlass::parse_fields(ClassFile *cf)
 {
 	// ** first copy parent's non-static fields / interfaces' non-static fields here ** (don't copy static fields !!)
 	// 1. super_klass
@@ -139,7 +158,7 @@ void InstanceKlass::parse_fields(shared_ptr<ClassFile> cf)
 #endif
 }
 
-void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *loader)
+void InstanceKlass::parse_superclass(ClassFile *cf, ClassLoader *loader)
 {
 	if (cf->super_class == 0) {	// this class = java/lang/Object		// TODO: java.lang.Object 怎么办？是个接口？？
 		this->parent = nullptr;
@@ -169,7 +188,7 @@ void InstanceKlass::parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *load
 #endif
 }
 
-void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *loader)	// interface should also be made by the InstanceKlass!!
+void InstanceKlass::parse_interfaces(ClassFile *cf, ClassLoader *loader)	// interface should also be made by the InstanceKlass!!
 {
 	for(int i = 0; i < cf->interfaces_count; i ++) {
 		// get interface name
@@ -196,7 +215,7 @@ void InstanceKlass::parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *load
 #endif
 }
 
-void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
+void InstanceKlass::parse_methods(ClassFile *cf)
 {
 	// copy vtable from parent
 	if (this->parent != nullptr) {	// if this class is not java.lang.Object
@@ -236,9 +255,10 @@ void InstanceKlass::parse_methods(shared_ptr<ClassFile> cf)
 #endif
 }
 
-void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader)
+void InstanceKlass::parse_constantpool(ClassFile *cf, ClassLoader *loader)
 {
-	this->rt_pool = make_shared<rt_constant_pool>(this, loader, cf);
+	this->rt_pool = new rt_constant_pool(this, loader, cf);
+	Rt_Pool::put(this->rt_pool);
 #ifdef KLASS_DEBUG
 	// this has been deleted because lazy parsing constant_pool...
 //	sync_wcout{} << "===--------------- (" << this->get_name() << ") Debug Runtime Constant Pool ---------------===" << std::endl;
@@ -247,7 +267,7 @@ void InstanceKlass::parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *lo
 #endif
 }
 
-void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
+void InstanceKlass::parse_attributes(ClassFile *cf)
 {
 	for(int i = 0; i < this->attributes_count; i ++) {
 		int attribute_tag = peek_attribute(this->attributes[i]->attribute_name_index, cf->constant_pool);
@@ -270,7 +290,7 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 				break;
 			}
 			case 14:{		// RuntimeVisibleAnnotation
-				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
+				auto & enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
 				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
 				constructor(this->rva, cf->constant_pool, enter);
 				break;
@@ -304,7 +324,7 @@ void InstanceKlass::parse_attributes(shared_ptr<ClassFile> cf)
 	}
 }
 
-InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, MirrorOop *java_loader, ClassType classtype) : java_loader(java_loader), loader(loader), Klass()/*, classtype(classtype)*/
+InstanceKlass::InstanceKlass(ClassFile *cf, ClassLoader *loader, MirrorOop *java_loader, ClassType classtype) : java_loader(java_loader), loader(loader), Klass()/*, classtype(classtype)*/
 {
 	this->classtype = classtype;
 	// this_class (only name)
@@ -336,15 +356,6 @@ InstanceKlass::InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, Mirr
 	parse_constantpool(cf, loader);
 	// become Runtime Attributes
 	parse_attributes(cf);
-
-	// TODO: enum status, Loaded, Parsed...
-	// TODO: Runtime constant pool and remove Non-Dynamic cp_pool.
-	// TODO: annotations...
-	// TODO: java.lang.Class: mirror!!!!
-	// TODO: 貌似没对 java.lang.Object 父类进行处理。比如 wait 方法等等...
-	// TODO: ReferenceKlass......
-	// TODO: Inner Class!!
-	// TODO: 补全 oop 的 Fields.
 
 	// 收尾工作：清理即将死去的 cf，把好东西全都移动出来。(constant_pool)
 	this->constant_pool = cf->constant_pool;

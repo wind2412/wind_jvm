@@ -10,8 +10,10 @@
 #include "system_directory.hpp"
 #include "utils/lock.hpp"
 #include <iomanip>
+#include <list>
 
 using std::map;
+using std::list;
 
 class ClassFile;
 class Klass;
@@ -19,6 +21,16 @@ class ByteStream;
 class MirrorOop;
 class InstanceKlass;
 class ObjArrayOop;
+
+class ClassFile_Pool {
+private:
+	static Lock & classfile_pool_lock();
+private:
+	static list<ClassFile *> & classfile_pool();
+public:
+	static void put(ClassFile *cf);
+	static void cleanup();
+};
 
 class ClassLoader {
 public:

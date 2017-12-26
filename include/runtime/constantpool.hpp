@@ -33,7 +33,7 @@ private:
 private:
 	Klass *if_didnt_load_then_load(ClassLoader *loader, const wstring & name);		// 有可能 load 到 数组类......
 public:
-	explicit rt_constant_pool(InstanceKlass *this_class, ClassLoader *loader, shared_ptr<ClassFile> cf)
+	explicit rt_constant_pool(InstanceKlass *this_class, ClassLoader *loader, ClassFile *cf)
 			: this_class(this_class), loader(loader), this_class_index(cf->this_class), bufs(cf->constant_pool), pool(cf->constant_pool_count-1, std::make_pair(0, boost::any())) {}	// 别忘了 -1 啊！！！！		// bufs 前边加上 const 竟然会报错 ???
 private:
 	const pair<int, boost::any> & if_didnt_parse_then_parse(int index);		// 把 cp_info static 常量池中的元素(符号引用) 解析成为 引用。

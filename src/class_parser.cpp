@@ -210,7 +210,7 @@ std::wstring CONSTANT_Utf8_info::convert_to_Unicode() {
 	}
 	return str;
 }
-CONSTANT_Utf8_info::~CONSTANT_Utf8_info() { if (bytes != nullptr)	delete bytes; }
+CONSTANT_Utf8_info::~CONSTANT_Utf8_info() { if (bytes != nullptr)	delete[] bytes; }
 
 // CONSTANT_MethodHandle_info
 std::istream & operator >> (std::istream & f, CONSTANT_MethodHandle_info & i) {
@@ -509,8 +509,8 @@ void Code_attribute::fill(std::istream & f, cp_info **constant_pool) {
 	}
 }
 Code_attribute::~Code_attribute() {
-	if(code != nullptr) delete code; 
-	if(exception_table != nullptr) delete exception_table; 
+	if(code != nullptr) delete[] code;
+	if(exception_table != nullptr) delete[] exception_table;
 	if(attributes != nullptr) {
 		for(int i = 0; i < attributes_count; i ++) {
 			delete attributes[i];
@@ -520,8 +520,8 @@ Code_attribute::~Code_attribute() {
 }
 
 // StackMapTable Attributes
-#define ITEM_Top				0
-#define ITEM_Integer			1
+#define ITEM_Top					0
+#define ITEM_Integer				1
 #define ITEM_Float				2
 #define ITEM_Double				3
 #define ITEM_Long				4

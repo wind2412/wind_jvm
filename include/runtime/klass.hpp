@@ -12,14 +12,15 @@
 #include "class_parser.hpp"
 #include <unordered_map>
 #include <vector>
-#include <memory>
 #include <utility>
+#include <list>
 #include "utils/synchronize_wcout.hpp"
+#include "utils/lock.hpp"
 
 using std::unordered_map;
 using std::vector;
 using std::pair;
-using std::shared_ptr;
+using std::list;
 
 //#define KLASS_DEBUG
 
@@ -57,8 +58,19 @@ enum OopType {
 
 class Oop;
 class MirrorOop;
+class rt_constant_pool;
 
 Type get_type(const wstring & name);		// in fact use wchar_t is okay.
+
+class Rt_Pool {
+private:
+	static Lock & rt_pool_lock();
+private:
+	static list<rt_constant_pool *> & rt_pool();
+public:
+	static void put(rt_constant_pool *pool);
+	static void cleanup();
+};
 
 /* 悲伤。由于循环引用以及在构造函数中就要使用 this 的 shared_ptr，造成了内存泄漏。经过考虑，决定舍弃 Klass 的 shared_ptr，直接使用指针。 */
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
@@ -144,7 +156,7 @@ private:
 	unordered_map<wstring, Method *> vtable;		// this vtable save's all father's vtables and override with this class-self. save WITHOUT private/static methods.(including final methods)
 	unordered_map<wstring, pair<int, Method *>> methods;	// all methods. These methods here are only for parsing constant_pool. Because `invokestatic`, `invokespecial` directly go to the constant_pool to get the method. WILL NOT go into the Klass to find !! [the `pair<int, ...>` 's int is the slot number. for: sun/reflect/NativeConstructorAccessorImpl-->newInstance0]
 	// constant pool
-	shared_ptr<rt_constant_pool> rt_pool;
+	rt_constant_pool *rt_pool;
 
 	// Attributes
 	// 4, 5, 6, 7, 8, 9, 13, 14, 15, 18, 19, 21
@@ -166,13 +178,13 @@ private:
 	InstanceKlass * host_klass = nullptr;		// if this klass is not Anonymous Klass, will be nullptr.
 
 private:
-	void parse_methods(shared_ptr<ClassFile> cf);
-	void parse_fields(shared_ptr<ClassFile> cf);
-	void parse_superclass(shared_ptr<ClassFile> cf, ClassLoader *loader);
-	void parse_interfaces(shared_ptr<ClassFile> cf, ClassLoader *loader);
-	void parse_attributes(shared_ptr<ClassFile> cf);
+	void parse_methods(ClassFile *cf);
+	void parse_fields(ClassFile *cf);
+	void parse_superclass(ClassFile *cf, ClassLoader *loader);
+	void parse_interfaces(ClassFile *cf, ClassLoader *loader);
+	void parse_attributes(ClassFile *cf);
 public:
-	void parse_constantpool(shared_ptr<ClassFile> cf, ClassLoader *loader);	// only initialize.
+	void parse_constantpool(ClassFile *cf, ClassLoader *loader);	// only initialize.
 public:
 	Method *get_static_void_main();
 	void initialize_final_static_field();
@@ -198,7 +210,7 @@ public:
 	bool get_static_field_value(const wstring & signature, Oop **result);			// use for forging String Oop at parsing constant_pool. However I don't no static field is of use ?
 	void set_static_field_value(const wstring & signature, Oop *value);		// as above.
 	Method *search_vtable(const wstring & signature);
-	shared_ptr<rt_constant_pool> get_rtpool() { return rt_pool; }
+	rt_constant_pool *get_rtpool() { return rt_pool; }
 	ClassLoader *get_classloader() { return this->loader; }
 	bool check_interfaces(const wstring & signature);		// find signature is `this_klass`'s parent interface.
 	bool check_interfaces(InstanceKlass *klass);
@@ -233,7 +245,7 @@ public:		// for invokedynamic.
 private:
 	InstanceKlass(const InstanceKlass &);
 public:
-	InstanceKlass(shared_ptr<ClassFile> cf, ClassLoader *loader, MirrorOop *java_loader = nullptr, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
+	InstanceKlass(ClassFile *cf, ClassLoader *loader, MirrorOop *java_loader = nullptr, ClassType type = ClassType::InstanceClass);	// 不可以用初始化列表初始化基类的 protected 成员！！ https://stackoverflow.com/questions/2290733/initialize-parents-protected-members-with-initialization-list-c
 	~InstanceKlass();
 };
 

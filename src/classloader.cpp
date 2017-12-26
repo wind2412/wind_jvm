@@ -11,6 +11,25 @@ using std::ifstream;
 using std::shared_ptr;
 using std::make_shared;
 
+Lock & ClassFile_Pool::classfile_pool_lock(){
+	static Lock classfile_pool_lock;
+	return classfile_pool_lock;
+}
+list<ClassFile *> & ClassFile_Pool::classfile_pool() {
+	static list<ClassFile *> classfile_pool;		// 存放所有的对象，以备日后的 delete。
+	return classfile_pool;
+}
+void ClassFile_Pool::put(ClassFile *cf) {
+	LockGuard lg(classfile_pool_lock());
+	classfile_pool().push_back(cf);
+}
+void ClassFile_Pool::cleanup() {
+	LockGuard lg(classfile_pool_lock());
+	for (auto iter : classfile_pool()) {
+		delete iter;
+	}
+}
+
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
 //BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
 
@@ -49,7 +68,8 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 #ifdef DEBUG
 			sync_wcout{} << "===----------------- begin parsing (" << target << ") 's ClassFile in BootstrapClassLoader..." << std::endl;
 #endif
-			shared_ptr<ClassFile> cf(new ClassFile);
+			ClassFile *cf = new ClassFile;
+			ClassFile_Pool::put(cf);
 			f >> *cf;
 #ifdef DEBUG
 			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
@@ -170,7 +190,7 @@ Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf,
 	if (is_anonymous) {		// Anonymous Klass 由 MyClassLoader 加载吧。
 		assert(byte_buf != nullptr);
 		std::istream *stream;
-		shared_ptr<ClassFile> cf(new ClassFile);
+		ClassFile *cf(new ClassFile);
 		std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
 #ifdef DEBUG
 		sync_wcout{} << "===----------------- begin parsing (" << classname << ") 's ClassFile in MyClassLoader ..." << std::endl;
@@ -247,7 +267,8 @@ MyClassLoader::get_loader().print();
 			return classmap[target];
 		} else {
 			std::istream *stream;
-			shared_ptr<ClassFile> cf(new ClassFile);
+			ClassFile *cf = new ClassFile;
+			ClassFile_Pool::put(cf);
 			if (byte_buf == nullptr) {
 				ifstream f(wstring_to_utf8(target).c_str(), std::ios::binary);		// use `ifstream`
 				if(!f.is_open()) {

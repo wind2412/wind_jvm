@@ -142,6 +142,7 @@ struct CodeStub {
 
 struct cp_info {
 	u1 tag = 0;
+	virtual ~cp_info() {}
 };
 
 struct CONSTANT_CS_info : public cp_info{			// Class, String
@@ -232,6 +233,7 @@ struct attribute_info {		// show be moved up because of incompleted type. but se
 	u2 attribute_name_index;
 	u4 attribute_length;
 	friend std::istream & operator >> (std::istream & f, attribute_info & i);
+	virtual ~attribute_info() {}
 };
 
 struct field_info {
@@ -322,6 +324,7 @@ struct StackMapTable_attribute : public attribute_info {
 	struct verification_type_info {
 		u1 tag;
 		friend std::istream & operator >> (std::istream & f, StackMapTable_attribute::verification_type_info & i);
+		virtual ~verification_type_info() {}
 	};
 	struct Top_variable_info : public verification_type_info {
 		// nothing
@@ -367,6 +370,7 @@ struct StackMapTable_attribute : public attribute_info {
 	struct stack_map_frame {
 		u1 frame_type;	
 		friend std::istream & operator >> (std::istream & f, StackMapTable_attribute::stack_map_frame & i);
+		virtual ~stack_map_frame() {}
 	};
 	struct same_frame : public stack_map_frame {		// frame_type: 0-63
 		// none
@@ -530,6 +534,7 @@ struct Deprecated_attribute : public attribute_info {
 
 struct value_t {
 	CodeStub stub;
+	virtual ~value_t() {}
 };
 
 struct const_value_t : public value_t {
@@ -582,6 +587,7 @@ struct type_annotation {
 	// target_type
 	struct target_info_t {
 		CodeStub stub;
+		virtual ~target_info_t() {}
 	};
 	struct type_parameter_target : target_info_t {
 		u1 type_parameter_index;

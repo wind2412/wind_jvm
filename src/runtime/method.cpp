@@ -87,7 +87,7 @@ Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) 
 				break;
 			}
 			case 14:{	// RuntimeVisibleAnnotation
-				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
+				auto & enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;		// bug report: 这里由于 shallow copy 了一个对象出来，因此导致了 delete！！然后 Method 释放的时候又析构，free 了两次......
 				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
 				constructor(this->rva, constant_pool, enter);
 				break;
@@ -112,7 +112,7 @@ Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) 
 				break;
 			}
 			case 20:{		// Annotation Default
-				auto element_value = ((AnnotationDefault_attribute *)this->attributes[i])->default_value;
+				auto & element_value = ((AnnotationDefault_attribute *)this->attributes[i])->default_value;
 				this->ad = (Element_value *)malloc(sizeof(Element_value));
 				constructor(this->ad, constant_pool, element_value);
 				this->_ad = ((AnnotationDefault_attribute *)this->attributes[i])->stub;

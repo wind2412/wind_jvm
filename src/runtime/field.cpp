@@ -57,7 +57,7 @@ Field_info::Field_info(InstanceKlass *klass, field_info & fi, cp_info **constant
 				break;
 			}
 			case 14:{		// RuntimeVisibleAnnotation
-				auto enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
+				auto & enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
 				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
 				constructor(this->rva, constant_pool, enter);
 				break;

@@ -538,6 +538,8 @@ void wind_jvm::end()
 	MemAlloc::cleanup();
 	Method_Pool::cleanup();
 	Field_Pool::cleanup();
+	Rt_Pool::cleanup();
+	ClassFile_Pool::cleanup();
 
 	std::wcout << "world ends..." << std::endl;
 }
