@@ -72,6 +72,7 @@ public:
 public:
 	explicit Oop(Klass *klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!
+	virtual ~Oop() {}
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.

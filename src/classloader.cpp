@@ -153,7 +153,7 @@ void BootStrapClassLoader::cleanup()
 {
 	LockGuard lg(system_classmap_lock);
 	for (auto iter : system_classmap) {
-		delete iter.second;
+		delete iter.second;			/// 很有意思啊...... 这个 ??? 被输出，然而 delete InstanceKlass 中的 输出却并没有...... 奇特啊。而且最后可能会报崩......
 	}
 }
 

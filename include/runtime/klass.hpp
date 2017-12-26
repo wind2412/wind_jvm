@@ -44,7 +44,6 @@ enum Type {		// TODO: 如果这里发生了变动，那么 TypeArrayKlass 可能
 
 enum ClassType {
 	InstanceClass,
-	MirrorClass,
 	ObjArrayClass,
 	TypeArrayClass,
 };
@@ -95,6 +94,7 @@ protected:
 	Klass operator= (const Klass &);
 public:
 	Klass() {}
+	virtual ~Klass() {}
 };
 
 class Field_info;

@@ -350,6 +350,8 @@ void JVM_DefineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp
 
 	ByteStream byte_buf(buf, len);
 
+//	byte_buf.print(',', true);
+
 	// host_klass
 	InstanceKlass *host_klass = ((InstanceKlass *)host_klass_mirror->get_mirrored_who());
 	// host_klass's java loader.

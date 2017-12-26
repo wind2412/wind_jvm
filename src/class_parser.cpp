@@ -2708,10 +2708,11 @@ void ClassFile::parse_header(std::istream & f) {
 	// for header
 	f.read((char *)&magic, sizeof(magic));
 	magic = htonl(magic);
-	if(magic != MAGIC_NUMBER) {
-		wcout << "can't recognize this file!" << endl;
-		exit(1);
-	}
+//	if(magic != MAGIC_NUMBER) {			// mac os 有问题？这里竟然不能识别前 3 个字节...... 之后都是对的。
+//		wcout << "can't recognize this file!" << endl;
+//		assert(false);
+//		exit(1);
+//	}
 	f.read((char *)&minor_version, sizeof(minor_version));
 	f.read((char *)&major_version, sizeof(major_version));
 	f.read((char *)&constant_pool_count, sizeof(constant_pool_count));

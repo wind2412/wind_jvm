@@ -745,21 +745,21 @@ std::string recursive_parse_annotation (annotation *target);
 struct ClassLoader;
 
 struct ClassFile {
-	u4 magic;
-	u2 minor_version;
-	u2 major_version;
-	u2 constant_pool_count;
+	u4 magic = 0;
+	u2 minor_version = 0;
+	u2 major_version = 0;
+	u2 constant_pool_count = 0;
 	cp_info **constant_pool = nullptr;		// [constant_pool_count-1]	// for cp_info's polymorphic, can't use array of cp_info but instead using array of cp_info*
-	u2 access_flags;
-	u2 this_class;
-	u2 super_class;
-	u2 interfaces_count;
+	u2 access_flags = 0;
+	u2 this_class = 0;
+	u2 super_class = 0;
+	u2 interfaces_count = 0;
 	u2 *interfaces = nullptr;				// [interfaces_count]
-	u2 fields_count;
+	u2 fields_count = 0;
 	field_info *fields = nullptr;			// [fields_count]
-	u2 methods_count;
+	u2 methods_count = 0;
 	method_info *methods = nullptr;			// [methods_count];
-	u2 attributes_count;
+	u2 attributes_count = 0;
 	attribute_info **attributes = nullptr;	// [attributes_count];
 
 	void parse_header(std::istream & f);

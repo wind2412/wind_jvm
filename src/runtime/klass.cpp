@@ -630,6 +630,8 @@ InstanceOop * InstanceKlass::new_instance() {
 }
 
 InstanceKlass::~InstanceKlass() {
+	std::wcout << "delete a klass: " << name << std::endl;		// delete
+
 	for (int i = 0; i < attributes_count; i ++) {
 		delete attributes[i];
 	}

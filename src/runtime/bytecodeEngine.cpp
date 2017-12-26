@@ -599,6 +599,7 @@ void BytecodeEngine::invokeVirtual(shared_ptr<Method> new_method, stack<Oop *> &
 		} else if (ref->get_klass()->get_type() == ClassType::TypeArrayClass || ref->get_klass()->get_type() == ClassType::ObjArrayClass) {
 			target_method = new_method;		// 那么 new_method 就是那个 target_method。因为数组没有 InstanceKlass，编译器会自动把 Object 的 Method 放上来。直接调用就可以～
 		} else {
+			std::wcout << ref->get_klass()->get_type() << std::endl;
 			assert(false);
 		}
 	} else {
