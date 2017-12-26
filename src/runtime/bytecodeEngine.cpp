@@ -1053,7 +1053,8 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 	wind_jvm::lock().unlock();
 
 	// force cancel gc thread?
-	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
+//	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
+	GC::cancel_gc_thread();						// 正在回收的时候强行停止...... 最后的回收资源一定会崩溃吧...... 数据结构都做到一半...
 
 	// 回收资源
 	wind_jvm::end();

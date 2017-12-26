@@ -46,6 +46,7 @@ struct java_string_equal_to
 
 
 class java_lang_string {
+	friend GC;
 private:
 	static Lock & getLock() {
 		static Lock lock;

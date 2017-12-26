@@ -10,7 +10,12 @@
 #include "utils/synchronize_wcout.hpp"
 
 /*===---------------- Memory -------------------===*/
-void *MemAlloc::allocate(size_t size)
+Oop *Mempool::copy(Oop & oop) {
+//	void *buf = oop.operator new(sizeof(oop), true);		// 非常悲伤，虽然明明 oop 是多态的，但是只要有了一层函数调用传参，sizeof 竟然一直是 Oop 的大小...... 而不是其他的大小。如果没有函数调用的话，则是正确的大小。
+	return oop.copy();		// do not record in `Mempool::oop_handler_pool()`.
+}
+
+void *MemAlloc::allocate(size_t size, bool dont_record)
 {
 	if (size == 0) {
 		return nullptr;			// 直接返回！
@@ -21,7 +26,9 @@ void *MemAlloc::allocate(size_t size)
 	memset(ptr, 0, size);		// default bzero!
 
 	// add it to the Mempool
-	Mempool::oop_handler_pool().push_back((Oop *)ptr);
+	if (!dont_record) {
+		Mempool::oop_handler_pool().push_back((Oop *)ptr);
+	}
 
 	return ptr;
 }
@@ -32,19 +39,17 @@ void MemAlloc::deallocate(void *ptr)
 
 	// TODO: 这里要怎么规划......是先把所有的全都扫描一遍并且复制到另一堆中，然后把这个 unordered_set 全部删除把...... 这样的话，这里什么也不用写就好了。
 
-//	assert(false);		// 先 assert(false) 了。
-
 	free(ptr);
 }
 
-void *MemAlloc::operator new(size_t size) throw()
+void *MemAlloc::operator new(size_t size, bool dont_record) throw()
 {
-	return allocate(size);
+	return allocate(size, dont_record);
 }
 
-void *MemAlloc::operator new[](size_t size) throw()
+void *MemAlloc::operator new[](size_t size, bool dont_record) throw()
 {
-	return allocate(size);
+	return allocate(size, dont_record);
 }
 
 void MemAlloc::operator delete(void *ptr)
@@ -62,6 +67,14 @@ void MemAlloc::cleanup() {
 	for (auto iter : Mempool::oop_handler_pool()) {
 		delete iter;
 	}
+}
+
+/*===----------------  Oop  -----------------===*/
+Oop *Oop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((Oop *)buf, *this);		// 虽然 Oop, InstanceOop 等内部的 copy 函数函数体完全相同，但是都要实现。因为 *this 没法得到真正类型......即便是 virtual 的。所以必须 virtual + override。
+	return (Oop *)buf;
 }
 
 /*===----------------  InstanceOop  -----------------===*/
@@ -138,10 +151,27 @@ int InstanceOop::get_static_field_offset(const wstring & signature)
 	return instance_klass->get_static_field_offset(signature);
 }
 
+Oop *InstanceOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((InstanceOop *)buf, *this);
+	return (Oop *)buf;
+}
+
 /*===----------------  MirrorOop  -------------------===*/
 MirrorOop::MirrorOop(Klass *mirrored_who)			// 注意：在使用 lldb 调试的时候：输入 mirrored_who 其实是在输出 this->mirrored_who...... 而不是这个形参的...... 形参的 mirrored_who 的输出要使用 fr v mirrored_who 来进行打印！......
 					: InstanceOop(((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Class"))),
 					  mirrored_who(mirrored_who){}
+
+MirrorOop::MirrorOop(const MirrorOop & rhs)
+					: InstanceOop(rhs), mirrored_who(rhs.mirrored_who), extra(rhs.extra) {}
+
+Oop *MirrorOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((MirrorOop *)buf, *this);
+	return (Oop *)buf;
+}
 
 /*===----------------  TypeArrayOop  -------------------===*/
 ArrayOop::ArrayOop(const ArrayOop & rhs) : Oop(rhs), buf(rhs.buf)	// TODO: not gc control......
@@ -149,3 +179,9 @@ ArrayOop::ArrayOop(const ArrayOop & rhs) : Oop(rhs), buf(rhs.buf)	// TODO: not g
 //	memcpy(this->buf, rhs.buf, sizeof(Oop *) * this->length);		// shallow copy
 }
 
+Oop *ArrayOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((ArrayOop *)buf, *this);
+	return (Oop *)buf;
+}

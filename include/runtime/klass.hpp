@@ -72,8 +72,11 @@ public:
 	static void cleanup();
 };
 
+class GC;
+
 /* 悲伤。由于循环引用以及在构造函数中就要使用 this 的 shared_ptr，造成了内存泄漏。经过考虑，决定舍弃 Klass 的 shared_ptr，直接使用指针。 */
 class Klass /*: public std::enable_shared_from_this<Klass>*/ {		// similar to java.lang.Class	-->		metaClass	// oopDesc is the real class object's Class.
+	friend GC;
 public:
 	enum KlassState{NotInitialized, Initializing, Initialized};		// Initializing is to prevent: some method --(invokestatic clinit first)--> <clinit> --(invokestatic other method but must again called clinit first forcely)--> recursive...
 protected:
@@ -125,6 +128,7 @@ class InstanceOop;
 class InstanceKlass : public Klass {
 	friend InstanceOop;
 	friend MirrorOop;
+	friend GC;
 private:
 //	ClassFile *cf;		// origin non-dynamic constant pool
 	ClassLoader *loader;
@@ -260,6 +264,7 @@ public:
 };
 
 class ArrayKlass : public Klass {
+	friend GC;
 private:
 	ClassLoader *loader;
 	MirrorOop *java_loader = nullptr;

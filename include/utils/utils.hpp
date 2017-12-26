@@ -4,6 +4,8 @@
 #include <string>
 #include <locale>
 #include <codecvt>
+#include <typeinfo>
+#include <iostream>
 
 /*===-----------------  Wstring ---------------------===*/
 // convert wstring to UTF-8 string

@@ -6,8 +6,15 @@
  */
 
 #include "runtime/gc.hpp"
+#include "runtime/oop.hpp"
+#include "runtime/klass.hpp"
 #include "runtime/thread.hpp"
 #include "wind_jvm.hpp"
+#include "classloader.hpp"
+#include "native/java_lang_Class.hpp"
+#include "native/java_lang_String.hpp"
+#include "utils/utils.hpp"
+
 
 void GC::init_gc()	// 设置标志位以及目标 vm_threads
 {
@@ -116,21 +123,174 @@ void *GC::gc_thread(void *)			// 此 gc thread 会一直运行下去。最后会
 
 }
 
+// 意为：直接复制对象，并且递归改动新对象的各种指针。最后把新的一堆对象放到 new_oop_map 集合中去。
+void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop * const & origin_oop, unordered_map<Oop *, Oop *> & new_oop_map)
+{																	// TODO: 上边！加了个 const 就可以适配 MirrorOop * & 到 Oop * & 了...... const 我一直不明白是什么原理啊...... 还是 too young......
+																	// 但是我还要修改它... 所以只能用 const_cast......
+	if (origin_oop == nullptr)	return;
+
+	auto iter = new_oop_map.find(origin_oop);			// find the origin_oop has been migrated ? or not ?
+	if (iter != new_oop_map.end()) {
+		const_cast<Oop *&>(origin_oop) = iter->second;				// 强制修改......
+		return;			// has been in the set already. substitute and return.
+	}
+
+	// 在 StringTable 中查找需要 hash 函数...... 不能够直接通过地址查找。而每个 oop 都判断是否 String 类，在我这里效率又不高。
+	// 因此采用不卸载 StringTable，完整复制的方法节省效率。
+
+	Oop *new_oop = Mempool::copy(*origin_oop);			// should copy the origin in next several conditions.
+	new_oop_map.insert(make_pair(origin_oop, new_oop));	// should add to the new_oop_map in next several conditions.
+	const_cast<Oop *&>(origin_oop) = new_oop;				// 强制修改......
+
+	if (origin_oop->get_ooptype() == OopType::_BasicTypeOop) {
+
+		// only substitute this oop is okay.
+		return;
+
+	} else if (origin_oop->get_ooptype() == OopType::_InstanceOop) {
+
+		// next, add its inner member variables!
+		for (auto & iter : ((InstanceOop *)origin_oop)->fields) {		// use `&` to modify.
+			// if need, substitute the pointer in origin... to the new pointer.
+			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
+		}
+		return;
+
+
+	} else if ((origin_oop->get_ooptype() == OopType::_ObjArrayOop) || (origin_oop->get_ooptype() == OopType::_TypeArrayOop)) {
+
+		// add this oop and its inner elements!
+		for (auto & iter : ((ArrayOop *)origin_oop)->buf) {
+			// if need, substitute the pointer in origin... to the new pointer.
+			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
+		}
+		return;
+
+	} else {
+		assert(false);
+	}
+}
+
+void GC::klass_inner_oop_gc(Klass *klass, unordered_map<Oop *, Oop *> & new_oop_map)
+{
+	if (klass->get_type() == ClassType::InstanceClass) {
+
+		InstanceKlass *instanceklass = (InstanceKlass *)klass;
+
+		// for static_fields:
+		for (auto & iter : instanceklass->static_fields) {
+			// if need, substitute the pointer in origin... to the new pointer.
+			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively add into.
+		}
+		// for java_loader:
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(instanceklass->java_loader, new_oop_map);		// recursively add into.
+
+	} else if (klass->get_type() == ClassType::TypeArrayClass || klass->get_type() == ClassType::ObjArrayClass) {
+
+		ArrayKlass *arrklass = (ArrayKlass *)klass;
+
+		// for java_loader:
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(arrklass->java_loader, new_oop_map);		// recursively add into.
+
+	} else {
+		assert(false);
+	}
+
+	// for java_mirror:
+	recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(klass->java_mirror, new_oop_map);		// recursively add into.
+
+}
+
 // 这个函数应该被执行在一个新的 GC 进程中。执行此 GC 之前，必须要先进行 stop-the-world。也就是，此函数进行之前，所有除了此 GC 进程之外的线程已经全部停止。
 void GC::system_gc()
 {
 	// GC-Root and Copy Algorithm
-	// 1. get the need-gc-threads:
-	// (no need to lock. because there's only this thread in the whole world...)
+	// get all need-gc-threads(in fact all threads):
+	// (**NO NEED TO LOCK**, because there's only this thread in the whole world...)
 
+	// GC-Roots include:
+	// 1. InstanceKlass::static_fields
+	// 2. InstanceKlass::java_mirror (don't include `get_single_basic_type_mirrors()`'s basic mirror)
+	// 3. InstanceKlass::java_loader
+	// 4. InstanceOop::fields
+	// 5. ArrayOop::buf
+	// #. (gc temporarily do not support `StringTable`'s StringOop. they are all remained.)
+	// 6. vm_thread::arg
+	// 7. vm_thread::StackFrame[0 ~ the last frame]::localVariableTable
+	// 8. vm_thread::StackFrame[0 ~ the last frame]::op_stack
 
+	// 0. create a TEMP new-oop-pool:
+	unordered_map<Oop *, Oop *> new_oop_map;		// must be `map/set` instead of list, for getting rid of duplication!!!
 
+	Oop *new_oop;		// global local variable
 
+	// 0.5. first migrate all of the basic type mirrors.
+	for (auto & iter : java_lang_class::get_single_basic_type_mirrors()) {
+		new_oop = Mempool::copy(*iter.second);		// 希望这里复制正确。确实执行了 MirrorOop 的拷贝函数。应该对的。
+		new_oop_map.insert(make_pair(iter.second, new_oop));
+		iter.second = (MirrorOop *)new_oop;
+	}
+	// 0.7. 为了避免在 GC 中对照 klass->name 字符串查找，就不实现 StringTable 的卸载了。直接整个复制了一份。
+	unordered_set<Oop *, java_string_hash, java_string_equal_to> new_string_table;
+	for (auto & iter : java_lang_string::get_string_table()) {
+		new_oop = Mempool::copy(*iter);
+		new_oop_map.insert(make_pair(iter, new_oop));
+		new_string_table.insert(new_oop);
+	}
+	new_string_table.swap(java_lang_string::get_string_table());
 
+	// 1. for all GC-Roots [InstanceKlass]:
+	for (auto iter : system_classmap) {
+		klass_inner_oop_gc(iter.second, new_oop_map);		// gc the klass
+	}
+	for (auto iter : MyClassLoader::get_loader().classmap) {
+		klass_inner_oop_gc(iter.second, new_oop_map);		// gc the klass
+	}
+	for (auto iter : MyClassLoader::get_loader().anonymous_klassmap) {
+		klass_inner_oop_gc(iter, new_oop_map);		// gc the klass
+	}
 
+	// 2. for all GC-Roots [vm_threads]:
+	for (auto & thread : wind_jvm::threads()) {
+		// 2.3. for thread.args
+		for (auto & iter : thread.arg) {
+			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);
+		}
+		for (auto & frame : thread.vm_stack) {
+			// 2.5. for vm_stack::StackFrame::LocalVariableTable
+			for (auto & oop : frame.localVariableTable) {
+				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
+			}
+			// 2.7. for vm_stack::StackFrame::op_stack
+			// stack can't use iter. so make it with another vector...
+			list<Oop *> temp;
+			while(!frame.op_stack.empty()) {
+				Oop *oop = frame.op_stack.top();	frame.op_stack.pop();
+				temp.push_front(oop);
+			}
+			for (auto & oop : temp) {
+				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
+			}
+			for (auto & oop : temp) {
+				frame.op_stack.push(temp.front());
+			}
+		}
 
+	}
 
-	// final: 收尾工作，必须进行。
+	// 3. create a new oop table and exchange with the global Mempool
+	list<Oop *> new_oop_handler_pool;
+	for (auto & iter : new_oop_map) {
+		new_oop_handler_pool.push_back(iter.second);
+	}
+	// delete all:
+	for (auto iter : Mempool::oop_handler_pool()) {
+		delete iter;
+	}
+	// swap.
+	new_oop_handler_pool.swap(Mempool::oop_handler_pool());
+
+	// 4. final: 收尾工作，必须进行。
 	unordered_map<vm_thread *, bool>().swap(target_threads());
 	gc() = false;				// no need to lock.
 	signal_all_thread();

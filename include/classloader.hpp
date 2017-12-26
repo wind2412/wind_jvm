@@ -32,7 +32,10 @@ public:
 	static void cleanup();
 };
 
+class GC;
+
 class ClassLoader {
+	friend GC;
 public:
 	// the third argument is the Java's ClassLoader, maybe Launcher$AppClassLoader's mirror.
 	virtual Klass *loadClass(const wstring & classname, ByteStream * = nullptr, MirrorOop * = nullptr,
@@ -87,6 +90,7 @@ public:
 };
 
 class MyClassLoader : public ClassLoader {
+	friend GC;
 private:
 	Lock lock;
 	BootStrapClassLoader & bs = BootStrapClassLoader::get_bootstrap();

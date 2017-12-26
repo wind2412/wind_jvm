@@ -11,6 +11,7 @@
 #include <queue>
 #include <list>
 #include <unordered_map>
+#include <unordered_set>
 #include <string>
 #include <cassert>
 #include <memory>
@@ -19,6 +20,7 @@
 using std::queue;
 using std::list;
 using std::unordered_map;
+using std::unordered_set;
 using std::wstring;
 using std::shared_ptr;
 
@@ -26,6 +28,7 @@ class MirrorOop;
 class Klass;
 
 class java_lang_class {
+	friend GC;
 public:
 	enum mirror_state { UnInited, Inited, Fixed };
 public:

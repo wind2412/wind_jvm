@@ -30,6 +30,7 @@ public:
 		static list<Oop *> oop_handler_pool;		// 存放所有的对象，以备日后的 delete。
 		return oop_handler_pool;
 	}
+	static Oop *copy(Oop & oop);					// 使用运行时多态来进行动态的类型 copy。		// for gc only.	// 此函数返回的 Oop 不会被放置在 oop_handler_pool 中。
 };
 
 class MemAlloc {
@@ -39,19 +40,21 @@ private:
 		return mem_lock;
 	}
 public:
-	static void *allocate(size_t size);
+	static void *allocate(size_t size, bool);
 	static void deallocate(void *ptr);
-	static void *operator new(size_t size) throw();
+	static void *operator new(size_t size, bool = false) throw();
 	static void *operator new(size_t size, const std::nothrow_t &) throw() { exit(-2); }		// do not use it.
-	static void *operator new[](size_t size) throw();
+	static void *operator new[](size_t size, bool = false) throw();
 	static void *operator new[](size_t size, const std::nothrow_t &) throw() { exit(-2); }		// do not use it.
 	static void operator delete(void *ptr);
 	static void operator delete[](void *ptr);
 	static void cleanup();
 };
 
+class GC;
 
 class Oop : public MemAlloc {		// 注意：Oop 必须只能使用 new ( = ::operator new + constructor-->::operator new(pointer p) )来分配！！因为要放在堆中。
+	friend GC;
 protected:
 	// TODO: HashCode .etc
 	OopType ooptype;
@@ -72,10 +75,12 @@ public:
 public:
 	explicit Oop(Klass *klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!
-	virtual ~Oop() {}
+	virtual ~Oop() {}			// ***VERY, VERY, VERY, VERY IMPORTANT!!!***		// 继承体系本来就必须实现虚析构 virtual ~A() {} 函数！！！
+	virtual Oop *copy();			// only use for gc:	// 此 new 的 Oop 不会被记录在 oop_handler_pool.
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
+	friend GC;
 private:
 	int field_length;
 	vector<Oop *> fields;	// save a lot of mixed datas. int, float, Long, Reference... if it's Reference, it will point to a Oop object.
@@ -99,9 +104,12 @@ private:
 //public:	// deprecated.
 //	unsigned long get_value(const wstring & signature);
 //	void set_value(const wstring & signature, unsigned long value);
+public:		// for gc:
+	virtual Oop *copy();
 };
 
 class MirrorOop : public InstanceOop {	// for java_mirror. Because java_mirror->klass must be java.lang.Class...... We'd add a varible: mirrored_who.
+	friend GC;
 private:
 	Klass * mirrored_who = nullptr;		// this Oop being instantiation, must after java.lang.Class loaded !!!
 	wstring extra;						// bad design... if it's basic type like int, long, use the `extra`. this time , mirrored_who == nullptr.
@@ -110,6 +118,7 @@ public:
 	void set_extra(const wstring & s) { extra = s; }
 public:
 	MirrorOop(Klass *mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
+	MirrorOop(const MirrorOop & rhs);
 public:
 	Klass *get_mirrored_who() { return mirrored_who; }
 	void set_mirrored_who(Klass *mirrored_who) { this->mirrored_who = mirrored_who; }
@@ -125,9 +134,12 @@ public:
 //		auto & this_static_field_map = ((InstanceKlass *)mirrored_who)->static_fields_layout;
 //		return this_static_field_map.find(signature) != this_static_field_map.end();
 //	}
+public:		// for gc:
+	virtual Oop *copy();
 };
 
 class ArrayOop : public Oop {
+	friend GC;
 protected:
 							// length 即 capacity！！是一个东西！vector 这种，由于 capacity 是 malloc 的内存，length 是 placement new 出来的对象，才有分别！这里一上来对象就全了，没有就是 null，所以没有区别！！
 	vector<Oop *> buf;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
@@ -150,11 +162,8 @@ public:
 //		return ((char *)&buf - (char *)this);
 		return 0;				// 因为我把 field 挂在了堆中，因此这里返回 0，在 Unsafe.getObjectVolatile() 中解码更加方便～
 	}
-	~ArrayOop() {
-//		for (int i = 0; i < buf.size(); i ++) {
-//			MemAlloc::deallocate(buf[i]);			// TODO: 这里的对于 gc 的写法，要好好考虑！！
-//		}
-	}
+public:		// for gc:
+	virtual Oop *copy();
 };
 
 class TypeArrayOop : public ArrayOop {
