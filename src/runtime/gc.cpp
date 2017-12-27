@@ -153,9 +153,9 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 		// next, add its inner member variables!
 		for (auto & iter : ((InstanceOop *)new_oop)->fields) {		// use `&` to modify.
 			// if need, substitute the pointer in origin... to the new pointer.
-			std::wcout << iter << " to ";		// delete
+//			std::wcout << iter << " to ";		// delete
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
-			std::wcout << iter << std::endl;		// delete
+//			std::wcout << iter << std::endl;		// delete
 		}
 		return;
 
@@ -165,9 +165,9 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 		// add this oop and its inner elements!
 		for (auto & iter : ((ArrayOop *)new_oop)->buf) {		// 验证 origin oop 是否真的替换了...?
 			// if need, substitute the pointer in origin... to the new pointer.
-			std::wcout << iter << " to ";		// delete
+//			std::wcout << iter << " to ";		// delete
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
-			std::wcout << iter << std::endl;		// delete
+//			std::wcout << iter << std::endl;		// delete
 		}
 		return;
 
@@ -299,9 +299,9 @@ void GC::system_gc()
 		for (auto & frame : thread.vm_stack) {
 			// 2.5. for vm_stack::StackFrame::LocalVariableTable
 			for (auto & oop : frame.localVariableTable) {
-				std::wcout << "localVariableTable: " << oop;			// delete
+//				std::wcout << "localVariableTable: " << oop;			// delete
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
-				std::wcout << " to " << oop;			// delete
+//				std::wcout << " to " << oop;			// delete
 			}
 			// 2.7. for vm_stack::StackFrame::op_stack
 			// stack can't use iter. so make it with another vector...
@@ -311,9 +311,9 @@ void GC::system_gc()
 				temp.push_front(oop);
 			}
 			for (auto & oop : temp) {
-				std::wcout << "op_stack: " << oop;		// delete
+//				std::wcout << "op_stack: " << oop;		// delete
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
-				std::wcout << " to " << oop;		// delete
+//				std::wcout << " to " << oop;		// delete
 			}
 			for (auto & oop : temp) {
 				frame.op_stack.push(oop);
@@ -324,11 +324,11 @@ void GC::system_gc()
 
 	// 2.5. for all GC-Roots: ThreadTable
 	for (auto & iter : ThreadTable::get_thread_table()) {
-		std::wcout << "thread: from " << iter.second.second;
+//		std::wcout << "thread: from " << iter.second.second;
 		Oop *thread = iter.second.second;
 		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(thread, new_oop_map);		// 由于直接传入 iter.second.second 是 InstanceOop &，和 Oop & 对不上，因此值并不会改变。有待研究。
 		iter.second.second = (InstanceOop *)thread;
-		std::wcout << " to " << iter.second.second;
+//		std::wcout << " to " << iter.second.second;
 	}
 
 	// 3. create a new oop table and exchange with the global Mempool
