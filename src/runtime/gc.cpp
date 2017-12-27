@@ -62,9 +62,9 @@ void GC::detect_ready()
 			total_size = ThreadTable::get_thread_table().size();
 			for (auto & iter : ThreadTable::get_thread_table()) {
 
-				pthread_mutex_lock(&_all_thread_wait_mutex);
+//				pthread_mutex_lock(&_all_thread_wait_mutex);		// bug report: dead lock bug from: wind_jvm.cpp::wait_cur_thread().
 				thread_state state = std::get<2>(iter.second)->state;
-				pthread_mutex_unlock(&_all_thread_wait_mutex);
+//				pthread_mutex_unlock(&_all_thread_wait_mutex);
 
 				if (state == Waiting || state == Death/*iter.second == false && iter.first->vm_stack.size() == 0*/) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
 					total_ready_num ++;

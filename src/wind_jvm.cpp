@@ -472,9 +472,22 @@ pthread_cond_t _all_thread_wait_cond;
 void wait_cur_thread(vm_thread *thread)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
-	thread->set_state(Waiting);
-	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
-	std::wcout << "running!!" << std::endl;		// delete
+	thread->set_state(Waiting);			// 防止：GC 的时候，被其他已经阻塞很久的、当时没有 GC 的线程，通过 signal() 唤醒。或者是 signal 的同时唤醒多个线程的虚假唤醒。
+	while (true) {
+		bool gc;
+		GC::gc_lock().lock();
+		{
+			gc = GC::gc();
+		}
+		GC::gc_lock().unlock();
+
+		if (gc) {
+			pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+		} else {
+			break;
+		}
+
+	}
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
@@ -484,9 +497,9 @@ void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 	pthread_mutex_lock(&_all_thread_wait_mutex);
 	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
 	thread->set_state(Waiting);
-	sync_wcout{} << "... AAA " << pthread_self() << std::endl;	// delete
+	std::wcout << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
-	sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
+	std::wcout << "... BBB " << pthread_self() << std::endl;	// delete
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
@@ -542,15 +555,17 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 
 void wind_jvm::end()
 {
+	Method_Pool::cleanup();
+	Field_Pool::cleanup();
+
+	ClassFile_Pool::cleanup();
+	Rt_Pool::cleanup();				// rt pool may be must deallocate before MyClassLoader...?
+
 	BootStrapClassLoader::get_bootstrap().cleanup();
 	MyClassLoader::get_loader().cleanup();
 
 	// finally! delete all allocated memory!!
 	MemAlloc::cleanup();
-	Method_Pool::cleanup();
-	Field_Pool::cleanup();
-	Rt_Pool::cleanup();
-	ClassFile_Pool::cleanup();
 
-	std::wcout << "world ends..." << std::endl;
+//	std::wcout << "world ends..." << std::endl;
 }
