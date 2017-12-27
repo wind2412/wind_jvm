@@ -11,7 +11,10 @@
 #include <pthread.h>
 #include <boost/noncopyable.hpp>
 
+class GC;
+
 class Lock : public boost::noncopyable {
+	friend GC;
 private:
 	pthread_mutexattr_t attr;
 	pthread_mutex_t mutex;

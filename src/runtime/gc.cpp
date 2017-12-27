@@ -24,32 +24,12 @@ void GC::init_gc()	// 设置标志位以及目标 vm_threads
 		return;
 	}
 	gc() = true;
-	// 2. 初始化快照：
-	// must use wind_jvm::Lock and GC::Lock.
-	LockGuard lg_wind_jvm(wind_jvm::lock());
-	list<vm_thread> & thread_list = wind_jvm::threads();		 // [√] 注意：这时也可以有新的线程被加进来。想了想，没有必要在线程创建那里加安全点......
-	for (auto & thread : thread_list) {			// [√] target_threads 这个快照，不一定是完整的。因为建立完这个快照之后，也有可能多个线程被创建出来。保证这个快照的正确性的方法，就是让后出现的线程上来就直接自动停止，和 dalvik vm 一样，这样才能够解决两边不一致的缺陷。
-		// detect the vm_stack is alive?
-		// in fact, `thread.vm_stack.size() == 0` can judge: 1. the vm_thread is waiting (create by `start0`) 2. the thread is dead. Because these two conditions are both: vm_thread.stack().size() == 0.
-		pthread_mutex_lock(&_all_thread_wait_mutex);
-		thread_state state = thread.state;
-		pthread_mutex_unlock(&_all_thread_wait_mutex);
-
-		if (state == Waiting || state == Death /*thread.vm_stack.size() == 0*/) {		// the vm_thread is waiting (create by `start0`) / end already.
-			sync_wcout{} << "ignore [" << thread.tid << "] because of: [" << (thread.state == Waiting ? "waiting]" : "death]") << std::endl;	// delete
-			continue;
-		}
-		// add it to the target_threads.
-		sync_wcout{} << "insert: " << thread.tid << " " << (long)&thread << std::endl;
-		bool ret = target_threads().insert(make_pair(&thread, false)).second;
-		assert(ret);
-	}
+	// 2. [x] snapshot canceled.
 	// 3. signal gc thread:
 	std::wcout << "signal gc..." << std::endl;			// delete
 	pthread_cond_signal(&gc_cond());
 	// 4. print some message...
 	ThreadTable::print_table();							// delete
-	GC::print_table();									// delete
 	sync_wcout{} << "init_gc() over." << std::endl;		// delete
 }
 
@@ -75,26 +55,29 @@ void GC::detect_ready()
 		LockGuard lg(gc_lock());
 
 		int total_ready_num = 0;
-		for (auto iter : target_threads()) {
+		int total_size;
 
-			pthread_mutex_lock(&_all_thread_wait_mutex);
-			thread_state state = iter.first->state;
-			pthread_mutex_unlock(&_all_thread_wait_mutex);
+		ThreadTable::get_lock().lock();
+		{
+			total_size = ThreadTable::get_thread_table().size();
+			for (auto & iter : ThreadTable::get_thread_table()) {
 
-			if (iter.second == true) {
-				total_ready_num ++;
-			} else if (state == Waiting || state == Death/*iter.second == false && iter.first->vm_stack.size() == 0*/) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
-				target_threads()[iter.first] = true;
-				total_ready_num ++;
-			} else {
-				continue;
+				pthread_mutex_lock(&_all_thread_wait_mutex);
+				thread_state state = std::get<2>(iter.second)->state;
+				pthread_mutex_unlock(&_all_thread_wait_mutex);
+
+				if (state == Waiting || state == Death/*iter.second == false && iter.first->vm_stack.size() == 0*/) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
+					total_ready_num ++;
+				} else {
+					continue;
+				}
 			}
 		}
+		ThreadTable::get_lock().unlock();
 
 		ThreadTable::print_table();		// delete
-		GC::print_table();				// delete
 
-		if (total_ready_num == target_threads().size()) {		// over!
+		if (total_ready_num == total_size) {		// over!
 			return;
 		}
 	}
@@ -344,7 +327,6 @@ void GC::system_gc()
 	new_oop_handler_pool.swap(Mempool::oop_handler_pool());
 
 	// 4. final: 收尾工作，必须进行。
-	unordered_map<vm_thread *, bool>().swap(target_threads());
 	gc() = false;				// no need to lock.
 	signal_all_thread();
 
@@ -361,7 +343,7 @@ void GC::set_safepoint_here(vm_thread *thread)		// 不能强行设置 safepoint 
 	gc_lock().unlock();
 
 	if (gc) {
-		std::wcout << "block!" << std::endl;		// delete
+		std::wcout << "block!" << std::endl;			// delete
 		wait_cur_thread(thread);						// stop this thread!!
 	} else {
 		signal_one_thread();		// if not GC, and this thread (maybe) create a new thread using `start0`, then the `new thread` must be hung up. so signal it and start it.
@@ -392,18 +374,4 @@ void GC::cancel_gc_thread()
 			break;
 		}
 	}
-}
-
-void GC::print_table()
-{
-//#ifdef DEBUG
-	sync_wcout::set_switch(true);
-	LockGuard lg(GC::gc_lock());
-	sync_wcout{} << "===------------- GC Thread Table ----------------===" << std::endl;		// TODO: 这里，sync_wcout 会 dead lock ??????
-	for (auto iter : target_threads()) {
-		sync_wcout{} << "pthread_t: [" << std::dec << iter.first->tid << "], vm_thread :[" << std::dec << (long)iter.first << "], is ready: ["
-				<< std::boolalpha << iter.second << std::dec << "] " << (!iter.first->p.should_be_stop_first ? "(main)" : "") << std::endl;
-	}
-	sync_wcout{} << "===------------------------------------------===" << std::endl;
-//	#endif
 }

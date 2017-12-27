@@ -92,14 +92,14 @@ bool ThreadTable::detect_thread_death(pthread_t tid)
 void ThreadTable::print_table()
 {
 //#ifdef DEBUG
-	sync_wcout::set_switch(true);
-	sync_wcout{} << "===------------- ThreadTable ----------------===" << std::endl;		// TODO: 这里，sync_wcout 会 dead lock ??????
+	LockGuard lg(get_lock());
+	std::wcout << "===------------- ThreadTable ----------------===" << std::endl;		// TODO: 这里，sync_wcout 会 dead lock ??????
 	for (auto iter : get_thread_table()) {
-		sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << std::get<0>(iter.second) <<
+		std::wcout << "pthread_t :[" << iter.first << "], is the [" << std::get<0>(iter.second) <<
 				"] thread, Thread Oop address: [" << std::dec << (long)std::get<1>(iter.second) << "]"
 				", state:[" << std::get<2>(iter.second)->state << "]" << (!std::get<2>(iter.second)->p.should_be_stop_first ? "(main)" : "")<< std::endl;
 	}
-	sync_wcout{} << "===------------------------------------------===" << std::endl;
+	std::wcout << "===------------------------------------------===" << std::endl;
 //#endif
 }
 

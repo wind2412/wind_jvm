@@ -474,6 +474,7 @@ void wait_cur_thread(vm_thread *thread)
 	pthread_mutex_lock(&_all_thread_wait_mutex);
 	thread->set_state(Waiting);
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	std::wcout << "running!!" << std::endl;		// delete
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }

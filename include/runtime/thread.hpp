@@ -25,8 +25,10 @@ using std::unordered_map;
 
 class vm_thread;
 class InstanceOop;
+class GC;
 
 class ThreadTable {
+	friend GC;
 private:
 	static Lock & get_lock();
 public:

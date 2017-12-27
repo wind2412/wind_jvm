@@ -44,10 +44,6 @@ public:
 		static bool gc = false;
 		return gc;
 	}
-	static unordered_map<vm_thread *, bool> & target_threads() {
-		static unordered_map<vm_thread *, bool> target_threads;	// 目标 vm_thread，以及它们有无给此 GC 类信号
-		return target_threads;
-	}
 public:
 	static void init_gc();			// 设置标志位以及目标 vm_threads
 	static void detect_ready();
@@ -55,7 +51,6 @@ public:
 	static void system_gc();
 	static void set_safepoint_here(vm_thread *);
 	static void signal_all_patch();
-	static void print_table();
 	static void cancel_gc_thread();
 };
 
