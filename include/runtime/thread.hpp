@@ -17,20 +17,22 @@
 #include <errno.h>
 #include "utils/lock.hpp"
 #include <utility>
+#include <tuple>
 
+using std::tuple;
+using std::make_tuple;
 using std::unordered_map;
-using std::make_pair;
-using std::pair;
 
+class vm_thread;
 class InstanceOop;
 
 class ThreadTable {
 private:
 	static Lock & get_lock();
 public:
-	static unordered_map<pthread_t, pair<int, InstanceOop *>> & get_thread_table();
+	static unordered_map<pthread_t, tuple<int, InstanceOop *, vm_thread *>> & get_thread_table();
 public:
-	static void add_a_thread(pthread_t tid, InstanceOop *_thread);
+	static void add_a_thread(pthread_t tid, InstanceOop *_thread, vm_thread *t);
 	static void remove_a_thread(pthread_t tid);
 	static int get_threadno(pthread_t tid);
 	static bool is_in(pthread_t tid);

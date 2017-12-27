@@ -41,9 +41,12 @@ enum thread_state {
 	Death,
 };
 
+class ThreadTable;
+
 class vm_thread {
 	friend BytecodeEngine;
 	friend GC;
+	friend ThreadTable;
 private:
 	temp p;			// pthread aux struct. must be global!!!
 	pthread_t tid;

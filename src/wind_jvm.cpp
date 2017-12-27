@@ -24,7 +24,7 @@ int all_thread_num;
 void * scapegoat (void *pp) {
 	temp *real = (temp *)pp;
 //	if (real->cur_thread_obj != nullptr) {		// so the ThreadTable::get_thread_obj may be nullptr.		// I add all thread into Table due to gc should stop all threads.
-		ThreadTable::add_a_thread(pthread_self(), real->cur_thread_obj);		// the cur_thread_obj is from `java/lang/Thread.start0()`.
+		ThreadTable::add_a_thread(pthread_self(), real->cur_thread_obj, real->thread);		// the cur_thread_obj is from `java/lang/Thread.start0()`.
 //	}
 
 	if (real->should_be_stop_first) {		// if this thread is a child thread created by `start0`: should stop it first because of gc's race.
@@ -236,7 +236,7 @@ void vm_thread::init_and_do_main()
 		init_thread->set_field_value(THREAD L":eetop:J", new LongOop((uint64_t)pthread_self()));		// TODO: 这样没有移植性！！要改啊！！！虽然很方便......其实在 linux 下，也是 8 bytes......
 		init_thread->set_field_value(THREAD L":priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
 		// add this Thread obj to ThreadTable!!!	// ......在这里放入的 init_thread 并没有初始化完全。因为它还没有执行构造函数。不过，那也必须放到表中了。因为在 <init> 执行的时候，内部有其他的类要调用 currentThread...... 所以不放入表中不行啊......
-		ThreadTable::add_a_thread(pthread_self(), init_thread);
+		ThreadTable::add_a_thread(pthread_self(), init_thread, this);
 
 
 		// 2. create a [System] ThreadGroup obj.

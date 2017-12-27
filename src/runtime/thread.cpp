@@ -15,13 +15,13 @@ Lock & ThreadTable::get_lock()
 	return lock;
 }
 
-unordered_map<pthread_t, pair<int, InstanceOop *>> & ThreadTable::get_thread_table()
+unordered_map<pthread_t, tuple<int, InstanceOop *, vm_thread *>> & ThreadTable::get_thread_table()
 {
-	static unordered_map<pthread_t, pair<int, InstanceOop *>> thread_table;
+	static unordered_map<pthread_t, tuple<int, InstanceOop *, vm_thread *>> thread_table;
 	return thread_table;
 }
 
-void ThreadTable::add_a_thread(pthread_t tid, InstanceOop *_thread)
+void ThreadTable::add_a_thread(pthread_t tid, InstanceOop *_thread, vm_thread *t)
 {
 	LockGuard lg(get_lock());
 
@@ -29,10 +29,10 @@ void ThreadTable::add_a_thread(pthread_t tid, InstanceOop *_thread)
 	// C++ 17 新增了一个 insert_or_assign() 比较好...QAQ
 //	get_thread_table().insert(make_pair(tid, make_pair(get_thread_table().size(), _thread)));		// Override!!!! because tid maybe the same...?
 	int number = get_thread_table().size();
-	if (get_thread_table().insert(make_pair(tid, make_pair(get_thread_table().size(), _thread))).second == false) {	// 如果原先已经插入了的话，那么就复用原先的 thread_no.
-		number = get_thread_table()[tid].first;
+	if (get_thread_table().insert(make_pair(tid, make_tuple(get_thread_table().size(), _thread, t))).second == false) {	// 如果原先已经插入了的话，那么就复用原先的 thread_no.
+		number = std::get<0>(get_thread_table()[tid]);
 	}
-	get_thread_table()[tid] = make_pair(number, _thread);		// Override!!!! because tid maybe the same...?
+	get_thread_table()[tid] = std::make_tuple(number, _thread, t);		// Override!!!! because tid maybe the same...?
 					// 已解决： 这里有可能会出故障的。因为设置的时候是设置 size，所以如果要是重复插入了两次，就不好弄了(因为 pthread 会复用原来的线程 pthread_t)。size 就会不准确。不过 size 仅仅用于输出，所以没有别的用处。
 					// 不过 fix 了这个问题带来的小代价就是，线程的 thread_no 可能不按照顺序了。没准最新插入的线程因为 pthread_t 复用，而复用了原来的 thread_no。所以这样的话，
 					// 可能原先那个 thread_no 是 0，而这个本来应该是 3，但是复用之后还是 0。因此，输出的颜色只能作为分辨 “不同线程” 来用，
@@ -50,7 +50,7 @@ int ThreadTable::get_threadno(pthread_t tid)
 	LockGuard lg(get_lock());
 	auto iter = get_thread_table().find(tid);
 	if (iter != get_thread_table().end()) {
-		return (*iter).second.first;
+		return std::get<0>((*iter).second);
 	}
 	return -1;
 }
@@ -70,7 +70,7 @@ InstanceOop * ThreadTable::get_a_thread(pthread_t tid)
 	LockGuard lg(get_lock());
 	auto iter = get_thread_table().find(tid);
 	if (iter != get_thread_table().end()) {
-		return (*iter).second.second;
+		return std::get<1>((*iter).second);
 	}
 	return nullptr;
 }
@@ -95,7 +95,9 @@ void ThreadTable::print_table()
 	sync_wcout::set_switch(true);
 	sync_wcout{} << "===------------- ThreadTable ----------------===" << std::endl;		// TODO: 这里，sync_wcout 会 dead lock ??????
 	for (auto iter : get_thread_table()) {
-		sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << iter.second.first << "] thread, Thread Oop address: [" << std::dec << (long)iter.second.second << "]" << std::endl;
+		sync_wcout{} << "pthread_t :[" << iter.first << "], is the [" << std::get<0>(iter.second) <<
+				"] thread, Thread Oop address: [" << std::dec << (long)std::get<1>(iter.second) << "]"
+				", state:[" << std::get<2>(iter.second)->state << "]" << (!std::get<2>(iter.second)->p.should_be_stop_first ? "(main)" : "")<< std::endl;
 	}
 	sync_wcout{} << "===------------------------------------------===" << std::endl;
 //#endif

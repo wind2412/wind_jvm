@@ -325,9 +325,9 @@ void GC::system_gc()
 	// 2.5. for all GC-Roots: ThreadTable
 	for (auto & iter : ThreadTable::get_thread_table()) {
 //		std::wcout << "thread: from " << iter.second.second;
-		Oop *thread = iter.second.second;
+		Oop *thread = std::get<1>(iter.second);
 		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(thread, new_oop_map);		// 由于直接传入 iter.second.second 是 InstanceOop &，和 Oop & 对不上，因此值并不会改变。有待研究。
-		iter.second.second = (InstanceOop *)thread;
+		std::get<1>(iter.second) = (InstanceOop *)thread;
 //		std::wcout << " to " << iter.second.second;
 	}
 
@@ -361,6 +361,7 @@ void GC::set_safepoint_here(vm_thread *thread)		// 不能强行设置 safepoint 
 	gc_lock().unlock();
 
 	if (gc) {
+		std::wcout << "block!" << std::endl;		// delete
 		wait_cur_thread(thread);						// stop this thread!!
 	} else {
 		signal_one_thread();		// if not GC, and this thread (maybe) create a new thread using `start0`, then the `new thread` must be hung up. so signal it and start it.
