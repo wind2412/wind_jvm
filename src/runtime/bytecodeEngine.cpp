@@ -1046,7 +1046,10 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 													// https://www.cnblogs.com/lijunamneg/archive/2013/01/25/2877211.html
 					assert(false);		// 那就肯定是错的。
 				}
+			} else {
+				thread.state = Death;		// 设置自己为 Death。这一步是为了防止：下边在 GC 的时候进行 cancel_gc_thread。然后 GC 会一直轮询 Running 的此线程，而此线程又会一直轮询等待 GC 终止的 bug.
 			}
+
 			pthread_cleanup_pop(0);
 		}
 	}
@@ -1536,6 +1539,7 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 				break;
 			}
 			case 0x2e:{		// iaload
+				assert(op_stack.top()->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)op_stack.top())->get_type() == Type::INT);
 				int index = ((IntOop *)op_stack.top())->value;	op_stack.pop();
 				if (op_stack.top() == nullptr) {
 					// TODO: should throw NullpointerException

@@ -185,3 +185,40 @@ Oop *ArrayOop::copy()
 	constructor((ArrayOop *)buf, *this);
 	return (Oop *)buf;
 }
+
+/*===---------------- BasicTypeOop ---------------------===*/
+Oop *BasicTypeOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((BasicTypeOop *)buf, *this);
+	return (Oop *)buf;
+}
+
+Oop *IntOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((IntOop *)buf, *this);
+	return (Oop *)buf;
+}
+
+Oop *FloatOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((FloatOop *)buf, *this);
+	return (Oop *)buf;
+}
+
+Oop *DoubleOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((DoubleOop *)buf, *this);
+	return (Oop *)buf;
+}
+
+Oop *LongOop::copy()
+{
+	void *buf = MemAlloc::operator new(sizeof(*this), true);
+	constructor((LongOop *)buf, *this);
+	return (Oop *)buf;
+}
+

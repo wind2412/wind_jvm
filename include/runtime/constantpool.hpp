@@ -22,8 +22,10 @@ using std::shared_ptr;
 
 class Klass;
 class InstanceKlass;
+class GC;
 
 class rt_constant_pool {	// runtime constant pool
+	friend GC;
 private:
 	InstanceKlass *this_class;
 	int this_class_index;

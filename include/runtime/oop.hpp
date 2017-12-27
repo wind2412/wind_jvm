@@ -188,6 +188,7 @@ private:
 public:
 	BasicTypeOop(Type type) : Oop(nullptr, OopType::_BasicTypeOop), type(type) {}
 	Type get_type() { return type; }
+	virtual Oop *copy() override;
 };
 
 //struct ByteOop : public BasicTypeOop {
@@ -213,21 +214,25 @@ public:
 struct IntOop : public BasicTypeOop {
 	int value;		// data
 	IntOop(int value) : BasicTypeOop(Type::INT), value(value) {}
+	virtual Oop *copy() override;
 };
 
 struct FloatOop : public BasicTypeOop {
 	float value;		// data
 	FloatOop(float value) : BasicTypeOop(Type::FLOAT), value(value) {}
+	virtual Oop *copy() override;
 };
 
 struct LongOop : public BasicTypeOop {
 	long value;		// data
 	LongOop(long value) : BasicTypeOop(Type::LONG), value(value) {}
+	virtual Oop *copy() override;
 };
 
 struct DoubleOop : public BasicTypeOop {
 	double value;		// data
 	DoubleOop(float value) : BasicTypeOop(Type::DOUBLE), value(value) {}
+	virtual Oop *copy() override;
 };
 
 #endif /* INCLUDE_RUNTIME_OOP_HPP_ */

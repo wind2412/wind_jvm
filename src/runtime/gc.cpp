@@ -150,7 +150,7 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 	} else if (origin_oop->get_ooptype() == OopType::_InstanceOop) {
 
 		// next, add its inner member variables!
-		for (auto & iter : ((InstanceOop *)origin_oop)->fields) {		// use `&` to modify.
+		for (auto & iter : ((InstanceOop *)new_oop)->fields) {		// use `&` to modify.
 			// if need, substitute the pointer in origin... to the new pointer.
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
 		}
@@ -160,7 +160,7 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 	} else if ((origin_oop->get_ooptype() == OopType::_ObjArrayOop) || (origin_oop->get_ooptype() == OopType::_TypeArrayOop)) {
 
 		// add this oop and its inner elements!
-		for (auto & iter : ((ArrayOop *)origin_oop)->buf) {
+		for (auto & iter : ((ArrayOop *)new_oop)->buf) {		// 验证 origin oop 是否真的替换了...?
 			// if need, substitute the pointer in origin... to the new pointer.
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
 		}
@@ -183,22 +183,53 @@ void GC::klass_inner_oop_gc(Klass *klass, unordered_map<Oop *, Oop *> & new_oop_
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively add into.
 		}
 		// for java_loader:
-		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(instanceklass->java_loader, new_oop_map);		// recursively add into.
+		Oop *mirror = instanceklass->java_loader;
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(mirror, new_oop_map);		// recursively add into.
+		instanceklass->java_loader = (MirrorOop *)mirror;
+
+		// for rt_pool:
+		auto rt_pool = instanceklass->rt_pool;
+		for (auto & _pair : rt_pool->pool) {
+			if (_pair.first == 0) {		// this position of the pool has not been parsed.
+				continue;
+			} else {
+				switch (_pair.first) {		// only for String...
+					case CONSTANT_String:{
+						Oop *addr = boost::any_cast<Oop *>(_pair.second);
+						recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(addr, new_oop_map);		// recursively add into.
+						_pair.second = boost::any(addr);		// re-pack
+						break;
+					}
+				}
+			}
+		}
 
 	} else if (klass->get_type() == ClassType::TypeArrayClass || klass->get_type() == ClassType::ObjArrayClass) {
 
 		ArrayKlass *arrklass = (ArrayKlass *)klass;
 
 		// for java_loader:
-		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(arrklass->java_loader, new_oop_map);		// recursively add into.
+		Oop *mirror = arrklass->java_loader;
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(mirror, new_oop_map);		// recursively add into.
+		arrklass->java_loader = (MirrorOop *)mirror;
 
 	} else {
 		assert(false);
 	}
 
-	// for java_mirror:
-	recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(klass->java_mirror, new_oop_map);		// recursively add into.
+//	MirrorOop *oop = klass->java_mirror;		// for debug		// TODO: 这里有 bug ？？ 竟然无法修改？？
+//
+//	// for java_mirror:
+//	recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(klass->java_mirror, new_oop_map);		// recursively add into.
+//
+//	if (true) {		// for debug
+//		std::wcout << klass->name << "'s mirror: from [" << oop << "] to [" << klass->java_mirror << "]." << std::endl;
+//	}
 
+	Oop *mirror = klass->java_mirror;						// TODO: 这个是对的......
+	// for java_mirror:
+	recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(mirror, new_oop_map);		// recursively add into.
+	klass->java_mirror = (MirrorOop *)mirror;
 }
 
 // 这个函数应该被执行在一个新的 GC 进程中。执行此 GC 之前，必须要先进行 stop-the-world。也就是，此函数进行之前，所有除了此 GC 进程之外的线程已经全部停止。
@@ -212,12 +243,13 @@ void GC::system_gc()
 	// 1. InstanceKlass::static_fields
 	// 2. InstanceKlass::java_mirror (don't include `get_single_basic_type_mirrors()`'s basic mirror)
 	// 3. InstanceKlass::java_loader
-	// 4. InstanceOop::fields
-	// 5. ArrayOop::buf
+	// 4. InstanceKlass::rt_pool's String...
+	// 5. InstanceOop::fields
+	// 6. ArrayOop::buf
 	// #. (gc temporarily do not support `StringTable`'s StringOop. they are all remained.)
-	// 6. vm_thread::arg
-	// 7. vm_thread::StackFrame[0 ~ the last frame]::localVariableTable
-	// 8. vm_thread::StackFrame[0 ~ the last frame]::op_stack
+	// 7. vm_thread::arg
+	// 8. vm_thread::StackFrame[0 ~ the last frame]::localVariableTable
+	// 9. vm_thread::StackFrame[0 ~ the last frame]::op_stack
 
 	// 0. create a TEMP new-oop-pool:
 	unordered_map<Oop *, Oop *> new_oop_map;		// must be `map/set` instead of list, for getting rid of duplication!!!
@@ -252,13 +284,16 @@ void GC::system_gc()
 
 	// 2. for all GC-Roots [vm_threads]:
 	for (auto & thread : wind_jvm::threads()) {
+//		std::wcout << "thread: " << thread.tid << ", has " << thread.vm_stack.size() << " frames... "<< std::endl;		// delete
 		// 2.3. for thread.args
 		for (auto & iter : thread.arg) {
+//			std::wcout << "arg: " << iter << std::endl;			// delete
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);
 		}
 		for (auto & frame : thread.vm_stack) {
 			// 2.5. for vm_stack::StackFrame::LocalVariableTable
 			for (auto & oop : frame.localVariableTable) {
+//				std::wcout << "localVariableTable: " << oop << std::endl;			// delete
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
 			}
 			// 2.7. for vm_stack::StackFrame::op_stack
@@ -267,12 +302,15 @@ void GC::system_gc()
 			while(!frame.op_stack.empty()) {
 				Oop *oop = frame.op_stack.top();	frame.op_stack.pop();
 				temp.push_front(oop);
+//				std::wcout << "frame: " << &frame << ", op_stack: " << oop << std::endl;		// delete
 			}
 			for (auto & oop : temp) {
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
 			}
+//			std::wcout << "..."  << std::endl;		// delete			// 竟然只输出了两次.......666
 			for (auto & oop : temp) {
-				frame.op_stack.push(temp.front());
+//				std::wcout << "frame: " << &frame << ", op_stack: " << oop << std::endl;		// delete
+				frame.op_stack.push(oop);
 			}
 		}
 
