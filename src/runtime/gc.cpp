@@ -91,7 +91,8 @@ void GC::detect_ready()
 			}
 		}
 
-		GC::print_table();		// delete
+		ThreadTable::print_table();		// delete
+		GC::print_table();				// delete
 
 		if (total_ready_num == target_threads().size()) {		// over!
 			return;
@@ -346,12 +347,9 @@ void GC::set_safepoint_here(vm_thread *thread)		// 不能强行设置 safepoint 
 	gc_lock().unlock();
 
 	if (gc) {
-		sync_wcout{} << "block" << std::endl;		// delete
-		thread->state = Waiting;
-		wait_cur_thread();				// stop this thread!!
-		thread->state = Running;
+		wait_cur_thread(thread);						// stop this thread!!
 	} else {
-		signal_all_thread();		// if not GC, and this thread (maybe) create a new thread using `start0`, then the `new thread` must be hung up. so signal it and start it.
+		signal_one_thread();		// if not GC, and this thread (maybe) create a new thread using `start0`, then the `new thread` must be hung up. so signal it and start it.
 	}
 }
 

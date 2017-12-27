@@ -469,10 +469,12 @@ pthread_mutex_t _all_thread_wait_mutex;
 pthread_cond_t _all_thread_wait_cond;
 
 // 不采用信号来实现 stop-the-world 了。那样太糟糕了。
-void wait_cur_thread()
+void wait_cur_thread(vm_thread *thread)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
+	thread->set_state(Waiting);
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
@@ -485,6 +487,13 @@ void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	sync_wcout{} << "... BBB " << pthread_self() << std::endl;	// delete
 	thread->set_state(Running);
+	pthread_mutex_unlock(&_all_thread_wait_mutex);
+}
+
+void signal_one_thread()		// 发现没有在 gc 的时候，仅仅唤醒一个线程，这样能够尽快进入 gc 吧...
+{
+	pthread_mutex_lock(&_all_thread_wait_mutex);
+	pthread_cond_signal(&_all_thread_wait_cond);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
