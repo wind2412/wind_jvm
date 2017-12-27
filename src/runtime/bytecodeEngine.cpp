@@ -1096,6 +1096,10 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 
 	if (thread.get_monitor_num() == 0) {		// 只有在没在任何管程内的时候，才可以 stop-this-thread！！见 GC::set_safepoint_here() 的解释。
 		GC::set_safepoint_here(&thread);
+	} else {
+		if (!thread.p.should_be_stop_first) {
+			std::wcout << "main can't wait because of monitor. [" << thread.get_monitor_num() << "]" << std::endl;
+		}
 	}
 
 

@@ -153,7 +153,9 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 		// next, add its inner member variables!
 		for (auto & iter : ((InstanceOop *)new_oop)->fields) {		// use `&` to modify.
 			// if need, substitute the pointer in origin... to the new pointer.
+			std::wcout << iter << " to ";		// delete
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
+			std::wcout << iter << std::endl;		// delete
 		}
 		return;
 
@@ -163,7 +165,9 @@ void GC::recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop
 		// add this oop and its inner elements!
 		for (auto & iter : ((ArrayOop *)new_oop)->buf) {		// 验证 origin oop 是否真的替换了...?
 			// if need, substitute the pointer in origin... to the new pointer.
+			std::wcout << iter << " to ";		// delete
 			recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(iter, new_oop_map);		// recursively substitute and add into.
+			std::wcout << iter << std::endl;		// delete
 		}
 		return;
 
@@ -251,6 +255,7 @@ void GC::system_gc()
 	// 7. vm_thread::arg
 	// 8. vm_thread::StackFrame[0 ~ the last frame]::localVariableTable
 	// 9. vm_thread::StackFrame[0 ~ the last frame]::op_stack
+	// 10. ThreadTable
 
 	// 0. create a TEMP new-oop-pool:
 	unordered_map<Oop *, Oop *> new_oop_map;		// must be `map/set` instead of list, for getting rid of duplication!!!
@@ -259,15 +264,15 @@ void GC::system_gc()
 
 	// 0.5. first migrate all of the basic type mirrors.
 	for (auto & iter : java_lang_class::get_single_basic_type_mirrors()) {
-		new_oop = Mempool::copy(*iter.second);		// 希望这里复制正确。确实执行了 MirrorOop 的拷贝函数。应该对的。
-		new_oop_map.insert(make_pair(iter.second, new_oop));
-		iter.second = (MirrorOop *)new_oop;
+		Oop *mirror = iter.second;
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(mirror, new_oop_map);
+		iter.second = (MirrorOop *)mirror;
 	}
 	// 0.7. 为了避免在 GC 中对照 klass->name 字符串查找，就不实现 StringTable 的卸载了。直接整个复制了一份。
 	unordered_set<Oop *, java_string_hash, java_string_equal_to> new_string_table;
 	for (auto & iter : java_lang_string::get_string_table()) {
-		new_oop = Mempool::copy(*iter);
-		new_oop_map.insert(make_pair(iter, new_oop));
+		new_oop = iter;
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(new_oop, new_oop_map);
 		new_string_table.insert(new_oop);
 	}
 	new_string_table.swap(java_lang_string::get_string_table());
@@ -294,8 +299,9 @@ void GC::system_gc()
 		for (auto & frame : thread.vm_stack) {
 			// 2.5. for vm_stack::StackFrame::LocalVariableTable
 			for (auto & oop : frame.localVariableTable) {
-//				std::wcout << "localVariableTable: " << oop << std::endl;			// delete
+				std::wcout << "localVariableTable: " << oop;			// delete
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
+				std::wcout << " to " << oop;			// delete
 			}
 			// 2.7. for vm_stack::StackFrame::op_stack
 			// stack can't use iter. so make it with another vector...
@@ -303,18 +309,26 @@ void GC::system_gc()
 			while(!frame.op_stack.empty()) {
 				Oop *oop = frame.op_stack.top();	frame.op_stack.pop();
 				temp.push_front(oop);
-//				std::wcout << "frame: " << &frame << ", op_stack: " << oop << std::endl;		// delete
 			}
 			for (auto & oop : temp) {
+				std::wcout << "op_stack: " << oop;		// delete
 				recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(oop, new_oop_map);
+				std::wcout << " to " << oop;		// delete
 			}
-//			std::wcout << "..."  << std::endl;		// delete			// 竟然只输出了两次.......666
 			for (auto & oop : temp) {
-//				std::wcout << "frame: " << &frame << ", op_stack: " << oop << std::endl;		// delete
 				frame.op_stack.push(oop);
 			}
 		}
 
+	}
+
+	// 2.5. for all GC-Roots: ThreadTable
+	for (auto & iter : ThreadTable::get_thread_table()) {
+		std::wcout << "thread: from " << iter.second.second;
+		Oop *thread = iter.second.second;
+		recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(thread, new_oop_map);		// 由于直接传入 iter.second.second 是 InstanceOop &，和 Oop & 对不上，因此值并不会改变。有待研究。
+		iter.second.second = (InstanceOop *)thread;
+		std::wcout << " to " << iter.second.second;
 	}
 
 	// 3. create a new oop table and exchange with the global Mempool

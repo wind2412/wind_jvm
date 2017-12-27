@@ -19,7 +19,7 @@ import java.lang.Void;
 public class Test7 extends Thread{
 
 	@Override
-	public synchronized void run() {
+	public void run() {
 		for (int i = 90; i < 95; i ++) {
 			System.out.println(i);
 			if (i == 93)
