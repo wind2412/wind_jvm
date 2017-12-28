@@ -33,7 +33,7 @@ Hello, wind jvm!
 - [x] multithread support
 - [x] exception support
 - [x] some native libraries support
-- [] simple lambda support (invokedynamic)
+- [x] simple lambda support (invokedynamic)
 - [x] big deal of reflection support
 
 ## Welcome to communicate with me~
