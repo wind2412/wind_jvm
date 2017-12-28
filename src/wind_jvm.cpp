@@ -563,18 +563,18 @@ void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是
 
 }
 
-void SIGUSR1_handler(int signo)
-{
-	// 由于信号会直接陷入内核，有时候锁来不及释放...... 唉。
-	// 释放一堆锁...
-	system_classmap_lock.unlock();
-	pthread_exit(0);
-}
+//void SIGUSR1_handler(int signo)		// pthread_exit 也会抛出异常。弃用。这告诉我们不能强杀一个线程......QAQ
+//{
+//	// 由于信号会直接陷入内核，有时候锁来不及释放...... 唉。
+//	// 释放一堆锁...
+//	system_classmap_lock.unlock();
+//	pthread_exit(0);
+//}
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
 	signal(SIGINT, SIGINT_handler);
-	signal(SIGUSR1, SIGUSR1_handler);
+//	signal(SIGUSR1, SIGUSR1_handler);
 
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);

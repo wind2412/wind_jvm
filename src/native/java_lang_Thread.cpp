@@ -58,13 +58,11 @@ void JVM_StartThread(list<Oop *> & _stack){
 	}
 	wind_jvm::lock().unlock();
 
-	std::wcout << "finish0ro...." << std::endl;
 	wind_jvm::num_lock().lock();
 	{
 		wind_jvm::thread_num() ++;
 	}
 	wind_jvm::num_lock().unlock();
-	std::wcout << "finish1ro...." << std::endl;
 
 	// start!
 	new_thread->launch(_this);

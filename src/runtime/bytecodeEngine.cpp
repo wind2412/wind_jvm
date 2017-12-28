@@ -1028,37 +1028,36 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 	wind_jvm::lock().lock();
 	{
 		for (auto & thread : wind_jvm::threads()) {
-//			pthread_mutex_lock(&_all_thread_wait_mutex);
+			pthread_mutex_lock(&_all_thread_wait_mutex);
 			thread_state state = thread.state;
-//			pthread_mutex_unlock(&_all_thread_wait_mutex);
+			pthread_mutex_unlock(&_all_thread_wait_mutex);
 
 			if (state == Death) {					// pthread_cancel SIGSEGV bug 解决：
-				std::wcout << thread.tid << " is ignored because of [DEATH]" << std::endl;
+//				std::wcout << thread.tid << " is ignored because of [DEATH]" << std::endl;
 				continue;			// 防止 pthread_cancel 的 SIGSEGV
 			}
 
-//			pthread_cleanup_push(cleanup, nullptr);
+			pthread_cleanup_push(cleanup, nullptr);
 			if (thread.tid != pthread_self()) {		// TODO: cannot be the thread itself: 取消自己有可能死锁????
-				pthread_kill(thread.tid, SIGUSR1);
 //				std::wcout << "cancelling: [" << thread.tid << "]" << std::endl;
-//				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
+				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
 														// ...... 卧槽？？我才知道，，pthread_cancel 的“取消点”的意思竟然是，在取消点处会恢复线程吗...????
 														// 我其实是想要强杀线程啊......
-//				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
+				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
 													// http://tonybai.com/2010/04/09/be-careful-about-thread-cancellation/
 													// https://www.cnblogs.com/lijunamneg/archive/2013/01/25/2877211.html
-//					assert(false);		// 那就肯定是错的。
-//				}
+					assert(false);		// 那就肯定是错的。
+				}
 			} else {
 				thread.state = Death;		// 设置自己为 Death。这一步是为了防止：下边在 GC 的时候进行 cancel_gc_thread。然后 GC 会一直轮询 Running 的此线程，而此线程又会一直轮询等待 GC 终止的 bug.
 			}
 
-//			pthread_cleanup_pop(0);
+			pthread_cleanup_pop(0);
 		}
 	}
 	wind_jvm::lock().unlock();
 
-	ThreadTable::print_table();		// delete
+//	ThreadTable::print_table();		// delete
 
 	// force cancel gc thread?
 //	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
