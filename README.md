@@ -28,6 +28,9 @@ At `wind_jvm` folder:
 Hello, wind jvm!
 ```
 
+## About Tests
+Some Java Tests are from network, especially those java lambda test files. Thank you~
+
 ## Java Features Support
 - [x] fully independent ClassFile parser tool support: @[wind2412:javap](https://github.com/wind2412/javap) 
 - [x] multithread support
