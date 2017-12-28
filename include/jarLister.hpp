@@ -9,6 +9,7 @@
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
 #include <cassert>
+#include "utils/utils.hpp"
 
 using std::shared_ptr;
 using std::wstring;
@@ -78,6 +79,9 @@ public:
 		return have1 || have2;
 	}
 };
+
+// get pwd:
+extern wstring pwd;
 
 class JarLister {
 private:

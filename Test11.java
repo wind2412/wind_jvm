@@ -15,8 +15,8 @@ class Test11 {
 				};  
 		Thread m = new Thread(x);
 		m.start();
-//		t.join();
-//		m.join();
-//		new Thread( () -> { for (int i = 0; i < 1000; i ++) System.out.println(i); } ).start();
+		t.join();
+		m.join();
+		new Thread( () -> { for (int i = 0; i < 1000; i ++) System.out.println(i); } ).start();
 	}
 }

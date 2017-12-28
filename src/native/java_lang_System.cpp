@@ -17,6 +17,7 @@
 #include "wind_jvm.hpp"
 #include "classloader.hpp"
 #include <sys/time.h>
+#include "jarLister.hpp"
 
 using std::vector;
 
@@ -212,6 +213,10 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
 	Method *hashtable_put = ((InstanceKlass *)prop->get_klass())->get_class_method(L"put:(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
 	assert(hashtable_put != nullptr);
+
+	// get pwd/sun_src
+	wstring sun_src = pwd + L"/sun_src";
+
 	// add properties: 	// this, key, value		// TODO: 没有设置完！！
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.name"), java_lang_string::intern(L"Java Virtual Machine Specification")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.version"), java_lang_string::intern(L"1.8")});
@@ -241,33 +246,9 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.version"), java_lang_string::intern(L"52.0")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.management.compiler"), java_lang_string::intern(L"nop")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.io.unicode.encoding"), java_lang_string::intern(L"UnicodeBig")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.reflect.noCaches"), java_lang_string::intern(L"true")});	// 直接魔改了（逃
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.ext.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/ext:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.endorsed.dirs"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib/endorsed")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/jdk/lib")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.boot.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/resources.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/rt.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/sunrsasign.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jsse.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jce.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/charsets.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/lib/jfr.jar:/Users/zhengxiaolin/jvm/jdk8_mac/build/macosx-x86_64-normal-server-slowdebug/images/j2re-bundle/jre1.8.0.jre/Contents/Home/classes")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.library.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Library/Java/Extensions:/Library/Java/Extensions:/Network/Library/Java/Extensions:/System/Library/Java/Extensions:/usr/lib/java:.")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vendor.url.bug"), java_lang_string::intern(L"http://bugreport.sun.com/bugreport/")});
-#if (defined (__linux__))
-	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(L"/home/parallels/Documents/github/wind_jvm")});			// [x] 乱写的。不过不能不指定这个变量就好！因为 UnixFileSystem 中 canonicalize() 方法指明这个 java.home 不可以是 null，否则会崩溃。// [√] 也不能乱写...... java/util/Currency$1 的 run() 方法会在 $JAVA_HOME/lib/ 打开一个 currency.data 文件向内写入二进制文件......
-#else
-	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/github/wind_jvm")});			// [x] 乱写的。不过不能不指定这个变量就好！因为 UnixFileSystem 中 canonicalize() 方法指明这个 java.home 不可以是 null，否则会崩溃。// [√] 也不能乱写...... java/util/Currency$1 的 run() 方法会在 $JAVA_HOME/lib/ 打开一个 currency.data 文件向内写入二进制文件......
-#endif
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.name"), java_lang_string::intern(L"Mac OS X")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1/bin")});
-#if (defined (__linux__))
-	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/home/parallels/Documents/github/wind_jvm:/home/parallels/Documents/github/wind_jvm/sun_src")});		 // TODO: need modified.
-#else
-	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/github/wind_jvm:/Users/zhengxiaolin/Documents/github/wind_jvm/sun_src")});		 // TODO: need modified.
-#endif
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.home"), java_lang_string::intern(L"/Users/zhengxiaolin")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.timezone"), java_lang_string::intern(L"Asia/Shanghai")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"os.version"), java_lang_string::intern(L"10.12.6")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.io.tmpdir"), java_lang_string::intern(L"/var/folders/wc/0c_zn09x12s_y90ccmvjb6900000gn/T/")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.dir"), java_lang_string::intern(L"/Users/zhengxiaolin/Documents/eclipse/test1")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"user.name"), java_lang_string::intern(L"zhengxiaolin")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.java.command"), java_lang_string::intern(L"test1.Test8")});
-//	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.cpu.endian"), java_lang_string::intern(L"little")});
+
+	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(pwd)});			// [x] 乱写的。不过不能不指定这个变量就好！因为 UnixFileSystem 中 canonicalize() 方法指明这个 java.home 不可以是 null，否则会崩溃。// [√] 也不能乱写...... java/util/Currency$1 的 run() 方法会在 $JAVA_HOME/lib/ 打开一个 currency.data 文件向内写入二进制文件......
+	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(pwd + L":" + sun_src)});		 // TODO: need modified.
 
 	_stack.push_back(prop);
 }

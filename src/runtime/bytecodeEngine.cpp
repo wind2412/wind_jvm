@@ -954,6 +954,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_Fieldref);
 			auto field = boost::any_cast<Field_info *>(rt_pool[ref_index-1].second);
 			auto findStaticSetter_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStaticSetter:(" CLS STR CLS ")" MH);
+			assert(findStaticSetter_method != nullptr);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStaticSetter_method,
 						{lookup_obj, field->get_klass()->get_mirror(), java_lang_string::intern(field->get_name()), field->get_type_klass()->get_mirror()});
 			assert(result != nullptr);
@@ -964,6 +965,7 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
 			auto findVirtual_method = ((InstanceKlass *)lookup_obj->get_klass())->search_vtable(L"findVirtual:(" CLS STR MT ")" MH);
+			assert(findVirtual_method != nullptr);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findVirtual_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -973,7 +975,9 @@ InstanceOop *BytecodeEngine::MethodHandle_make(rt_constant_pool & rt_pool, int m
 			assert(rt_pool[ref_index-1].first == CONSTANT_Methodref || rt_pool[ref_index-1].first == CONSTANT_InterfaceMethodref);
 			auto method = boost::any_cast<Method *>(rt_pool[ref_index-1].second);
 			assert(method->get_name() != L"<init>" && method->get_name() != L"<clinit>");
+//			std::wcout << ((InstanceKlass *)lookup_obj->get_klass())->get_name() << std::endl;
 			auto findStatic_method = ((InstanceKlass *)lookup_obj->get_klass())->get_this_class_method(L"findStatic:(" CLS STR MT ")" MH);
+			assert(findStatic_method != nullptr);
 			InstanceOop *result = (InstanceOop *)thread.add_frame_and_execute(findStatic_method,
 						{lookup_obj, method->get_klass()->get_mirror(), java_lang_string::intern(method->get_name()), MethodType_make(method, thread)});
 			assert(result != nullptr);
@@ -1042,7 +1046,8 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 //				std::wcout << "cancelling: [" << thread.tid << "]" << std::endl;
 				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
 														// ...... 卧槽？？我才知道，，pthread_cancel 的“取消点”的意思竟然是，在取消点处会恢复线程吗...????
-														// 我其实是想要强杀线程啊......
+														// 我其实是想要强杀线程啊......emmmm 看来想要强行杀死线程，是理论上无法做到的了？必然有异常抛出啊。各种情况。
+														// 看来只有 pthread_cancel + pthread_join 才能完美解决了。不过这样代码会变得难看......看心情改不改了吧...
 				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
 													// http://tonybai.com/2010/04/09/be-careful-about-thread-cancellation/
 													// https://www.cnblogs.com/lijunamneg/archive/2013/01/25/2877211.html

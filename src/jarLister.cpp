@@ -3,6 +3,9 @@
 #include <fstream>
 #include <sstream>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/xml_parser.hpp>
 #include <jarLister.hpp>
 #include "utils/synchronize_wcout.hpp"
 #include "utils/utils.hpp"
@@ -176,13 +179,25 @@ bool JarLister::getjarlist(const wstring & rtjar_pos) const
 	return false;
 }
 
+wstring pwd;
+
 JarLister::JarLister() : rjd(L"root")
 {
+	// get pwd
+	pwd = utf8_to_wstring(boost::filesystem::initial_path<boost::filesystem::path>().string());
+	// get xml
+	wstring config_xml = pwd + L"/config.xml";
+	if(!boost::filesystem::exists(config_xml)) {
+		std::wcerr << "error! didn't find wind_jvm/config.xml. maybe you deleted it or didn't run the program under the wind_jvm/ folder and using the ./bin/wind_jvm command?" << std::endl;
+	}
+	boost::property_tree::ptree pt;
+	boost::property_tree::read_xml("/Users/zhengxiaolin/Documents/github/wind_jvm/config.xml", pt);
+
 	wstring rtjar_folder;
 #if (defined (__APPLE__))
-	rtjar_folder = L"/Library/Java/JavaVirtualMachines/jdk1.8.0_144.jdk/Contents/Home/jre/lib/";
+	rtjar_folder = utf8_to_wstring(pt.get<std::string>("path.mac"));
 #elif (defined (__linux__))
-	rtjar_folder = L"/usr/lib/jvm/java-8-openjdk-amd64/jre/lib/";
+	rtjar_folder = utf8_to_wstring(pt.get<std::string>("path.linux"));
 #else
 	std::cerr << "do not support for windows!" << std::endl;
 	assert(false);

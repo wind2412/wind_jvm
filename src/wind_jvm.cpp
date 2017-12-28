@@ -484,10 +484,10 @@ void wait_cur_thread(vm_thread *thread)
 		GC::gc_lock().unlock();
 
 		if (gc) {
-			std::wcout << "... AAAA " << pthread_self() << std::endl;		// delete
+//			std::wcout << "... AAAA " << pthread_self() << std::endl;		// delete
 			pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 			pthread_testcancel();
-			std::wcout << "... BBBB " << pthread_self() << std::endl;		// delete
+//			std::wcout << "... BBBB " << pthread_self() << std::endl;		// delete
 		} else {
 			break;
 		}
@@ -502,10 +502,10 @@ void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 	pthread_mutex_lock(&_all_thread_wait_mutex);
 	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
 	thread->set_state(Waiting);
-	std::wcout << "... AAA " << pthread_self() << std::endl;	// delete
+//	std::wcout << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	pthread_testcancel();
-	std::wcout << "... BBB " << pthread_self() << std::endl;	// delete
+//	std::wcout << "... BBB " << pthread_self() << std::endl;	// delete
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
