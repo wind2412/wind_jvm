@@ -14,14 +14,15 @@
 #include "native/java_lang_Class.hpp"
 #include "native/java_lang_String.hpp"
 #include "utils/utils.hpp"
+#include <sched.h>
 
 
-void GC::init_gc()	// 设置标志位以及目标 vm_threads
+bool GC::init_gc()	// 设置标志位以及目标 vm_threads
 {
 	LockGuard lg(gc_lock());
 	// 1. set gc bit
-	if (gc() == true) {		// if has been inited, then here must be during the stop-the-world. so return only.
-		return;
+	if (gc() == true) {		// if has been inited, then here must be during the stop-the-world: 这是因为 signal INT 被触发，而 signal INT 用 stop-the-world 来取消所有线程。
+		return false;		// 不得触发 GC！
 	}
 	gc() = true;
 	// 2. [x] snapshot canceled.
@@ -31,6 +32,7 @@ void GC::init_gc()	// 设置标志位以及目标 vm_threads
 	// 4. print some message...
 	ThreadTable::print_table();							// delete
 	sync_wcout{} << "init_gc() over." << std::endl;		// delete
+	return true;
 }
 
 /**
@@ -51,11 +53,14 @@ void GC::init_gc()	// 设置标志位以及目标 vm_threads
 void GC::detect_ready()
 {
 	// 轮询，直到所有其他线程都走到了安全点(wait 状态)
+//	int i = 0;		// delete
 	while (true) {
 		LockGuard lg(gc_lock());
 
 		int total_ready_num = 0;
 		int total_size;
+
+//		i ++;		// delete
 
 		ThreadTable::get_lock().lock();
 		{
@@ -69,7 +74,7 @@ void GC::detect_ready()
 				if (state == Waiting || state == Death/*iter.second == false && iter.first->vm_stack.size() == 0*/) {		// 如果这时候再检查，发现线程已经结束了，就标记为 true 了。
 					total_ready_num ++;
 				} else {
-					continue;
+					break;
 				}
 			}
 		}
@@ -80,6 +85,12 @@ void GC::detect_ready()
 		if (total_ready_num == total_size) {		// over!
 			return;
 		}
+
+//		if (i == 1000) {		// delete
+//			assert(false);
+//		}
+
+		sched_yield();
 	}
 }
 
@@ -88,7 +99,6 @@ void *GC::gc_thread(void *)			// 此 gc thread 会一直运行下去。最后会
 	// init `cond` and `mutex` first:
 	pthread_cond_init(&gc_cond(), nullptr);
 	pthread_mutex_init(&gc_cond_mutex(), nullptr);
-	pthread_detach(pthread_self());
 
 	// 无限循环:
 	while (true) {
@@ -371,6 +381,7 @@ void GC::cancel_gc_thread()
 			continue;
 		} else {
 			pthread_cancel(wind_jvm::gc_thread());
+			pthread_join(wind_jvm::gc_thread(), nullptr);
 			break;
 		}
 	}

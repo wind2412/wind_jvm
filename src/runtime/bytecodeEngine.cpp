@@ -1028,32 +1028,37 @@ void BytecodeEngine::main_thread_exception(int exitcode)		// dummy is use for By
 	wind_jvm::lock().lock();
 	{
 		for (auto & thread : wind_jvm::threads()) {
-			pthread_mutex_lock(&_all_thread_wait_mutex);
+//			pthread_mutex_lock(&_all_thread_wait_mutex);
 			thread_state state = thread.state;
-			pthread_mutex_unlock(&_all_thread_wait_mutex);
+//			pthread_mutex_unlock(&_all_thread_wait_mutex);
 
 			if (state == Death) {					// pthread_cancel SIGSEGV bug 解决：
 				std::wcout << thread.tid << " is ignored because of [DEATH]" << std::endl;
 				continue;			// 防止 pthread_cancel 的 SIGSEGV
 			}
 
-			pthread_cleanup_push(cleanup, nullptr);
+//			pthread_cleanup_push(cleanup, nullptr);
 			if (thread.tid != pthread_self()) {		// TODO: cannot be the thread itself: 取消自己有可能死锁????
-				std::wcout << "cancelling: [" << thread.tid << "]" << std::endl;
-				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
-				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
+				pthread_kill(thread.tid, SIGUSR1);
+//				std::wcout << "cancelling: [" << thread.tid << "]" << std::endl;
+//				int ret = pthread_cancel(thread.tid);					// 虽然没必要检查返回值，但是 pthread_cancel 在 linux 的实现上，如果 cancel 一个已经死亡的(?)，貌似会收到 SIGSEGV。
+														// ...... 卧槽？？我才知道，，pthread_cancel 的“取消点”的意思竟然是，在取消点处会恢复线程吗...????
+														// 我其实是想要强杀线程啊......
+//				if (ret != 0 && ret != ESRCH) {		// pthread_cancel 死锁 bug 解决：
 													// http://tonybai.com/2010/04/09/be-careful-about-thread-cancellation/
 													// https://www.cnblogs.com/lijunamneg/archive/2013/01/25/2877211.html
-					assert(false);		// 那就肯定是错的。
-				}
+//					assert(false);		// 那就肯定是错的。
+//				}
 			} else {
 				thread.state = Death;		// 设置自己为 Death。这一步是为了防止：下边在 GC 的时候进行 cancel_gc_thread。然后 GC 会一直轮询 Running 的此线程，而此线程又会一直轮询等待 GC 终止的 bug.
 			}
 
-			pthread_cleanup_pop(0);
+//			pthread_cleanup_pop(0);
 		}
 	}
 	wind_jvm::lock().unlock();
+
+	ThreadTable::print_table();		// delete
 
 	// force cancel gc thread?
 //	pthread_cancel(wind_jvm::gc_thread());		// 不知道正在 GC 的时候 cancel 会有什么问题啊...... 我对这方面把握不到位......
@@ -1084,13 +1089,24 @@ Oop * BytecodeEngine::execute(vm_thread & thread, StackFrame & cur_frame, int th
 	uint8_t * & pc = thread.pc;
 	pc = code_begin;
 
+	// self-destruction
+//	init_lock.lock();
+//	static bool iii = false;
+//	if (!iii && ThreadTable::size() > 5) {
+//		iii = true;
+//	init_lock.unlock();
+//		kill(getpid(), SIGINT);
+//	} else {
+//	init_lock.unlock();
+//
+//	}
+
 	// 在这里设置安全点1。这里会检查 GC 标志位，如果命中，就给 GC 发送信号。(安全点一定要在 Native 方法之外，而且不能是程序正好执行完，因为那样就到不了这里了。)
 	static bool inited = false;
 	init_lock.lock();		// 可耻地设置了这里是仅仅 gc 一次，测出了 stop-the-world 应该完成了...??
 	if (!inited && ThreadTable::size() >= 3) {	// delete
-		sync_wcout{} << pthread_self() << " triggered gc!!" << std::endl;
-		GC::init_gc();
-		inited = true;
+//		sync_wcout{} << pthread_self() << " triggered gc!!" << std::endl;
+		inited = GC::init_gc();
 	}
 	init_lock.unlock();
 
@@ -3704,16 +3720,16 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 
 						if (thread.p.should_be_stop_first) {		// this is a thread with start by `start0`.
 
-							wind_jvm::lock().lock();
+							wind_jvm::num_lock().lock();
 							{
 								wind_jvm::thread_num() --;
 								assert(wind_jvm::thread_num() >= 0);
 							}
-							wind_jvm::lock().unlock();
+							wind_jvm::num_lock().unlock();
 
-							pthread_mutex_lock(&_all_thread_wait_mutex);
+//							pthread_mutex_lock(&_all_thread_wait_mutex);
 							thread.state = Death;
-							pthread_mutex_unlock(&_all_thread_wait_mutex);
+//							pthread_mutex_unlock(&_all_thread_wait_mutex);
 
 							pthread_exit(nullptr);		// Spec 指出，只要退出此线程即可......		// TODO: 如果主线程也在这里异常退出......
 

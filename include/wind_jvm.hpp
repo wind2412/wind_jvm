@@ -112,6 +112,10 @@ public:
 		static int thread_num = 0;		// 不包括 main 线程和 gc 线程，甚至是真·主线程！即，它仅仅包含了通过 start0 创建的线程数目！
 		return thread_num;
 	}
+	static Lock & num_lock() {		// 不和 wind_jvm lock 用同一把锁！！wind_jvm lock 专门用于锁住所有线程！这里只要用另一个锁就好.
+		static Lock num_lock;
+		return num_lock;
+	}
 	static Lock & lock() {
 		static Lock lock;
 		return lock;

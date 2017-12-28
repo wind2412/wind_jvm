@@ -76,16 +76,18 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 
 		int remain_thread_num;
 		while(true) {				// 等待所有 start0 创建的子线程退出。
-			wind_jvm::lock().lock();
+			wind_jvm::num_lock().lock();
 			{
 				remain_thread_num = wind_jvm::thread_num();
 			}
-			wind_jvm::lock().unlock();
+			wind_jvm::num_lock().unlock();
 
 			assert(remain_thread_num >= 0);
 			if (remain_thread_num == 0) {
 				break;
 			}
+
+			sched_yield();
 		}
 
 		// 最后，cancel 掉 gc 线程。于是世界只剩下了此真·主线程。
@@ -119,12 +121,12 @@ void vm_thread::start(list<Oop *> & arg)
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
 
-		wind_jvm::lock().lock();				// 对于 start0 启动的线程：
+		wind_jvm::num_lock().lock();				// 对于 start0 启动的线程：
 		{
 			wind_jvm::thread_num() --;
 			assert(wind_jvm::thread_num() >= 0);		// 一定要 >= 0。否则是线程不安全的。
 		}
-		wind_jvm::lock().unlock();
+		wind_jvm::num_lock().unlock();		// bug report: 一开始这里使用的是重量级的 wind_jvm lock，因此走到这里的时候，由于 signal 函数中直接持有了 wind_jvm lock，造成线程无法终止。遂换用另一个轻量的 wind_jvm num_lock 来改进。
 	}
 
 	pthread_mutex_lock(&_all_thread_wait_mutex);
@@ -482,7 +484,10 @@ void wait_cur_thread(vm_thread *thread)
 		GC::gc_lock().unlock();
 
 		if (gc) {
+			std::wcout << "... AAAA " << pthread_self() << std::endl;		// delete
 			pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+			pthread_testcancel();
+			std::wcout << "... BBBB " << pthread_self() << std::endl;		// delete
 		} else {
 			break;
 		}
@@ -499,6 +504,7 @@ void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 	thread->set_state(Waiting);
 	std::wcout << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
+	pthread_testcancel();
 	std::wcout << "... BBB " << pthread_self() << std::endl;	// delete
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
@@ -506,28 +512,69 @@ void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 
 void signal_one_thread()		// 发现没有在 gc 的时候，仅仅唤醒一个线程，这样能够尽快进入 gc 吧...
 {
-	pthread_mutex_lock(&_all_thread_wait_mutex);
+//	pthread_mutex_lock(&_all_thread_wait_mutex);
 	pthread_cond_signal(&_all_thread_wait_cond);
-	pthread_mutex_unlock(&_all_thread_wait_mutex);
+//	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
 void signal_all_thread()		// 垃圾回收之后，就可以调用它，把所有的线程全部重新开启......
 {
-	pthread_mutex_lock(&_all_thread_wait_mutex);
+//	pthread_mutex_lock(&_all_thread_wait_mutex);
 	pthread_cond_broadcast(&_all_thread_wait_cond);
-	pthread_mutex_unlock(&_all_thread_wait_mutex);
+//	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
 void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是只要一 ctrl+c 就会产生 segmentation fault 的问题......虽然我也不知道为什么...... 不过这里还是要进行退出处理的......
 {
 	// TODO: 实现更加安全的：此函数只能执行一次的方法：
-	std::wcout << "called!!!!!!" << std::endl;
-	BytecodeEngine::main_thread_exception();
+
+	// 使用 GC 标志位来达到 stop-the-world，但是不触发 GC。
+	while (true) {
+		bool gc;
+		GC::gc_lock().lock();
+		{
+			gc = GC::gc();
+		}
+		GC::gc_lock().unlock();
+
+		if (gc) {
+			// 如果正在 GC 中，则等待 GC 结束.
+			continue;
+		} else {
+			// 否则如果不在 GC 中，那么就使用 GC 标志位，来达到 stop-the-world.
+			GC::gc_lock().lock();
+			{
+				GC::gc() = true;
+			}
+			GC::gc_lock().unlock();
+
+			// FIXME: I don't know whether it is safe... only a solution for dead lock of wind_jvm::num_lock...
+			wind_jvm::num_lock().unlock();		// It's only a patch.
+
+			GC::detect_ready();
+
+			GC::gc() = false;		// set back
+
+
+			BytecodeEngine::main_thread_exception();		// exit
+
+		}
+	}
+
+}
+
+void SIGUSR1_handler(int signo)
+{
+	// 由于信号会直接陷入内核，有时候锁来不及释放...... 唉。
+	// 释放一堆锁...
+	system_classmap_lock.unlock();
+	pthread_exit(0);
 }
 
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
 	signal(SIGINT, SIGINT_handler);
+	signal(SIGUSR1, SIGUSR1_handler);
 
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);

@@ -21,12 +21,12 @@ void *MemAlloc::allocate(size_t size, bool dont_record)
 		return nullptr;			// 直接返回！
 	}
 
-	LockGuard lg(mem_lock());
 	void *ptr = malloc(size);
 	memset(ptr, 0, size);		// default bzero!
 
 	// add it to the Mempool
 	if (!dont_record) {
+		LockGuard lg(mem_lock());
 		Mempool::oop_handler_pool().push_back((Oop *)ptr);
 	}
 
@@ -35,10 +35,6 @@ void *MemAlloc::allocate(size_t size, bool dont_record)
 
 void MemAlloc::deallocate(void *ptr)
 {
-	LockGuard lg(mem_lock());
-
-	// TODO: 这里要怎么规划......是先把所有的全都扫描一遍并且复制到另一堆中，然后把这个 unordered_set 全部删除把...... 这样的话，这里什么也不用写就好了。
-
 	free(ptr);
 }
 

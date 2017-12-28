@@ -45,7 +45,7 @@ public:
 		return gc;
 	}
 public:
-	static void init_gc();			// 设置标志位以及目标 vm_threads
+	static bool init_gc();			// 设置标志位以及目标 vm_threads
 	static void detect_ready();
 	static void *gc_thread(void *);	// 应该由另一个新的 GC 线程开启。
 	static void system_gc();
