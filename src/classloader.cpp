@@ -427,10 +427,10 @@ Klass *MyClassLoader::find_in_classmap(const wstring & classname)
 void MyClassLoader::cleanup()
 {
 	LockGuard lg(this->lock);
-	for (auto iter : classmap) {
-		delete iter.second;
-	}
 	for (auto iter : anonymous_klassmap) {
 		delete iter;
+	}
+	for (auto iter : classmap) {
+		delete iter.second;
 	}
 }

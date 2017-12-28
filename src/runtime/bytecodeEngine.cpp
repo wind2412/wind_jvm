@@ -3374,7 +3374,9 @@ sync_wcout{} << "(DEBUG) find the last frame's exception: [" << klass->get_name(
 				// 3. get target BootStrapMethod index and the struct:
 				int bootstrap_method_index = invokedynamic_pair.first;
 				assert(bootstrap_method_index >= 0 && bootstrap_method_index < bm->num_bootstrap_methods);
-				auto fake_method_struct = bm->bootstrap_methods[bootstrap_method_index];	// struct BootstrapMethods_attribute::bootstrap_methods_t
+				auto & fake_method_struct = bm->bootstrap_methods[bootstrap_method_index];	// struct BootstrapMethods_attribute::bootstrap_methods_t
+							// final bug report: 在这里一开始没加引用，造成了创建了一个副本。不过这个副本也要析构啊！！
+							// 所以最后只要走 invokeDynamic 的测试用例最后都会崩溃！而且 mac 测试的故障位置非常准确，linux 的不准。释放了两次，却在别的地方提示...... 搞得我头痛。
 				// 4. using `CONSTANT_invokeDynamic_info` to get target NameAndType index and Name && Type
 				int name_and_type_index = invokedynamic_pair.second;
 				assert(rt_pool[name_and_type_index-1].first == CONSTANT_NameAndType);

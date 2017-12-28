@@ -565,7 +565,6 @@ void wind_jvm::end()
 	MyClassLoader::get_loader().cleanup();
 
 	// finally! delete all allocated memory!!
-	MemAlloc::cleanup();
-
+	MemAlloc::cleanup();				// 仅仅去掉 MyClassLoader 就没有问题了！！说明错误出现在 Test11 这个 parse 的 klass 上！！而且在 annotation 上！mac 是准的！！错误定位了！！
 //	std::wcout << "world ends..." << std::endl;
 }

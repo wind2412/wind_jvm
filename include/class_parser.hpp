@@ -452,7 +452,7 @@ struct Synthetic_attribute : public attribute_info {
 };
 
 struct Signature_attribute : public attribute_info {
-     u2 signature_index;
+    u2 signature_index;
 	friend std::istream & operator >> (std::istream & f, Signature_attribute & i);
 };
 
@@ -462,7 +462,7 @@ struct SourceFile_attribute : public attribute_info {
 };
 
 struct SourceDebugExtension_attribute : public attribute_info {
-     u1 *debug_extension = nullptr;		// [attribute_length];
+    u1 *debug_extension = nullptr;		// [attribute_length];
 	friend std::istream & operator >> (std::istream & f, SourceDebugExtension_attribute & i);
 	~SourceDebugExtension_attribute();
 };
