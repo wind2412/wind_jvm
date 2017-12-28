@@ -38,5 +38,6 @@ Some Java Tests are from network, especially those java lambda test files. Thank
 - [x] some native libraries support
 - [x] simple lambda support (invokedynamic)
 - [x] big deal of reflection support
+- [x] stop-the-world and GC support, using GC-Root algorithm.
 
 ## Welcome to communicate with me~
