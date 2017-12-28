@@ -12,6 +12,6 @@ rt.list
 sun_src
 */sun_src
 log*
-Test.java
 gmon.out
 !Test7.class
+Test16.java
