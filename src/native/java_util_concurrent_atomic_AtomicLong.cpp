@@ -24,7 +24,6 @@ void JVM_VMSupportsCS8(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *java_util_concurrent_atomic_atomicLong_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

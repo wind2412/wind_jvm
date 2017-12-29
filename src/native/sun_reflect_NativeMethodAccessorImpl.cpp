@@ -33,7 +33,6 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 
 	// get the real arg:
 	list<Oop *> arg;
-//	if (_this != nullptr) {		// 这里不能按照 _this == nullptr 判断是否是 static ！！因为 `method.invoke(_this, 5, "haha");` 即便是一个 static 方法，有两个参数 5 和 "haha"，用户也可以传入一个对象，即第一个参数进来！！
 	if (!target_method->is_static()) {
 		arg.push_back(_this);
 	}
@@ -41,7 +40,7 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 		arg.push_back((*objs)[i]);
 	}
 
-	// 自动拆箱：
+	// unboxing
 	argument_unboxing(target_method, arg);
 
 	// check
@@ -54,7 +53,7 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 	// call
 	result = thread->add_frame_and_execute(target_method, arg);
 
-	// 把返回值所有能自动装箱的自动装箱......因为要返回一个 Object。
+	// boxing
 	Oop *real_result = return_val_boxing(result, thread, target_method->return_type());
 
 	_stack.push_back(real_result);
@@ -62,7 +61,6 @@ void JVM_Invoke0(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *sun_reflect_nativeMethodAccessorImpl_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

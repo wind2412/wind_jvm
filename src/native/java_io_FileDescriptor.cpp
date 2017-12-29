@@ -18,15 +18,12 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_FD_InitIDs(list<Oop *> & _stack){		// static
 
-	// 此方法旨在设置 FileDescriptor::field 的偏移大小......
-	// 我并不知道这有什么意义......
-	// 所以我 do nothing...
+	// do nothing
 
 }
 
 
 
-// 返回 fnPtr.
 void *java_io_fileDescriptor_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

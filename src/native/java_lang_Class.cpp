@@ -55,14 +55,13 @@ void java_lang_class::init() {		// must execute this method before jvm!!!
 	state() = Inited;
 }
 
-// 注：内部根本没有 [[I, [[[[I 这类的 mirror，它们的 mirror 全是 [I ！！
 void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Class load!!!
 	assert(state() == Inited);
 	assert(system_classmap.find(L"java/lang/Class.class") != system_classmap.end());		// java.lang.Class must be loaded !!
 	// set state
 	state() = Fixed;
 	// do fix-up
-	auto & delay_mirrors = get_single_delay_mirrors();		// 别忘了加上 & ！！否则会复制！！auto 的类型推导仅仅能推导出类型，但是不会给你加上引用！！！
+	auto & delay_mirrors = get_single_delay_mirrors();
 	while(!delay_mirrors.empty()) {
 		wstring name = delay_mirrors.front();
 		delay_mirrors.pop();
@@ -95,7 +94,7 @@ void java_lang_class::fixup_mirrors() {	// must execute this after java.lang.Cla
 					assert(false);
 				}
 			}
-		}		// fix up 的行列中不可能出现二维以上的 array。因为在一开始启动时这个函数就执行了。
+		}
 		else {
 			// I set java.lang.Class load at the first of jvm. So there can't be any user-loaded-klass. So find in the system_map.
 			auto iter = system_classmap.find(name);
@@ -161,8 +160,7 @@ void java_lang_class::if_Class_didnt_load_then_delay(Klass *klass, MirrorOop *lo
 static unordered_map<wstring, void*> methods = {
     {L"getName0:()" STR,						(void *)&JVM_GetClassName},
     {L"forName0:(" STR L"Z" JCL CLS ")" CLS,	(void *)&JVM_ForClassName},
-//  {L"getSuperclass:()" CLS,				NULL},			// 为啥是 NULL ？？？
-    {L"getSuperclass:()" CLS,				(void *)&JVM_GetSuperClass},			// 那我可自己实现了...
+    {L"getSuperclass:()" CLS,				(void *)&JVM_GetSuperClass},
     {L"getInterfaces0:()[" CLS,				(void *)&JVM_GetClassInterfaces},
     {L"getClassLoader0:()" JCL,				(void *)&JVM_GetClassLoader},
     {L"isInterface:()Z",						(void *)&JVM_IsInterface},
@@ -188,8 +186,6 @@ static unordered_map<wstring, void*> methods = {
     {L"getRawTypeAnnotations:()" BA,			(void *)&JVM_GetClassTypeAnnotations},
     {L"getPrimitiveClass:(" STR ")" CLS,		(void *)&JVM_GetPrimitiveClass},
 };
-
-// TODO: 调查他们哪个是 static！！
 
 void JVM_GetClassName(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
@@ -241,7 +237,7 @@ void JVM_ForClassName(list<Oop *> & _stack){		// static
 	vm_thread & thread = *(vm_thread *)_stack.back();	_stack.pop_back();
 	wstring klass_name = java_lang_string::stringOop_to_wstring((InstanceOop *)_stack.front());	_stack.pop_front();
 //	bool initialize = ((BooleanOop *)_stack.front())->value;	_stack.pop_front();
-	bool initialize = ((IntOop *)_stack.front())->value;	_stack.pop_front();		// 虚拟机内部全都使用 Int！！
+	bool initialize = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
 	// the fourth argument is not needed ?
 	if (loader != nullptr) {
@@ -327,7 +323,7 @@ void JVM_IsInstance(list<Oop *> & _stack){		// is obj a `this` klass's instance?
 	auto obj_klass = ((InstanceKlass *)obj->get_klass());
 	auto this_klass = ((InstanceKlass *)_this->get_mirrored_who());
 
-	if (obj_klass == this_klass || obj_klass->check_parent(this_klass) || obj_klass->check_interfaces(this_klass))		// 千万别忘了判等啊！！QAQ......
+	if (obj_klass == this_klass || obj_klass->check_parent(this_klass) || obj_klass->check_interfaces(this_klass))
 		_stack.push_back(new IntOop(true));
 	else
 		_stack.push_back(new IntOop(false));
@@ -520,8 +516,8 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 
 			// fill in!		// see: openjdk: share/vm/runtime/reflection.cpp
 			field_oop->set_field_value(FIELD L":clazz:Ljava/lang/Class;", field->get_klass()->get_mirror());
-			field_oop->set_field_value(FIELD L":slot:I", new IntOop(iter.second.first));			// TODO: 不知道这里设置的对不对??
-			field_oop->set_field_value(FIELD L":name:Ljava/lang/String;", java_lang_string::intern(field->get_name()));		// bug report... 原先写得是 iter.first，结果那是 name+type... 这里只要 name......
+			field_oop->set_field_value(FIELD L":slot:I", new IntOop(iter.second.first));
+			field_oop->set_field_value(FIELD L":name:Ljava/lang/String;", java_lang_string::intern(field->get_name()));
 
 			// judge whether it is a basic type?
 			if (field->get_type_klass() != nullptr) {		// It is an obj/objArray/TypeArray.
@@ -549,8 +545,6 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 				}
 				else assert(false);
 			}
-			// 注意：field 属性也有 Annotation，因此 ACC_ANNOTATION 也会被设置上！但是，参加 class_parser.hpp 开头，field 在 jvm 规范中是不允许设置 ACC_ANNOTATION 的！
-			// 这里在 openjdk 中也有提到。
 			field_oop->set_field_value(FIELD L":modifiers:I", new IntOop(field->get_flag() & (~ACC_ANNOTATION)));
 			field_oop->set_field_value(L"java/lang/reflect/AccessibleObject:override:Z", new IntOop(false));
 			// set Generic Signature.
@@ -558,10 +552,6 @@ void JVM_GetClassDeclaredFields(list<Oop *> & _stack){
 			if (template_signature != L"")
 				field_oop->set_field_value(FIELD L":signature:Ljava/lang/String;", java_lang_string::intern(template_signature));	// TODO: transient...???
 			// set Annotation...
-			// 我完全没有搞清楚为什么 openjdk 那里要额外设置 TypeAnnotations ??? 这一项按照源码，分明是 java/lang/reflect/Field 通过 native 去读取的啊...
-			// 很多东西都设置好了，除了 TypeAnnotations，因为它是自己取的啊，通过 Field::private native byte[] getTypeAnnotationBytes0(); 方法...
-			// 而且我调试了一波，发现 jdk8 的 annotations 并没有走那条 oop Reflection::new_field(fieldDescriptor* fd, bool intern_name, TRAPS) 的 set_type_annotations.
-			// 应该是没有用处的。所以我仅仅设置 annotations。
 			CodeStub *stub = field->get_rva();		// RuntimeVisibleAnnotations' bytecode
 			if (stub) {
 				ArrayOop *byte_arr = Byte_arr_klass->new_instance(stub->stub.size());
@@ -799,7 +789,7 @@ void JVM_GetProtectionDomain(list<Oop *> & _stack){
 	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 //	thread->get_stack_trace();
 
-	_stack.push_back(nullptr);		// 都不知道对不对...	// TODO: emmmm.... 非常害怕这里出错。
+	_stack.push_back(nullptr);
 }
 
 void JVM_GetDeclaredClasses(list<Oop *> & _stack){		// return the mirror's inner: public/protected/private inner classes.
@@ -807,7 +797,7 @@ void JVM_GetDeclaredClasses(list<Oop *> & _stack){		// return the mirror's inner
 	assert(false);
 }
 
-void JVM_GetDeclaringClass(list<Oop *> & _stack){		// 对一个内部类使用，返回这个内部类的 outer。
+void JVM_GetDeclaringClass(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
 	if (_this == nullptr) {
 		_stack.push_back(nullptr);
@@ -872,7 +862,7 @@ void JVM_GetClassConstantPool(list<Oop *> & _stack){
 
 void JVM_DesiredAssertionStatus(list<Oop *> & _stack){
 	MirrorOop *_this = (MirrorOop *)_stack.front();	_stack.pop_front();
-	_stack.push_back(new IntOop(false));		// 虚拟机内部全使用 Int！！		// TODO: 默认是关闭的。不过如果发现了虚拟机有 bug，可以打开它使用 java 类库的 assert 来调试。
+	_stack.push_back(new IntOop(false));
 }
 
 void JVM_GetEnclosingMethodInfo(list<Oop *> & _stack){
@@ -971,7 +961,6 @@ void JVM_GetPrimitiveClass(list<Oop *> & _stack){		// static
 	}
 }
 
-// 返回 fnPtr.
 void *java_lang_class_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

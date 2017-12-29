@@ -23,7 +23,9 @@ static unordered_map<wstring, void*> methods = {
 };
 
 void JVM_UFS_InitIDs(list<Oop *> & _stack){		// static
-	// TODO: 到了这一步我还不明白这方法有什么用......有待研究...
+
+	// do nothing
+
 }
 
 void JVM_Canonicalize0(list<Oop *> & _stack){
@@ -32,7 +34,7 @@ void JVM_Canonicalize0(list<Oop *> & _stack){
 
 	std::wstring path = java_lang_string::stringOop_to_wstring(str);
 
-	// 注意：此地略有玄机。在 jdk 源码中，FilePermission.init() 中，会向文件 xx/xxxx/xx/ 的后边加上一个 "-" 表示递归文件夹。还有一个 "*".
+	// in jdk source code, '-' means `recursive`.
 	bool has_final_char = false;
 	wchar_t final_char = path[path.size() - 1];
 	if (final_char == L'*' || final_char == L'-') {
@@ -59,20 +61,11 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 
 	Oop *result;
 	file->get_field_value(JFILE L":path:Ljava/lang/String;", &result);
-//	std::wcout.imbue(std::locale(""));			// IMPORTANT!!!!! 如果不指定...... 用 下边 wcout 输出，是正确的......但是 path 真正的值其实只有一个 "x"......
 #ifdef DEBUG
 	sync_wcout{} << wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str() << std::endl;	// delete
 #endif
 
-	// 注：通过 wstring_to_utf8 转成的 string 是没有问题的。有问题的是对这个 string 直接求 c_str() 得到 char*。
-	// 这个提取 c_str() 的过程，是可能会出现各种诡异的状况的。
-	// 非常好的解决方法，就是直接复制一份 string 出来，就没问题了。
 	std::string backup_str = wstring_to_utf8(java_lang_string::stringOop_to_wstring((InstanceOop *)result));
-
-//	const char *path = .c_str();
-//	const char *path = narrow(java_lang_string::stringOop_to_wstring((InstanceOop *)result)).c_str();
-
-//	std::wcout << "(((" << backup_str.c_str() << ")))" << std::endl;	// 竟然复制一份 转换成的 string 就好了？？？
 
 	const char *path = backup_str.c_str();
 
@@ -102,7 +95,6 @@ void JVM_GetBooleanAttributes0(list<Oop *> & _stack){
 }
 
 
-// 返回 fnPtr.
 void *java_io_unixFileSystem_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

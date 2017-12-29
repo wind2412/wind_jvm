@@ -130,14 +130,14 @@ void Field_info::if_didnt_parse_then_parse()
 			if (loader == nullptr) {
 				this->true_type = BootStrapClassLoader::get_bootstrap().loadClass(descriptor.substr(1, descriptor.size() - 2));
 			} else {
-				this->true_type = loader->loadClass(descriptor.substr(1, descriptor.size() - 2));		// 这里写错了，写成了 descriptor，竟然出现了诡异的 EXC_BAD_ACCESS (code=2, ...) 错误...... 而且，显示是 wcout 输出那一行错误，但是却怎么也看不出来......要引以为戒啊！！这种错误，很有可能已经在很早很早之前就发生了......
+				this->true_type = loader->loadClass(descriptor.substr(1, descriptor.size() - 2));
 			}
 			assert(true_type != nullptr);
 			break;
 		}
 		case L'[':{
 			type = Type::ARRAY;
-			auto loader = this->klass->get_classloader();			// 这里，即使是 BasicTypeArray 也会有 Klass！！	// 只有 BasicType 是没有的！！
+			auto loader = this->klass->get_classloader();
 			if (loader == nullptr) {
 				this->true_type = BootStrapClassLoader::get_bootstrap().loadClass(descriptor);
 			} else {
@@ -159,7 +159,7 @@ wstring Field_info::parse_signature() {
 	auto _pair = (*klass->get_rtpool())[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
 	wstring signature = boost::any_cast<wstring>(_pair.second);
-	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
+	assert(signature != L"");
 	return signature;
 }
 

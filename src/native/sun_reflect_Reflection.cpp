@@ -19,7 +19,7 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_GetCallerClass(list<Oop *> & _stack){		// static		// @CallerSensitive ! Very important stack-backtracing method!
 	// see: JVM_ENTRY(jclass, JVM_GetCallerClass(JNIEnv* env, int depth)) in openjdk8 : jvm.cpp : 668
-	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();		// 类似于得到 JNIEnv。
+	vm_thread *thread = (vm_thread *)_stack.back();	_stack.pop_back();
 	MirrorOop *result = thread->get_caller_class_CallerSensitive();
 	_stack.push_back(result);
 }
@@ -40,7 +40,6 @@ void JVM_GetClassAccessFlags(list<Oop *> & _stack){		// static
 	}
 }
 
-// 返回 fnPtr.
 void *sun_reflect_reflection_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

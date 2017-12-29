@@ -28,19 +28,6 @@ class InstanceKlass;
 class Field_info;
 
 
-/**
- * all non-static fields [values]. save in oop object.
-// */
-//class Fields {
-//private:
-//	InstanceKlass *klass;		// search [static field / non-static field layout] via this klass
-//	uint8_t *fields;				// non-static field <real values>
-//public:
-//	Fields(InstanceKlass *klass) : klass(klass) {		// 通过 运行时常量池来 parse ！ 不着急。最后再弄。
-////		for (int i = 0; i < klass->cf->)
-//	}
-//};
-
 class Field_Pool {
 private:
 	static Lock & field_pool_lock();

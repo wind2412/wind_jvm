@@ -82,7 +82,6 @@ void JVM_NewArray(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *java_lang_reflect_array_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

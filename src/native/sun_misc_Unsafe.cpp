@@ -70,7 +70,7 @@ void JVM_ObjectFieldOffset(list<Oop *> & _stack){
 	field->get_field_value(FIELD L":modifiers:I", &oop);
 	int modifier = ((IntOop *)oop)->value;
 
-	// static 的方面，在 JVM_StaticFieldOffset 中支持！
+	// static is in JVM_StaticFieldOffset
 	field->get_field_value(FIELD L":name:Ljava/lang/String;", &oop);
 	wstring name = java_lang_string::stringOop_to_wstring((InstanceOop *)oop);
 
@@ -132,7 +132,6 @@ void JVM_GetIntVolatile(list<Oop *> & _stack){
 	} else {		// it's in non-static field.
 		target = obj->get_fields_addr()[offset];
 	}
-	// 非常危险...
 	assert(target->get_ooptype() == OopType::_BasicTypeOop && ((BasicTypeOop *)target)->get_type() == Type::INT);
 
 	int value = *((volatile int *)&((volatile IntOop *)target)->value);		// volatile
@@ -182,8 +181,8 @@ void JVM_AllocateMemory(list<Oop *> & _stack){
 	} else if (size == 0) {
 		_stack.push_back(new LongOop((uintptr_t)nullptr));
 	} else {
-		void *addr = ::malloc(size);														// TODO: GC !!!!! 这个是堆外分配！！
-		_stack.push_back(new LongOop((uintptr_t)addr));		// 地址放入。不过会转成 long。
+		void *addr = ::malloc(size);
+		_stack.push_back(new LongOop((uintptr_t)addr));
 	}
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) malloc size of [" << size << "] at address: [" << std::hex << ((LongOop *)_stack.back())->value << "]." << std::endl;
@@ -226,28 +225,19 @@ void JVM_FreeMemory(list<Oop *> & _stack){
 #endif
 }
 
-void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)		// obj 可能是一个 InstanceOop，也有可能是一个 ArrayOop。
+void *get_inner_obj_from_obj_and_offset(Oop *obj, long offset)
 {
 	void *addr;
 
-	// 在这里我的实现 hack 了一发～～～ 由于我的 oop 对象模型中，InstanceOop 的 field 全是挂在堆分配的内存中的。所以 Unsafe 得到的 offset 是 field [之内] 的 offset，也就是 field 内部的一个 oop 相对于 field 这个 vector 本身的地址。
-	// 而并不是 openjdk 实现中的相对于 this 的 offset。由于设计不同，只有这样才能让我日后的 GC 能够选择更多的算法。但是针对 ArrayOop，这样不行。因为 ArrayOop 的 Unsafe 已经写死了 ——
-	// 是通过 ABASE + i << ASHIFT (java/util/concurrent/ConcurrentHashMap) 来实现的 真·偏移。所以，看到这一点之后，我把 ArrayBaseOffset 默认返回了 0.
-	// 这样，每次传进来的此方法的 offset，就一定只是 i << ASHIFT。即 i * sizeof(intptr_t)。然后就可以逆向算出来 i 的大小～
-	// 而且，在下边为了 InstanceOop 和 ArrayOop 区别对待，需要判断 obj 的类型～
-
 	if (obj->get_ooptype() == OopType::_TypeArrayOop || obj->get_ooptype() == OopType::_ObjArrayOop) {
-		// 通过 vector 相对偏移来取值。直接 volatile + barrier 取值就可以。
 		int i_element = offset / sizeof(intptr_t);
 		addr = (void *)&((*(ArrayOop *)obj)[i_element]);		// Oop ** to void *.
 		if (*(Oop **)addr != nullptr)
 			assert((*(Oop **)addr)->get_ooptype() == OopType::_BasicTypeOop || (*(Oop **)addr)->get_ooptype() == OopType::_InstanceOop || (*(Oop **)addr)->get_ooptype() == OopType::_TypeArrayOop || (*(Oop **)addr)->get_ooptype() == OopType::_ObjArrayOop);
 	} else if (obj->get_ooptype() == OopType::_InstanceOop) {
-		// 也是通过 vector 相对偏移来取值～
 		Oop **target = get_inner_oop_from_instance_oop_of_static_or_non_static_fields((InstanceOop *)obj, offset);
-		// 非常危险...
 		if (*target != nullptr) {
-//			assert((*target)->get_ooptype() == OopType::_InstanceOop);		// 其实 inner 可能是任意类型吧....等到用到再改......
+//			assert((*target)->get_ooptype() == OopType::_InstanceOop);
 		}
 		addr = (void *)target;
 	} else {
@@ -265,7 +255,7 @@ void JVM_GetObjectVolatile(list<Oop *> & _stack){			// volatile + memory barrier
 	void *addr = get_inner_obj_from_obj_and_offset(obj, offset);
 
 	// the code's thought is from openjdk:
-	volatile Oop * v = *(volatile Oop **)addr;		// TODO: 这里还有不理解的地方......等待高人解惑......
+	volatile Oop * v = *(volatile Oop **)addr;
 
 	acquire();
 
@@ -329,17 +319,6 @@ void JVM_DefineAnonymousClass(list<Oop *> & _stack){	// see: OpenJDK: unsafe.cpp
 
 	int len = bytes->get_length();
 
-	// delete all:	( 调试信息还是留着吧. )
-//	vm_thread *thread = (vm_thread *)_stack.back();		// 输出堆栈信息
-//	thread->get_stack_trace();			// delete
-//	// delete:
-//	for (int i = 0; i < bytes->get_length(); i ++) {		// 输出全部字节码
-//		std::wcout << std::hex << ((IntOop *)(*bytes)[i])->value << " " << std::dec;
-//	}
-//	std::wcout << std::endl;
-//	std::wcout << host_klass_mirror->get_mirrored_who()->get_name() << " " << len << " " << cp_patch->get_length() << std::endl;	// delete
-
-
 	wstring klass_name = L"<unknown>";
 
 	char *buf = new char[len];
@@ -385,7 +364,7 @@ void JVM_DefineClass(list<Oop *> & _stack){
 	int offset = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	int len = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	InstanceOop *loader = (InstanceOop *)_stack.front();	_stack.pop_front();
-	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();		// 我忽略掉这东西了。安全机制就算了。
+	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();
 
 	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
 
@@ -398,10 +377,6 @@ void JVM_DefineClass(list<Oop *> & _stack){
 	}
 
 	ByteStream byte_buf(buf, len);
-
-	// 和 java_lang_ClassLoader.hpp::JVM_DefineClass1() 不同的是...... 这个 loader 是传进来的参数，可能是 null；而那个的 loader 是 _this，不可能是 null...
-//	assert(loader != nullptr);
-	// 嗯。看来唯一的不同就是，这里的 loader 可以是 nullptr....
 
 	Klass *klass;
 	if (loader != nullptr) {
@@ -487,7 +462,6 @@ void JVM_PutObject(list<Oop *> & _stack){			// (no volatile!!)
 #endif
 }
 
-// 返回 fnPtr.
 void *sun_misc_unsafe_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

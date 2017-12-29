@@ -52,8 +52,8 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_GetConstant(list<Oop *> & _stack){		// static
 	int num = ((IntOop *)_stack.front())->value;	_stack.pop_front();
-	assert(num == 4);		// 看源码得到的...
-	_stack.push_back(new IntOop(false));		// 我就 XJB 返回了......看到源码好像没有用到这的...而且也看不太懂....定义 COMPILER2 宏就 true ???
+	assert(num == 4);
+	_stack.push_back(new IntOop(false));
 }
 
 wstring get_full_name(MirrorOop *mirror)
@@ -82,16 +82,6 @@ InstanceOop *fill_in_MemberName_with_Method(Method *target_method, InstanceOop *
 
 	assert(ref_kind >= 5 && ref_kind <= 9);
 	new_flag |= 0x10000 | (ref_kind << 24);		// invokeStatic
-
-//	// delete all for debug
-//	std::wcout << target_method->get_name() << " " << type << std::endl;
-//	if (thread != nullptr) {
-//		auto toString = ((InstanceKlass *)type->get_klass())->get_this_class_method(L"toString:()" STR);
-//		assert(toString != nullptr);
-//		InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {type});
-//		std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
-//		std::wcout << type << std::endl;
-//	}
 
 	member_name2->set_field_value(MEMBERNAME L":flags:I", new IntOop(new_flag));
 	member_name2->set_field_value(MEMBERNAME L":name:" STR, java_lang_string::intern(target_method->get_name()));
@@ -139,13 +129,13 @@ wstring get_member_name_descriptor(InstanceKlass *real_klass, const wstring & re
 	// 0.5. if we should 钦定 these blow: only for real_klass is `java/lang/invoke/MethodHandle`:
 	if (real_klass->get_name() == L"java/lang/invoke/MethodHandle" &&
 				(real_name == L"invoke"
-				|| real_name == L"invokeBasic"				// 钦定这些。因为 else 中都是通过把 ptypes 加起来做到的。但是 MethodHandle 中的变长参数是一个例外。其他类中的变长参数没问题，因为最后编译器会全部转为 Object[]。只有 MethodHandle 是例外～
+				|| real_name == L"invokeBasic"
 				|| real_name == L"invokeExact"
 				|| real_name == L"invokeWithArauments"
 				|| real_name == L"linkToSpecial"
 				|| real_name == L"linkToStatic"
 				|| real_name == L"linkToVirtual"
-				|| real_name == L"linkToInterface"))  {		// 悲伤。由于历史原因（，我的查找是通过字符串比对来做的......简直无脑啊......这样这里效率好低吧QAQ。不过毕竟只是个玩具，跑通就好......
+				|| real_name == L"linkToInterface"))  {
 		descriptor = L"([Ljava/lang/Object;)Ljava/lang/Object;";
 	} else {
 		// 1. should parse the `Object type;` member first.
@@ -205,7 +195,7 @@ Method *get_member_name_target_method(InstanceKlass *real_klass, const wstring &
 	} else {
 		assert(false);
 	}
-	return target_method;		// 可以返回 nullptr ！！！这个千万注意！！像是 jdk 的 resolveOrNull 方法，就是这样，故意找不到然后抛一个 LinkageError，然后捕获！！
+	return target_method;
 }
 
 void JVM_Resolve(list<Oop *> & _stack){		// static
@@ -256,7 +246,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 	} else if (klass->get_type() == ClassType::InstanceClass) {
 		// right. do nothing.
 	} else if (klass->get_type() == ClassType::ObjArrayClass || klass->get_type() == ClassType::TypeArrayClass) {
-		klass = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Object");		// TODO: 并不清楚为何要这样替换。
+		klass = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Object");
 	} else {
 		assert(false);
 	}
@@ -317,7 +307,7 @@ void JVM_Resolve(list<Oop *> & _stack){		// static
 
 
 void JVM_Expand(list<Oop *> & _stack) {
-	// 这个方法无法使用。因为我的实现没有 itable...而且我也并不知道 vmindex 应该被放到哪里。
+	// do nothing is okay in my jvm.
 }
 
 void JVM_Init(list<Oop *> & _stack){		// static
@@ -396,47 +386,6 @@ void JVM_Init(list<Oop *> & _stack){		// static
 //		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, type);
 		member_name_obj->set_field_value(MEMBERNAME L":clazz:" CLS, klass->get_mirror());
 
-
-		// 这里要进行魔改一下。由于在 invokeBasic 那里碰到了问题，导致搜索 MethodType 搜索不到————原因有可能是：因为这里没有设置 type，因此 jdk 设置了。在 Method 那里，
-		// 有几率会被设置成 Object[]...... 而不是 MethodType。现在很好奇是不是这个原因......于是，在这里测试一发。
-		// 唉...... 看来是失败了。不过代码还是留下吧。
-
-/*
-		auto method_type_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/invoke/MethodType"));
-		assert(method_type_klass != nullptr);
-		auto init_method_type = method_type_klass->get_this_class_method(L"methodType:(" CLS "[" CLS ")" MT);		// static method!!!
-		assert(init_method_type != nullptr);
-
-		auto arg_list_vector = target_method->parse_argument_list();		// vector<MirrorOop *>
-		auto return_mirror = target_method->parse_return_type();			// MirrorOop *
-		if (return_mirror->get_extra() == L"V") {			// 卧槽！！设置 MethodType.type 的时候，返回值如果是 void，也要强行变成 java/lang/Void!!!
-			return_mirror = BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Void")->get_mirror();
-		}
-
-		auto klass_arr_klass = ((ObjArrayKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"[" CLS));
-		assert(klass_arr_klass != nullptr);
-		auto klass_arr_obj = klass_arr_klass->new_instance(arg_list_vector.size());		// alloc a [Ljava/lang/Class; for arg list's length.
-
-		// fill in
-		for (int i = 0; i < arg_list_vector.size(); i ++) {
-			(*klass_arr_obj)[i] = arg_list_vector[i];
-		}
-
-		// run <init>!
-		InstanceOop *method_type_obj = (InstanceOop *)thread->add_frame_and_execute(init_method_type, {return_mirror, klass_arr_obj});
-
-//		// delete all for debug
-//		std::wcout << target_method->get_name() << " " << method_type_obj << std::endl;
-//		if (thread != nullptr) {
-//			auto toString = ((InstanceKlass *)method_type_obj->get_klass())->get_this_class_method(L"toString:()" STR);
-//			assert(toString != nullptr);
-//			InstanceOop *str = (InstanceOop *)thread->add_frame_and_execute(toString, {method_type_obj});
-//			std::wcout << java_lang_string::stringOop_to_wstring(str) << std::endl;
-//			std::wcout << method_type_obj << std::endl;
-//		}
-
-		member_name_obj->set_field_value(MEMBERNAME L":type:" OBJ, method_type_obj);
-*/
 	} else {
 		assert(false);
 	}
@@ -446,7 +395,7 @@ void JVM_Init(list<Oop *> & _stack){		// static
 
 }
 
-void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN (field) 得到 field 在 klass 中的偏移量。
+void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static
 	InstanceOop *member_name_obj = (InstanceOop *)_stack.front();	_stack.pop_front();
 
 	assert(member_name_table.find(member_name_obj) != member_name_table.end());		// simple check...
@@ -464,10 +413,10 @@ void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN
 	InstanceOop *name = (InstanceOop *)oop;
 	assert(name != nullptr);
 	member_name_obj->get_field_value(MEMBERNAME L":type:" OBJ, &oop);
-	InstanceOop *type = (InstanceOop *)oop;	// type 这个变量的类型可能是 String, Class, MethodType!	// 如果此 MN 表示 Field 的话，按照上边 JVM_Resolve 中对 Field 的设置，type 是字符串.... 不过实测确实 Class...... 看来是 Java 给替换掉了...
+	InstanceOop *type = (InstanceOop *)oop;	// `type`'s type may be: String, Class, MethodType!
 	assert(type != nullptr);
 
-	assert(type->get_klass()->get_name() == L"java/lang/Class");		// 后边被 Java 设置成了 Class。
+	assert(type->get_klass()->get_name() == L"java/lang/Class");
 
 	assert(clazz->get_mirrored_who() != nullptr);
 	auto real_klass = ((InstanceKlass *)clazz->get_mirrored_who());		// klass
@@ -485,7 +434,7 @@ void JVM_MH_ObjectFieldOffset(list<Oop *> & _stack){		// static		// 由一个 MN
 	member_name_table.insert(member_name_obj);		// save to the Table
 }
 
-void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一处：getMembers 用到了 MethodHandleNatives.getMembers。
+void JVM_GetMembers(list<Oop *> & _stack) {		// static
 	MirrorOop *klass = (MirrorOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *match_name = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *match_sig = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -496,7 +445,7 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 
 	assert(klass != nullptr && member_name_arr != nullptr);
 	for (int i = 0; i < member_name_arr->get_length(); i ++) {
-		assert((*member_name_arr)[i] != nullptr);		// 因为只有一处使用，而那里是直接 fully initialized by `new` dummy structures 的，所以我直接这么判定了。
+		assert((*member_name_arr)[i] != nullptr);
 	}
 	assert(klass->get_mirrored_who() != nullptr);
 
@@ -509,11 +458,11 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 	wstring real_signature = match_sig == nullptr ? L"" : java_lang_string::stringOop_to_wstring(match_sig);
 
 	if (match_flag & 0x10000) {				// Field
-		if (real_name != L"" && real_signature != L"") {	// 指定了某个固定的 name 和 signature。这样直接查找即可。
-			wstring descriptor = real_name + L":" + real_signature;		// TODO: 就是不知道这个 signature 到底是 Ljava/lang/Object; 还是 java/lang/Object...
+		if (real_name != L"" && real_signature != L"") {
+			wstring descriptor = real_name + L":" + real_signature;
 			auto _pair = real_klass->get_field(descriptor);
 			assert(_pair.second != nullptr);
-			fill_in_MemberName_with_Fieldinfo(_pair.second, (InstanceOop*)(*member_name_arr)[0], 0);	// 第三个参数只要小于 2 即可。即定义为 getField / getStatic，而不是 put。
+			fill_in_MemberName_with_Fieldinfo(_pair.second, (InstanceOop*)(*member_name_arr)[0], 0);
 		} else {
 			vector<Field_info *> v;
 			if (!search_super_klass && !search_interfaces) {
@@ -532,7 +481,7 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 			for (int i = 0; i < len; i ++) {
 				fill_in_MemberName_with_Fieldinfo(v[i], (InstanceOop*)(*member_name_arr)[i], 0);
 			}
-			_stack.push_back(new IntOop(v.size()));		// 总共应该填进去的 nums 数量。Jdk 接到这个数字，判断之后会看数组是不是分配太小，会重新分配之后引发此函数重新进行。
+			_stack.push_back(new IntOop(v.size()));
 		}
 	} else if (match_flag & 0x20000) {		// Constructor
 		assert(false);		// not support yet...
@@ -547,7 +496,6 @@ void JVM_GetMembers(list<Oop *> & _stack) {		// static // 整个 Java8 只有一
 }
 
 
-// 返回 fnPtr.
 void *java_lang_invoke_methodHandleNatives_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

@@ -24,9 +24,7 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_FOS_InitIDs(list<Oop *> & _stack){		// static
 
-	// 此方法旨在设置 FileDescriptor::field 的偏移大小......
-	// 我并不知道这有什么意义......
-	// 所以我 do nothing...
+	// do nothing...
 
 }
 
@@ -45,7 +43,7 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 
 	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
 
-	if (fd == STDOUT_FILENO) {		// 如果输出到标准输出，那么对于多线程加上颜色输出。
+	if (fd == STDOUT_FILENO) {
 		char *buf = new char[5+len+5];
 
 		switch (ThreadTable::get_threadno(pthread_self()) % 7) {
@@ -79,7 +77,7 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 			buf[j] = (char)((IntOop *)(*bytes)[i])->value;
 		}
 		strncpy(buf+j, RESET, 5);
-		if (write(fd, buf, 5+len+5) == -1) {		// TODO: 对中断进行处理！！
+		if (write(fd, buf, 5+len+5) == -1) {
 			assert(false);
 		}
 		delete[] buf;
@@ -88,7 +86,7 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 		for (int i = offset, j = 0; i < offset + len; i ++, j ++) {
 			buf[j] = (char)((IntOop *)(*bytes)[i])->value;
 		}
-		if (write(fd, buf, len) == -1) {			// TODO: 对中断进行处理！！
+		if (write(fd, buf, len) == -1) {
 			assert(false);
 		}
 		delete[] buf;
@@ -98,7 +96,6 @@ void JVM_WriteBytes(list<Oop *> & _stack){
 
 
 
-// 返回 fnPtr.
 void *java_io_fileOutputStream_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

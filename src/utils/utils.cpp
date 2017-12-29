@@ -8,7 +8,7 @@
 #include "native/java_lang_String.hpp"
 
 // from Stack Overflow
-std::string wstring_to_utf8 (const std::wstring& str)			// 这东西有时候不准。像是我的 JVM_GetBooleanAttributes0 这个函数，wstring 文件路径转为 char* 经常变成 "x"。。。都不知道为啥....
+std::string wstring_to_utf8 (const std::wstring& str)
 {
 	std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
 	return myconv.to_bytes(str);
@@ -52,7 +52,6 @@ int parse_field_descriptor(const std::wstring & descriptor)
 			case L'I':	// int
 			case L'S':	// short
 			case L'Z':	// boolean
-//				return 4;					// 可耻地全部设成 8 字节了......
 			case L'D':	// double
 			case L'J':	// long
 				return 8;

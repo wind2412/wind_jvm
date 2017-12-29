@@ -36,7 +36,7 @@ public:
 class Method {
 private:
 	// InstanceKlass
-	InstanceKlass *klass = nullptr;		// 同理。由于是 this 指针生成的 shared_ptr...... 希望不会循环引用......
+	InstanceKlass *klass = nullptr;
 	// method basic
 	wstring name;
 	wstring descriptor;
@@ -50,7 +50,7 @@ private:
 
 	// Attributes: 1, 3, 6, 7, 13, 14, 15, 16, 17, 18, 19, 20, 22
 	u2 attributes_count;
-	attribute_info **attributes;		// 留一个指针在这，就能避免大量的复制了。因为毕竟 attributes 已经产生，没必要在复制一份。只要遍历判断类别，然后分派给相应的 子attributes 指针即可。
+	attribute_info **attributes;
 
 	// RuntimeAnnotation
 	Parameter_annotations_t *rva = nullptr;		// [1]
@@ -64,11 +64,8 @@ private:
 	TypeAnnotation *rvta = nullptr;				// [n]
 
 	// Code attribute
-	Code_attribute *code = nullptr;			// TODO: !!! 小心！！ Code 属性中还有一份异常表！！
-	LineNumberTable_attribute *lnt = nullptr;					// 用于调试器。   // 而且用于 printStackTrace。因此留下了。
-//	LocalVariableTable_attribute *lvt = nullptr;				// 用于调试器。
-//	LocalVariableTypeTable_attribute *lvtt = nullptr;			// 用于调试器。
-//	StackMapTable_attribute *smt = nullptr;					// 此属性用于虚拟机的类型检查阶段。
+	Code_attribute *code = nullptr;
+	LineNumberTable_attribute *lnt = nullptr;					// for printStackTrace.
 	// RuntimeTypeAnnotation [of Code attribute]
 	u2 Code_num_RuntimeVisibleTypeAnnotations = 0;
 	TypeAnnotation *Code_rvta = nullptr;			// [n]
@@ -80,7 +77,6 @@ private:
 	u2 signature_index = 0;
 	Element_value *ad = nullptr;					// [1]
 	CodeStub _ad;
-//	MethodParameters_attribute *mp = nullptr;		// in fact, in my vm, this is of no use.	@Deprecated.
 
 public:
 	bool is_static() { return (this->access_flags & ACC_STATIC) == ACC_STATIC; }

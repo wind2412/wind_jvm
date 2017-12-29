@@ -21,16 +21,13 @@
 using std::shared_ptr;
 using std::list;
 
-// [x] 千万不要忘了：所有的 vector 存放 field，都要把 vector 中的 Allocator 置换为 Mempool 的！！！
-// [√] 不对吧。这些 field 全是通过 setField 字节码设置的。所以本体肯定再外边，用不着回收了吧。
-
-class Mempool {		// TODO: 此类必须实例化！！内存池 Heap！！适用于多线程！因此 MemAlloc 应该内含一个实例化的 Mempool 对象才行！
+class Mempool {
 public:
 	static list<Oop *> & oop_handler_pool() {
-		static list<Oop *> oop_handler_pool;		// 存放所有的对象，以备日后的 delete。
+		static list<Oop *> oop_handler_pool;
 		return oop_handler_pool;
 	}
-	static Oop *copy(Oop & oop);					// 使用运行时多态来进行动态的类型 copy。		// for gc only.	// 此函数返回的 Oop 不会被放置在 oop_handler_pool 中。
+	static Oop *copy(Oop & oop);
 };
 
 class MemAlloc {
@@ -53,7 +50,7 @@ public:
 
 class GC;
 
-class Oop : public MemAlloc {		// 注意：Oop 必须只能使用 new ( = ::operator new + constructor-->::operator new(pointer p) )来分配！！因为要放在堆中。
+class Oop : public MemAlloc {
 	friend GC;
 protected:
 	// TODO: HashCode .etc
@@ -75,8 +72,8 @@ public:
 public:
 	explicit Oop(Klass *klass, OopType ooptype) : klass(klass), ooptype(ooptype) {}
 	Oop(const Oop & rhs) : ooptype(rhs.ooptype), klass(rhs.klass) {}		// Monitor don't copy !!
-	virtual ~Oop() {}			// ***VERY, VERY, VERY, VERY IMPORTANT!!!***		// 继承体系本来就必须实现虚析构 virtual ~A() {} 函数！！！
-	virtual Oop *copy();			// only use for gc:	// 此 new 的 Oop 不会被记录在 oop_handler_pool.
+	virtual ~Oop() {}			// ***VERY, VERY, VERY, VERY IMPORTANT!!!***
+	virtual Oop *copy();			// only use for gc:
 };
 
 class InstanceOop : public Oop {	// Oop::klass must be an InstanceKlass type.
@@ -87,7 +84,7 @@ private:
 public:
 	InstanceOop(InstanceKlass *klass);
 	InstanceOop(const InstanceOop & rhs);		// shallow copy
-public:		// 以下 8 个方法全部用来赋值。
+public:
 	bool get_field_value(Field_info *field, Oop **result);
 	void set_field_value(Field_info *field, Oop *value);
 	bool get_field_value(const wstring & BIG_signature, Oop **result);				// use for forging String Oop at parsing constant_pool.
@@ -117,7 +114,7 @@ public:
 	wstring get_extra() { return extra; }
 	void set_extra(const wstring & s) { extra = s; }
 public:
-	MirrorOop(Klass *mirrored_who);		// 禁止使用任何其他成员变量，比如 OopType!!
+	MirrorOop(Klass *mirrored_who);
 	MirrorOop(const MirrorOop & rhs);
 public:
 	Klass *get_mirrored_who() { return mirrored_who; }
@@ -127,7 +124,7 @@ public:
 	bool is_the_field_owned_by_this(int offset) {
 		auto & this_fields_map = ((InstanceKlass *)mirrored_who)->is_this_klass_field;
 		auto iter = this_fields_map.find(offset);
-		assert (iter != this_fields_map.end()); // 那么一定在 static field 中。this 的 field 没有！调用者需要在 static field 中找。
+		assert (iter != this_fields_map.end());
 		return iter->second;
 	}
 //	bool is_the_static_field_owned_by_this(const wstring & signature) {
@@ -141,9 +138,7 @@ public:		// for gc:
 class ArrayOop : public Oop {
 	friend GC;
 protected:
-							// length 即 capacity！！是一个东西！vector 这种，由于 capacity 是 malloc 的内存，length 是 placement new 出来的对象，才有分别！这里一上来对象就全了，没有就是 null，所以没有区别！！
-	vector<Oop *> buf;		// 注意：这是一个指针数组！！内部全部是指针！这样设计是为了保证 ArrayOop 内部可以嵌套 ArrayOop 的情况，而且也非常符合 Java 自身的特点。
-							// 这里， java/util/concurrent/ConcurrentHashMap 源码最后几行中，发现内部计算 Unsafe 的数组元素偏移量，是完全通过 ABASE + i << ASHIFT 的。而 i << ASHIFT 就是平台指针的大小，也就是 scale。所以必须固定大小储存。
+	vector<Oop *> buf;
 public:
 	ArrayOop(ArrayKlass *klass, int length, OopType ooptype) : Oop(klass, ooptype) {
 		buf.resize(length);
@@ -160,7 +155,7 @@ public:
 	}
 	int get_buf_offset() {		// use for sun/misc/Unsafe...
 //		return ((char *)&buf - (char *)this);
-		return 0;				// 因为我把 field 挂在了堆中，因此这里返回 0，在 Unsafe.getObjectVolatile() 中解码更加方便～
+		return 0;
 	}
 public:		// for gc:
 	virtual Oop *copy();
@@ -174,7 +169,7 @@ public:
 };
 
 class ObjArrayOop : public ArrayOop {
-public:		// Most inner type of `buf` is InstanceOop.		// 注意：维度要由自己负责！！并不会进行检查。
+public:		// Most inner type of `buf` is InstanceOop.
 	ObjArrayOop(ObjArrayKlass * klass, int length) : ArrayOop(klass, length, OopType::_ObjArrayOop) {}
 public:
 };
@@ -190,26 +185,6 @@ public:
 	Type get_type() { return type; }
 	virtual Oop *copy() override;
 };
-
-//struct ByteOop : public BasicTypeOop {
-//	int8_t value;		// data		// 全都有符号......！！
-//	ByteOop(int8_t value) : BasicTypeOop(Type::BYTE), value(value) {}
-//};
-//
-//struct BooleanOop : public BasicTypeOop {
-//	bool value;		// data
-//	BooleanOop(bool value) : BasicTypeOop(Type::BOOLEAN), value(value) {}
-//};
-//
-//struct ShortOop : public BasicTypeOop {
-//	short value;		// data
-//	ShortOop(short value) : BasicTypeOop(Type::SHORT), value(value) {}
-//};
-//
-//struct CharOop : public BasicTypeOop {
-//	unsigned short value;		// data		// [x] must be 16 bits!! for unicode (jchar is unsigned short)	// I modified it to 32 bits... Though of no use, jchar of 16 bits is very bad design......	// finally modified back to short...
-//	CharOop(unsigned short value) : BasicTypeOop(Type::CHAR), value(value) {}
-//};
 
 struct IntOop : public BasicTypeOop {
 	int value;		// data

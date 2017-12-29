@@ -28,8 +28,8 @@ void JVM_FindLoadedClass(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
-	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name，即 java.lang.invoke.MethodType。因此[不]可以在 map 中直接查找！！
-	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/") + L".class";	// 变成 java/lang/invoke/MethodType.class
+	wstring klass_name = java_lang_string::stringOop_to_wstring(str);
+	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/") + L".class";
 
 	LockGuard lg(system_classmap_lock);
 
@@ -60,12 +60,12 @@ void JVM_FindBootStrapClass(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
-	wstring klass_name = java_lang_string::stringOop_to_wstring(str);		// 注意：这里传入的 str 是 Binary name，即 java.lang.invoke.MethodType。因此[不]可以在 map 中直接查找！！
-	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/");	// 变成 java/lang/invoke/MethodType.
+	wstring klass_name = java_lang_string::stringOop_to_wstring(str);
+	klass_name = std::regex_replace(klass_name, std::wregex(L"\\."), L"/");
 
 	LockGuard lg(system_classmap_lock);
 
-	auto klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);	// 如果是系统类，直接 load 了。
+	auto klass = BootStrapClassLoader::get_bootstrap().loadClass(klass_name);
 	if (klass == nullptr) {
 		_stack.push_back(nullptr);
 	} else {
@@ -87,8 +87,8 @@ void JVM_DefineClass1(list<Oop *> & _stack){
 	TypeArrayOop *bytes = (TypeArrayOop *)_stack.front();	_stack.pop_front();
 	int offset = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 	int len = ((IntOop *)_stack.front())->value;	_stack.pop_front();
-	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();		// 我忽略掉这东西了。安全机制就算了。
-	InstanceOop *source_str = (InstanceOop *)_stack.front();	_stack.pop_front();				// 这东西也算了。不过如果不是 nullptr，可以打印出来玩玩。
+	InstanceOop *protection_domain = (InstanceOop *)_stack.front();	_stack.pop_front();
+	InstanceOop *source_str = (InstanceOop *)_stack.front();	_stack.pop_front();
 
 	assert(bytes->get_length() > offset && bytes->get_length() >= (offset + len));		// ArrayIndexOutofBoundException
 
@@ -114,7 +114,6 @@ void JVM_DefineClass1(list<Oop *> & _stack){
 }
 
 
-// 返回 fnPtr.
 void *java_lang_classLoader_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

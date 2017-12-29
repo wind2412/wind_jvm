@@ -26,7 +26,7 @@ void JVM_FillInStackTrace(list<Oop *> & _stack){		// the int argument is dummy. 
 	_this->set_field_value(THROWABLE L":backtrace:" OBJ, nullptr);
 	_this->set_field_value(THROWABLE L":stackTrace:[Ljava/lang/StackTraceElement;", nullptr);
 
-	ArrayOop *obj = thread.get_stack_trace();		// TODO: 我得出的行号只是粗略值，基于 LineNumberTable。待改进。find_pc_desc_internal()
+	ArrayOop *obj = thread.get_stack_trace();
 
 	_this->set_field_value(THROWABLE L":backtrace:" OBJ, obj);
 
@@ -43,7 +43,7 @@ void JVM_GetStackTraceDepth(list<Oop *> & _stack){
 
 	ArrayOop *stacktrace_arr = (ArrayOop *)obj;
 
-	_stack.push_back(new IntOop(stacktrace_arr->get_length()));		// 注意，这里应当取得已经填入的 fillInStackTrace 当时的 stack 深度。现在的深度肯定是不对的。都不知道走过多少个方法，到了这个方法。所以直接取 thread.getstacksize() 肯定不对的。
+	_stack.push_back(new IntOop(stacktrace_arr->get_length()));
 }
 
 void JVM_GetStackTraceElement(list<Oop *> & _stack){
@@ -61,7 +61,6 @@ void JVM_GetStackTraceElement(list<Oop *> & _stack){
 	_stack.push_back((*stacktrace_arr)[layer]);
 }
 
-// 返回 fnPtr.
 void *java_lang_throwable_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

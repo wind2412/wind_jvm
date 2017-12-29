@@ -1,12 +1,12 @@
 CC := g++
 CPP_FLAGS := -std=c++14 -O3 -pg
-#CPP_FLAGS := -std=c++14 -O3 -pg -DBYTECODE_DEBUG -DDEBUG
-#CPP_FLAGS := -std=c++14 -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG	-DSTRING_DEBUG
+# CPP_FLAGS := -std=c++14 -O3 -pg -DBYTECODE_DEBUG -DDEBUG
+# CPP_FLAGS := -std=c++14 -O3 -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG -DBYTECODE_DEBUG
 LINK_FLAGS := -std=c++14 -pg
-# EXCEPT := ./src/main.cpp
+EXCEPT := ./useful_tools/classfile_interceptor.cpp
 # CPP_SOURCE := $(filter-out $(EXCEPT), $(shell find . -path "./tests" -prune -o -maxdepth 2 -name "*.cpp" -print))
 # CPP_SOURCE := $(filter-out $(EXCEPT), $(shell find ./src -name "*.cpp"))
-CPP_SOURCE := $(shell find ./src -name "*.cpp")
+CPP_SOURCE := $(filter-out $(EXCEPT), $(shell find ./src -name "*.cpp"))
 JAVA_TEST_SOURCE := $(shell find . -name "*.java")
 CPP_OBJ := $(patsubst %.cpp, %.o, $(CPP_SOURCE))
 JAVA_TEST_OBJ := $(patsubst %.java, %.class, $(JAVA_TEST_SOURCE))
@@ -28,10 +28,12 @@ ifeq ($(shell uname),Darwin)
 else 
 	$(CC) $(LINK_FLAGS) -L/usr/lib/x86_64-linux-gnu/ -pthread -g -I./include -o bin/wind_jvm $^ -lboost_system -lboost_filesystem
 endif
-# 卧槽？？ g++ 必须把链接库放在最后边？？？？放在前面能识别但是不装载......mac 的 ld 就没这个问题啊......
 
 test : $(JAVA_TEST_OBJ)
 #	@cd tests && make all
+
+interceptor: $(EXCEPT) src/class_parser.o
+	$(CC) $(CPP_FLAGS) -g -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG -I./include $^ -o useful_tools/$@
 
 clean : 
 	@rm -rf rt.list bin/* *.dSYM && cd tests && make clean

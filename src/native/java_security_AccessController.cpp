@@ -30,12 +30,9 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 	vm_thread & thread = (*(vm_thread*) (_stack.back ()));
 	_stack.pop_back ();
 	assert(pa != nullptr);
-	// [x]不支持泛型的代价。以后补上。---- [√] 看来不需要支持了。注释掉的部分是以前的。因为后来发现，
-	// java 字节码中，由于 java 是伪泛型，因此编译器会除了用户指定泛型的 `run:() STR` 等之外，还产生一个原本的 `run:() OBJ`。虚拟机由于不支持泛型，会调用 SYNTHETIC 的 `run:() OBJ`。
-	// 而 `run:() OBJ` 会转调用特化的 `run:() STR`。而由于是编译器生成的，因此虽然函数签名完全一致，却并不造成重载。
-	// 可以试试：
+	// try:
 	/**
-	 *  interface A<T> {		// 其实是一个简化版的 AccessController.doPrivileged()。
+	 *  interface A<T> {		// simple: AccessController.doPrivileged()。
 			T run();
 		}
 
@@ -72,8 +69,6 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 
 	Oop* result = thread.add_frame_and_execute (method, { pa }); // load the `this` obj
 
-	// **IMPORTANT** judge whether returns an Exception!!!		// TODO: bug：如果在 run() 中 throw 的话......像是 openjdk: URLClassLoader::findClass() 一样......
-																// 应当捕获所有 Exception，并且变成 PrivilegeException 抛出！！
 	bool substitute = false;
 	if (result != nullptr && result->get_ooptype() != OopType::_BasicTypeOop && result->get_klass()->get_type() == ClassType::InstanceClass) {	// same as `(Bytecode)invokeVirtual` 's exception judge.
 		auto klass = ((InstanceKlass *)result->get_klass());
@@ -87,7 +82,7 @@ void JVM_DoPrivileged (list<Oop*>& _stack)
 	}
 
 	if (substitute) {
-		_stack.push_back (pa);			// 使用 PriviledgeException 代替返回的 Exception 返回！！
+		_stack.push_back (pa);
 	} else {
 		_stack.push_back (result);
 	}
@@ -100,7 +95,6 @@ void JVM_GetStackAccessControlContext(list<Oop *> & _stack){	// static
 
 
 
-// 返回 fnPtr.
 void *java_security_accesscontroller_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

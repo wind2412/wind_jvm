@@ -31,7 +31,6 @@ private:
 		return gc_cond_mutex;
 	}
 	static void recursive_add_oop_and_its_inner_oops_and_modify_pointers_by_the_way(Oop * const & origin_oop, unordered_map<Oop *, Oop *> & new_oop_map);
-			// 此函数的第二个参数是新的 oop map。即新的临时堆的句柄空间。意为：unordered_map< origin oop address, new oop address >.
 			// return: pair< new oop address, should substitute the origin >.  if `should substitute the origin` == false, that says the oop has been
 			// migrated to the `new_oop_map` already. So we need not substitute the pointer.
 	static void klass_inner_oop_gc(Klass *klass, unordered_map<Oop *, Oop *> & new_oop_map);
@@ -45,9 +44,9 @@ public:
 		return gc;
 	}
 public:
-	static bool init_gc();			// 设置标志位以及目标 vm_threads
+	static bool init_gc();
 	static void detect_ready();
-	static void *gc_thread(void *);	// 应该由另一个新的 GC 线程开启。
+	static void *gc_thread(void *);
 	static void system_gc();
 	static void set_safepoint_here(vm_thread *);
 	static void signal_all_patch();

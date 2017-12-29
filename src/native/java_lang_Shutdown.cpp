@@ -22,13 +22,12 @@ void JVM_Halt0(list<Oop *> & _stack){		// static
 
 	// TODO: fully gc.
 
-	BytecodeEngine::main_thread_exception(exitcode);		// 直接退出！！
+	BytecodeEngine::main_thread_exception(exitcode);
 
 }
 
 
 
-// 返回 fnPtr.
 void *java_lang_shutdown_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

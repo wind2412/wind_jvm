@@ -31,11 +31,6 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 	Method *target_method = target_klass->search_method_in_slot(((IntOop *)result)->value);
 	assert(target_method->get_name() == L"<init>");
 	// get arg lists types
-//	assert(ctor->get_field_value(CONSTRUCTOR L":parameterTypes:[Ljava/lang/Class;", &result));
-//	assert(result->get_ooptype() == OopType::_ObjArrayOop);
-//	ObjArrayOop *args = (ObjArrayOop *)result;
-	// check match?
-//	vector<>		// TODO:
 	// parse objs to list<Oop *>
 	list<Oop *> arg_list;
 	arg_list.push_back(init);		// push `this` first
@@ -54,7 +49,6 @@ void JVM_NewInstanceFromConstructor(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *sun_reflect_nativeConstructorAccessorImpl_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

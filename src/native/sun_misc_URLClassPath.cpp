@@ -21,7 +21,6 @@ void JVM_GetLookupCacheURLs(list<Oop *> & _stack){		// static
 	_stack.push_back(nullptr);
 }
 
-// 返回 fnPtr.
 void *sun_misc_urlClassPath_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

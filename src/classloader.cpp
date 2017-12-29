@@ -16,7 +16,7 @@ Lock & ClassFile_Pool::classfile_pool_lock(){
 	return classfile_pool_lock;
 }
 list<ClassFile *> & ClassFile_Pool::classfile_pool() {
-	static list<ClassFile *> classfile_pool;		// 存放所有的对象，以备日后的 delete。
+	static list<ClassFile *> classfile_pool;
 	return classfile_pool;
 }
 void ClassFile_Pool::put(ClassFile *cf) {
@@ -31,34 +31,17 @@ void ClassFile_Pool::cleanup() {
 }
 
 /*===-------------------  BootStrap ClassLoader ----------------------===*/
-//BootStrapClassLoader BootStrapClassLoader::bootstrap;	// 见 classloader.hpp::BootStrapClassLoader!! 这里模块之间初始化顺序诡异啊 还是 Mayers 老人家说的对OWO 没想到竟然有一天被我碰上了......QAQ
-
-/**
- * bug report:
- * 调试最恶心的 bug，没有之一。线程安全问题。
- * 这应该是一个月前的坑......当时懒没有加锁......结果在把 GC 的线程模型弄好之后，一直在 PrintWriter 那里报 ref == nullptr 的 assertion fault......
- * 无论怎样就是看不出来错，真·绝望了QAQ
- * 这里跟报错没有半毛钱关系......讲真
- * 最后实在不行，用了 valgrind，结果改了一个没注意到的 ub bug。当时比较高兴，以为解决了......
- * 结果运行还是同样错误......真·绝望
- * 后来想着不行啊......起码我这不能有泄漏啊。于是来到了这里打算写卸载类的方法。。。
- * 突然看到上边把锁注释掉了......
- * 然后也没当回事......毕竟是毫不相关的地方......随手把注释去掉......
- * 一运行居然好了！！！居然好了！！！居然好了！！！心情激动QAQQAQQAQQAQ
- * 多线程玄学......一定要谨慎再谨慎......最恶心的地方，目前。没有之一
- * 内心受到了 1w 点暴击
- */
 Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, MirrorOop *,
-												  bool, InstanceKlass *, ObjArrayOop *)	// TODO: ... 如果我恶意删掉 java/lang/Object 会怎样......
+												  bool, InstanceKlass *, ObjArrayOop *)
 {
-	// TODO: add lock simply... because it will cause code very ugly...
-	LockGuard lg(system_classmap_lock);		// [x] 这样使用 LockGuard 的话，就会递归......并不会释放了......要使用递归锁??
-	assert(jl.find_file(L"java/lang/Object.class")==1);	// 这句是上边 static 模块之间初始化顺序不定实验的残留物。留着吧。
+	// add lock simply
+	LockGuard lg(system_classmap_lock);
+	assert(jl.find_file(L"java/lang/Object.class")==1);
 	wstring target = classname + L".class";
-	if (jl.find_file(target)) {	// 在 rt.jar 中，BootStrap 可以 load。
-		if (system_classmap.find(target) != system_classmap.end()) {	// 已经 load 过
+	if (jl.find_file(target)) {
+		if (system_classmap.find(target) != system_classmap.end()) {	// has been loaded
 			return system_classmap[target];
-		} else {	// 进行 load
+		} else {	// load
 			// parse a ClassFile (load)
 			ifstream f(wstring_to_utf8(jl.get_sun_dir() + L"/" + target).c_str(), std::ios::binary);
 			if(!f.is_open()) {
@@ -83,10 +66,10 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 #endif
 			return newklass;
 		}
-	} else if (boost::starts_with(classname, L"[")) {		// 一次剥离n层到最里边，加载数组类
-		if (system_classmap.find(target) != system_classmap.end()) {	// 已经 load 过
+	} else if (boost::starts_with(classname, L"[")) {
+		if (system_classmap.find(target) != system_classmap.end()) {	// has been loaded
 			return system_classmap[target];
-		} else {	// 进行 load
+		} else {	// load
 			int pos = 0;
 			for (; pos < classname.size(); pos ++) {
 				if (classname[pos] != L'[') 	break;
@@ -152,8 +135,8 @@ Klass *BootStrapClassLoader::loadClass(const wstring & classname, ByteStream *, 
 				}
 			}
 		}
-	} else {		// BootStrap 无法加载: 1. 正在加载一个非 java 类库的类；2. 正在加载一个数组类，而经过层层剥离之后发现它是一个普通类型。
-		// throw ClassNotFoundExcpetion(ERRMSG, target);	// 不应该抛异常...
+	} else {
+		// throw ClassNotFoundExcpetion(ERRMSG, target);
 		return nullptr;
 	}
 }
@@ -173,21 +156,20 @@ void BootStrapClassLoader::cleanup()
 {
 	LockGuard lg(system_classmap_lock);
 	for (auto iter : system_classmap) {
-		delete iter.second;			/// 很有意思啊...... 这个 ??? 被输出，然而 delete InstanceKlass 中的 输出却并没有...... 奇特啊。而且最后可能会报崩......
+		delete iter.second;
 	}
 }
 
 /*===-------------------  My ClassLoader -------------------===*/
 Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf, MirrorOop *loader_mirror,
-										   bool is_anonymous, InstanceKlass *hostklass, ObjArrayOop *cp_patch)		// [√] 更正：此 MyClassLoader 仅仅用于 defineClass1. 这时，传进来的 name 应该自动会变成：test/Test1 吧。
+										   bool is_anonymous, InstanceKlass *hostklass, ObjArrayOop *cp_patch)
 {
 	LockGuard lg(this->lock);
 	InstanceKlass *result;
 #ifdef DEBUG
 	sync_wcout{} << "(DEBUG) loading ... [" << classname << "]" << std::endl;		// delete
 #endif
-//	if (classname == L"<unknown>") {		// Anonymous Klass 由 MyClassLoader 加载吧。
-	if (is_anonymous) {		// Anonymous Klass 由 MyClassLoader 加载吧。
+	if (is_anonymous) {
 		assert(byte_buf != nullptr);
 		std::istream *stream;
 		ClassFile *cf(new ClassFile);
@@ -232,31 +214,20 @@ Klass *MyClassLoader::loadClass(const wstring & classname, ByteStream *byte_buf,
 		}
 
 		// convert to a MetaClass (link)
-		InstanceKlass *newklass = new InstanceKlass(cf, this /*nullptr*/, loader_mirror);	// [x] I think nullptr maybe good choice?? 反正是对所有 loader 都不可见... [√] 不行！因为在这些 VM Anonymous class 的常量池中，在 invokeDynamic 生成的这些类里，会有用户类的常量池句柄！这样就没法加载了！必须把 loader 传进去。
-		// 拦截：在这里可以拦截一些 VM Anonymous Klass，截获字节码。
-//		if (newklass->get_name() == L"xxxxx") {
-//			std::wcout << "success!!" << std::endl;
-//		}
+		InstanceKlass *newklass = new InstanceKlass(cf, this /*nullptr*/, loader_mirror);
 
-		// 拦截：VM Anonymous Klass 的字节码。
+		// intercept：VM Anonymous Klass's bytecode。
 //		if (newklass->get_name() == L"Test13$$Lambda$1") {
-//			byte_buf->print(',', true);		// 输出某一个特定类的字节码。此类是直接注入的，因此没有 .class 文件。
+//			byte_buf->print(',', true);
 //		}
 
-		// reset the Anonymous Klass's name. 但是这里，由于我内部的常量池会通过 name 来 parse...... 所以只能取消掉了......
-//		std::wstringstream ss;
-//		ss << newklass->get_name() << L"/" << newklass;			// 这里的 bug，在于看到注释了解到 Anonymous Klass 不属于任何一个 classloader......于是就没放进 classloader 中......结果 shared_ptr 由于引用计数变成0 自动析构了 .... 各种ub...
-//		newklass->set_name(ss.str());
-
-//		std::wcout << newklass->get_name() << std::endl;		// delete
 		// set the hostklass.
 		newklass->set_hostklass(hostklass);		// set hostklass...
 #ifdef KLASS_DEBUG
 BootStrapClassLoader::get_bootstrap().print();
 MyClassLoader::get_loader().print();
 #endif
-//		classmap.insert(make_pair(classname, newklass));			// 不插入！！！Anonymous 对于各种 loader 不可见！
-		anonymous_klassmap.push_back(newklass);					// bug report: 然而不插入的话...... shared_ptr 的特性...... 引用计数会消失......然后 ub... 所以只能强行插入一波了... 反正我也不会对 klass GC（逃
+		anonymous_klassmap.push_back(newklass);
 		return newklass;
 	} else if((result = ((InstanceKlass *)bs.loadClass(classname))) != nullptr) {		// use BootStrap to load first.
 		return result;
@@ -278,10 +249,9 @@ MyClassLoader::get_loader().print();
 //						}
 //					}
 
-					// 这里，如果要是复用之前的 VM Anonymous Klass 的话，也会走到这里......
-					// 先检测之前有无 VM Anonymous Klass.
+					// VM Anonymous Klass will go here.
 					auto iter = std::find_if(anonymous_klassmap.begin(), anonymous_klassmap.end(), [&classname](InstanceKlass *anonymous_klass) {
-						if (anonymous_klass->get_name() == classname) {		// 加上一个 / 来保证是 VM Anonymous klass. 因为原本的名称已经被我改变成了 ..../0x38343 这种地址形式。
+						if (anonymous_klass->get_name() == classname) {
 							return true;
 						} else {
 							return false;
@@ -303,9 +273,9 @@ MyClassLoader::get_loader().print();
 			} else {		// use ByteBuffer:
 				std::istream s(byte_buf);											// use `istream`, the parent of `ifstream`.
 
-				// 拦截：lambda 中的非匿名类，但是字节码是隐式注入的那种：即 jdk 为了隐藏实现而使用的字节码序列集。
+				// intercept
 //				if (classname == L"java/lang/invoke/BoundMethodHandle$Species_LL") {
-//					byte_buf->print(',', true);		// 输出某一个特定类的字节码。此类是直接注入的，因此没有 .class 文件。
+//					byte_buf->print(',', true);
 //				}
 
 #ifdef DEBUG
@@ -314,7 +284,7 @@ MyClassLoader::get_loader().print();
 				s >> *cf;
 			}
 //			std::wcout << "===----------------- begin parsing (" << target << ") 's ClassFile in MyClassLoader ..." << std::endl;
-//			(*stream) >> *cf;		// bug report !!! 注意：*stream 是不可以的！！*直接解引用，无法触发多态！！必须用 `.` 或者 `->` 才可以！！
+//			(*stream) >> *cf;
 #ifdef DEBUG
 			sync_wcout{} << "===----------------- parsing (" << target << ") 's ClassFile end." << std::endl;
 #endif
@@ -329,9 +299,9 @@ MyClassLoader::get_loader().print();
 		}
 	} else {	// e.g. '[[Lcom/zxl/Haha.   because if it is '[[Ljava/lang/Object', BootStrapClassLoader will load it already at the beginning of this method.
 		wstring target = classname + L".class";
-		if (classmap.find(target) != classmap.end()) {	// 已经 load 过
+		if (classmap.find(target) != classmap.end()) {	// has been loaded
 			return classmap[target];
-		} else {	// 进行 load
+		} else {	// load
 			int pos = 0;
 			for (; pos < classname.size(); pos ++) {
 				if (classname[pos] != L'[') 	break;
@@ -369,7 +339,7 @@ MyClassLoader::get_loader().print();
 					return newklass;
 				}
 			} else {
-				assert(false);		// 其实我认为不可能由 MyClassLoader 去 load 一个 primitive array... BootStrap 会先做。所以这里关闭掉了。
+				assert(false);
 				assert(classname.size() == (layer + 1));	// because it is basic type, so like '[[[C', it must be [layer + 1].
 				wstring type_name = classname.substr(pos);
 				// b. parse type array

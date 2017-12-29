@@ -22,7 +22,6 @@ void JVM_Initialize(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *sun_misc_vm_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

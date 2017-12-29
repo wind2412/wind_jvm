@@ -80,7 +80,6 @@ using std::function;
 
 void init_native();
 
-// 说明：所有的 native 方法我全部设置成为签名是 void (*)(list<Oop *> & _stack) 的形式了。避免了签名不同调用困难的问题。这样就很好啦～参数和返回值全都会被压入 _stack 中～～
 void *find_native(const wstring & klass_name, const wstring & signature);	// get a native method <$signature> in klass <$klass_name>. maybe return nullptr...
 
 class vm_thread;

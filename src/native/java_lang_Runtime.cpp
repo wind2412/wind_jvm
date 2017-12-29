@@ -26,7 +26,6 @@ void JVM_AvailableProcessors(list<Oop*>& _stack)
 #endif
 }
 
-// 返回 fnPtr.
 void *java_lang_runtime_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

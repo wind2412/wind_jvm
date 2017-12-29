@@ -12,7 +12,7 @@ Lock & Method_Pool::method_pool_lock(){
 	return method_pool_lock;
 }
 list<Method *> & Method_Pool::method_pool() {
-	static list<Method *> method_pool;		// 存放所有的对象，以备日后的 delete。
+	static list<Method *> method_pool;
 	return method_pool;
 }
 void Method_Pool::put(Method *method) {
@@ -61,7 +61,7 @@ Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) 
 						}
 						case 10:{		// LineNumberTable: 用于 printStackTrace。
 							this->lnt = ((LineNumberTable_attribute *)code->attributes[pos]);
-							code->attributes[pos] = nullptr;		// move 语义！ **IMPORTANT**
+							code->attributes[pos] = nullptr;
 							break;
 						}
 						case 2:
@@ -87,7 +87,7 @@ Method::Method(InstanceKlass *klass, method_info & mi, cp_info **constant_pool) 
 				break;
 			}
 			case 14:{	// RuntimeVisibleAnnotation
-				auto & enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;		// bug report: 这里由于 shallow copy 了一个对象出来，因此导致了 delete！！然后 Method 释放的时候又析构，free 了两次......
+				auto & enter = ((RuntimeVisibleAnnotations_attribute *)this->attributes[i])->parameter_annotations;
 				this->rva = (Parameter_annotations_t *)malloc(sizeof(Parameter_annotations_t));
 				constructor(this->rva, constant_pool, enter);
 				break;
@@ -143,7 +143,7 @@ wstring Method::parse_signature()
 	auto _pair = (*klass->get_rtpool())[signature_index];
 	assert(_pair.first == CONSTANT_Utf8);
 	wstring signature = boost::any_cast<wstring>(_pair.second);
-	assert(signature != L"");	// 别和我设置为空而返回的 L"" 重了.....
+	assert(signature != L"");
 	return signature;
 }
 
@@ -242,25 +242,11 @@ vector<MirrorOop *> Method::parse_argument_list(const wstring & descriptor)
 				}
 			}
 		} else if (args[i][0] == L'L') {	// InstanceOop type
-//			ClassLoader *loader = this->klass->get_classloader();		// bug report: 不要使用此 Method 的 classLoader ！！因为完全有可能是 invoke 方法(BootStrap 加载 java/lang/invoke...)，invoke 了一个 MyclassLoader 加载的类......
-//			Klass *klass;
-//			if (loader == nullptr) {
-//				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i].substr(1, args[i].size() - 2));
-//			} else {
-//				klass = loader->loadClass(args[i].substr(1, args[i].size() - 2));
-//			}
 			Klass *klass = MyClassLoader::get_loader().loadClass(args[i].substr(1, args[i].size() - 2));
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
 		} else {		// ArrayType
 			assert(args[i][0] == L'[');
-//			ClassLoader *loader = this->klass->get_classloader();
-//			Klass *klass;
-//			if (loader == nullptr) {
-//				klass = BootStrapClassLoader::get_bootstrap().loadClass(args[i]);
-//			} else {
-//				klass = loader->loadClass(args[i]);
-//			}
 			Klass *klass = MyClassLoader::get_loader().loadClass(args[i]);
 			assert(klass != nullptr);
 			v.push_back(klass->get_mirror());
@@ -347,7 +333,6 @@ int Method::where_is_catch(int cur_pc, InstanceKlass *cur_excp)
 	sync_wcout{} << "===-------------- [Begin Finding Catch/Finally Block...] -----------------===" << std::endl;
 #endif
 
-	// 可以改进：这里其实可以考虑设置一个计数器什么的。因为之前被 catch 的肯定不会被第二次 catch。catch 这东西，对于同一个对象而言，是一次性的。
 	auto rt_pool = this->get_klass()->get_rtpool();
 	for (int i = 0; i < this->code->exception_table_length; i ++) {
 		auto excp_tbl = this->code->exception_table[i];

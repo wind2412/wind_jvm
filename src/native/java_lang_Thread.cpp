@@ -40,14 +40,13 @@ void JVM_StartThread(list<Oop *> & _stack){
 	LongOop *tid = (LongOop *)result;
 	assert(tid->value == 0);			// must be 0. if not 0, it must be started already.
 
-	// 魔改。
-	// 如果 klass 是 ReferenceHandler 的话，我就不启动这个线程了。由于 DEBUG 模式下，有这个线程无限跑输出太多了......内存分分钟就没了......
+	// if class is ReferenceHandler, I won't open this thread like openjdk. it is of no use.
 	if (_this->get_klass()->get_name() == L"java/lang/ref/Reference$ReferenceHandler") {
 		return;
 	}
 
 	// first, find the `run()` method in `this`.
-	Method *run = ((InstanceKlass *)_this->get_klass())->get_this_class_method(L"run:()V");	// TODO: 不知道这里对不对。
+	Method *run = ((InstanceKlass *)_this->get_klass())->get_this_class_method(L"run:()V");
 	assert(run != nullptr && !run->is_abstract());
 	// set and start a thread.
 	vm_thread *new_thread;
@@ -154,9 +153,9 @@ void JVM_Sleep(list<Oop *> & _stack){			// static
 void JVM_CurrentThread(list<Oop *> & _stack){		// static
 	InstanceOop *thread_oop;
 	assert(ThreadTable::detect_thread_death(pthread_self()) == false);
-	thread_oop = ThreadTable::get_a_thread(pthread_self());						// TODO: 我自己都不知道这实现是否正确......多线程太诡异了......
+	thread_oop = ThreadTable::get_a_thread(pthread_self());
 	assert(thread_oop != nullptr);
-	_stack.push_back(thread_oop);		// 返回值被压入 _stack.
+	_stack.push_back(thread_oop);
 }
 void JVM_CountStackFrames(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
@@ -170,7 +169,7 @@ void JVM_IsInterrupted(list<Oop *> & _stack){
 	InstanceOop *_this = (InstanceOop *)_stack.front();	_stack.pop_front();
 	bool _clear_interrupted = ((IntOop *)_stack.front())->value;	_stack.pop_front();
 
-	// TODO: 暂不实现。因为还没有理解透彻。
+	// didn't implement
 
 	_stack.push_back(new IntOop(false));
 }
@@ -191,7 +190,6 @@ void JVM_SetNativeThreadName(list<Oop *> & _stack){
 	assert(false);
 }
 
-// 返回 fnPtr.
 void *java_lang_thread_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

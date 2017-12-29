@@ -73,16 +73,11 @@ public class Test7 extends Thread{
 
 		Signal.handle(new Signal("INT"), new SignalHandler() {
             public void handle(Signal sig) {
-                System.out
-                        .println("Aaarggh, a user is trying to interrupt me!!");
-                System.out
-                        .println("(throw garlic at user, say `shoo, go away')");
+                System.out.println("Will not get an output.");
             }
-        });
+          });
 		Signal.handle(new Signal("INT"), SignalHandler.SIG_IGN);
 	
-//		LauncherHelper
-//		UnixFileSystem
 		System.out.println(Float.POSITIVE_INFINITY / 0);
 		System.out.println(-0.0f == 0.0f);
 		
@@ -99,7 +94,7 @@ public class Test7 extends Thread{
 		
 		
 		
-//		System.out.println("haha");
+		System.out.println("haha");
 		
 	}
 }

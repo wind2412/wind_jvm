@@ -78,7 +78,6 @@ void Java_java_lang_object_getClass(list<Oop *> & _stack){
 	_stack.push_back(_this->get_klass()->get_mirror());
 }
 
-// 返回 fnPtr.
 void *java_lang_object_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

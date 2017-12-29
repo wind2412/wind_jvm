@@ -20,10 +20,9 @@ static unordered_map<wstring, void*> methods = {
 
 void JVM_GetSystemPackage0(list<Oop *> & _stack){		// static				// TODO:...
 	InstanceOop *str = (InstanceOop *)_stack.front();	_stack.pop_front();
-	_stack.push_back(nullptr);		// 就全返回 nullptr 了。没有 system package （逃
+	_stack.push_back(nullptr);
 }
 
-// 返回 fnPtr.
 void *java_lang_package_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

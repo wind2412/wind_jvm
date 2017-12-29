@@ -133,7 +133,7 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 		}
 
 		case SIGINT:{
-			_stack.push_back(new LongOop(2));		// 魔改：用我自己的 handler 了......
+			_stack.push_back(new LongOop(2));		// use my signal handler
 			return;
 		}
 
@@ -159,9 +159,9 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 	// register the handler now.
 	struct sigaction act, oact;
 	sigfillset(&act.sa_mask);
-	act.sa_flags = SA_RESTART;		// 如果信号被中断给中断了，那么中断结束之后会自动继续执行 handler。
+	act.sa_flags = SA_RESTART;
 #ifdef __APPLE__
-	act.__sigaction_u.__sa_handler = (void (*)(int))fake_new_handler;		// 由于 fake_new_handler 只能是 0，1，2。0 和 1 分别是 SIG_DFL 和 SIG_IGN，分别是 (void (*)(int))0 和 (void (*)(int))1，不用变。
+	act.__sigaction_u.__sa_handler = (void (*)(int))fake_new_handler;
 #elif defined __linux__
 	act.sa_handler = (void (*)(int))fake_new_handler;
 #endif
@@ -189,7 +189,6 @@ void JVM_Handle0(list<Oop *> & _stack){		// static
 
 
 
-// 返回 fnPtr.
 void *sun_misc_signal_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

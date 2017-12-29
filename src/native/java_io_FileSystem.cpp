@@ -50,7 +50,6 @@ void JVM_GetLength(list<Oop *> & _stack){
 
 
 
-// 返回 fnPtr.
 void *java_io_fileSystem_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

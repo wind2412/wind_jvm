@@ -93,12 +93,12 @@ u4 read4(std::istream & f);
 /*===----------- hexdump stub ---------------===*/
 // to save the ClassFile hex code stub... for Reflection...
 struct CodeStub {
-	std::vector<u1> stub;	// TODO: 改成 vector！！可以适应不定长度的变长策略......
+	std::vector<u1> stub;
 	void inject(u1 code) {
 		stub.push_back(code);
 	}
-	void inject(u2 code) {	// 已经存入变量中的小端序。(变量内部存储的顺序)
-		inject((u1)((code >> 8) & 0xFF));	// !! 先写入高字节。按顺序写入。
+	void inject(u2 code) {
+		inject((u1)((code >> 8) & 0xFF));
 		inject((u1)(code & 0xFF));
 	}
 	void inject(u4 code) {

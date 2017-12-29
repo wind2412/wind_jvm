@@ -10,9 +10,8 @@
 
 #include <string>
 #include <cassert>
-#include "class_parser.hpp"		// 由于 annotation::element_value_pairs_t 有嵌套类定义，前置声明无效。
+#include "class_parser.hpp"
 
-// TODO: 内联全都放到 .inl 文件中去
 
 using std::wstring;
 
@@ -43,10 +42,8 @@ struct Element_value {
 	CodeStub stub;
 };
 
-// 对 annotation 的封装
-// TODO: 只不过，这时这个 annotation 所在的类还没有被加载。可以设置为在生成的时候被加载～
 struct Annotation : public Value_t {
-	wstring type;				// annotation.[type_index]，指向了一个 CONSTANT_Utf8_info。这个 utf8 表示了此 annotation 的真实类型。
+	wstring type;
 	int num_element_value_pairs;
 	struct Element_value_pairs_t {
 		wstring element_name;

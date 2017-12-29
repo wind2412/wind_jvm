@@ -56,12 +56,6 @@ void JVM_NanoTime(list<Oop *> & _stack){				// static
 #endif
 }
 
-//InstanceKlass *get_real_element_klass(ObjArrayKlass * obj_arr_klass)		// [x]见下文 ArrayCopy 中的 bug 说明。旨在对泛型擦除引发的 bug 打补丁。	// [x] 替换所有 get_element_klass！！甚至可以钦定此方法替换掉 get_element_klass!!
-//{
-//		// [x] 设计修改！成为：如果放置元素进去，那么就设置...
-//		// [x] 再改！！因为泛型擦除只对 Object 成立......所以我如果看到 [Object，那就钦定......
-//}
-
 void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 	Oop *obj1 = (Oop *)_stack.front();	_stack.pop_front();
 	int src_pos = ((IntOop *)_stack.front())->value;	_stack.pop_front();
@@ -139,11 +133,6 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 		assert(objarr1->get_dimension() == objarr2->get_dimension());
 		assert(src_pos + length <= objarr1->get_length() && dst_pos + length <= objarr2->get_length());	// TODO: ArrayIndexOutofBound
 		// 1. src has same element of dst, 2. or is sub_type of dst, 3. all the copy part are null.
-		// bug report！！这样，只能得到 alloc 的数组的数组类的 klass！而不能得到真正的内部存放的数值的 klass！！打个比方...比如 ArrayList 类。因为泛型擦除，因此内部有个 Object[] 数组......如果要是使用 get_element，就只能得到 inner 的类型是 Object...但是人家可能向内存放 String...... 唉。考虑不周...
-		// 4. [x] 所以打算如果 src 是 java/lang/Object 的话，就改为检查数组内部的类型，并且加以钦定...
-		// [√] 最终的方案改成了：一上来就得到真正的 element type 类型。
-//		auto src_klass = ((ObjArrayKlass *)objarr1->get_klass())->get_element_klass();
-//		auto dst_klass = ((ObjArrayKlass *)objarr2->get_klass())->get_element_klass();
 		auto src_klass = get_ObjArray_real_element_klass(objarr1);
 		auto dst_klass = get_ObjArray_real_element_klass(objarr1);
 
@@ -165,36 +154,7 @@ void JVM_ArrayCopy(list<Oop *> & _stack){				// static
 					(*objarr2)[dst_pos + i] = nullptr;
 				}
 			} else {
-				// [√] 下边的想法还是并不是很安全。所以改成了一上来就 get 到 real element type.
-//				// 4. 走到这一步，也有可能是因为泛型擦除的关系。即 objarr1 的容器是 [Object，通过 get_element_klass 只能得到默认的“数组类型” Object，
-//				// 却得不到内部存放的真实类型了。因此在这里，会判断内部的元素真实类型！而且由于 splice_all_null，我们知道 null 元素不存在！
-//				// 给予最后一次机会：
-//
-//				if (src_klass->get_name() == L"java/lang/Object") {
-//					// get `the most inner` element type!!
-//					InstanceKlass *real_src_klass;
-//					if (objarr1->get_dimension() == 1) {
-//						// 如果一维 Object[]，且内部全不是 null，那么取出第一个就好～
-//						if (length == 0) {
-//							assert(false);	// I think it will be false...
-//						} else {
-//							real_src_klass = ((InstanceKlass *)(*objarr1)[src_pos]->get_klass());
-//							if (real_src_klass == dst_klass || real_src_klass->check_parent(dst_klass) || real_src_klass->check_interfaces(dst_klass)) {
-//								// directly copy
-//								for (int i = 0; i < length; i ++) {
-//									(*objarr2)[dst_pos + i] = (*objarr1)[src_pos + i];
-//								}
-//							} else {
-//								assert(false);
-//							}
-//						}
-//					} else {		// ...?
-//						// 整理一下代码结构...写出一个可以判断真实类型的函数把...这样递归太恶心了...先 assert(false)了...
-//						assert(false);
-//
-//					}
-//				} else
-					assert(false);
+				assert(false);
 			}
 		}
 	} else {
@@ -217,7 +177,7 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	// get pwd/sun_src
 	wstring sun_src = pwd + L"/sun_src";
 
-	// add properties: 	// this, key, value		// TODO: 没有设置完！！
+	// add properties: 	// this, key, value
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.name"), java_lang_string::intern(L"Java Virtual Machine Specification")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.specification.version"), java_lang_string::intern(L"1.8")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.vm.version"), java_lang_string::intern(L"25.0-b70-debug")});
@@ -247,7 +207,7 @@ void JVM_InitProperties(list<Oop *> & _stack){		// static
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.management.compiler"), java_lang_string::intern(L"nop")});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"sun.io.unicode.encoding"), java_lang_string::intern(L"UnicodeBig")});
 
-	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(pwd)});			// [x] 乱写的。不过不能不指定这个变量就好！因为 UnixFileSystem 中 canonicalize() 方法指明这个 java.home 不可以是 null，否则会崩溃。// [√] 也不能乱写...... java/util/Currency$1 的 run() 方法会在 $JAVA_HOME/lib/ 打开一个 currency.data 文件向内写入二进制文件......
+	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.home"), java_lang_string::intern(pwd)});
 	thread.add_frame_and_execute(hashtable_put, {prop, java_lang_string::intern(L"java.class.path"), java_lang_string::intern(pwd + L":" + sun_src)});		 // TODO: need modified.
 
 	_stack.push_back(prop);
@@ -275,7 +235,6 @@ void JVM_SetErr0(list<Oop *> & _stack){		// static
 	((InstanceKlass *)system)->set_static_field_value(L"err:Ljava/io/PrintStream;", printstream);
 }
 
-// 返回 fnPtr.
 void *java_lang_system_search_method(const wstring & signature)
 {
 	auto iter = methods.find(signature);

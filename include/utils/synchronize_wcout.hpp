@@ -29,7 +29,7 @@
  */
 class sync_wcout : public std::wostringstream {
 private:
-	static std::mutex & mutex() {		// static mutex 锁，非常好的实现～
+	static std::mutex & mutex() {
 		static std::mutex mutex;
 		return mutex;
 	}

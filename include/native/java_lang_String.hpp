@@ -34,7 +34,7 @@ using std::list;
 //    return h;
 //  }
 
-struct java_string_hash	// Hash 用于决定此 T 变量放到哪个桶中，equator 才是判断两个 T 相不相同的重要因素！！
+struct java_string_hash
 {
 	size_t operator()(Oop* const & ptr) const noexcept;
 };
@@ -60,20 +60,17 @@ private:
 public:
 	static wstring print_stringOop(InstanceOop *stringoop);
 	static wstring stringOop_to_wstring(InstanceOop *stringoop);
-	static inline __attribute__((always_inline)) Oop *intern(const wstring & str) {		// intern 用到的次数非常多。建议内联。
-		Oop *stringoop = java_lang_string::intern_to_oop(str);							// TODO: 注意！！这里也用了 new，但是没有放到 GC 堆当中............
+	static inline __attribute__((always_inline)) Oop *intern(const wstring & str) {
+		Oop *stringoop = java_lang_string::intern_to_oop(str);
 		LockGuard lg(getLock());
 #ifdef STRING_DEBUG
 	sync_wcout{} << "===-------------- origin string_table ---------------===" << std::endl;
 	for(auto iter : get_string_table()) {
-		sync_wcout{} << java_lang_string::print_stringOop((InstanceOop *)iter) << std::endl;	// TODO: map 的 iter 是 pair... set 的 iter 就是元素自身..... 都忘光了......
+		sync_wcout{} << java_lang_string::print_stringOop((InstanceOop *)iter) << std::endl;
 	}
 	sync_wcout{} << "===-------------------------------------------===" << std::endl;
 #endif
 		auto iter = java_lang_string::get_string_table().find(stringoop);
-//#ifndef DEBUG		// 查了半天得到结论，应该是 mac 系统内部以及 clang++ 内部的共同的 bug 造成的吧。
-//#define DEBUG
-//#endif
 		if (iter == java_lang_string::get_string_table().end()) {
 			assert(java_lang_string::get_string_table().find(stringoop) == java_lang_string::get_string_table().end());
 			java_lang_string::get_string_table().insert(stringoop);

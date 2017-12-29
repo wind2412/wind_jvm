@@ -8,8 +8,6 @@
 #include "runtime/annotation.hpp"
 #include "utils/utils.hpp"
 
-// 注意：因为设置了各种结构体全带构造函数，为了延迟构造，因此使用了 malloc + placement new 的方式。
-
 // RuntimeVisibleAnnotation
 Const_value_t::Const_value_t(cp_info **constant_pool, const const_value_t & v) : const_value(((CONSTANT_Utf8_info *)constant_pool[v.const_value_index-1])->convert_to_Unicode()) {
 	assert(constant_pool[v.const_value_index-1]->tag == CONSTANT_Utf8);
@@ -118,7 +116,7 @@ Parameter_annotations_t::~Parameter_annotations_t() {
 
 // RuntimeVisibleTypeAnnotation
 TypeAnnotation::TypeAnnotation(cp_info **constant_pool, type_annotation & v) : target_type(v.target_type), target_info(v.target_info), target_path(v.target_path), anno((Annotation *)malloc(sizeof(Annotation))) {
-	v.target_info = nullptr;		// 移动语义！直接抢过来。
+	v.target_info = nullptr;
 	v.target_path.path = nullptr;
 	constructor(anno, constant_pool, *v.anno);
 }
@@ -126,6 +124,5 @@ TypeAnnotation::TypeAnnotation(cp_info **constant_pool, type_annotation & v) : t
 TypeAnnotation::~TypeAnnotation() {
 	destructor(anno);
 	free(anno);
-	delete target_info;	// 这是个指针，没法自动释放。
-	// target_path 会自动执行写好的析构函数。
+	delete target_info;
 }

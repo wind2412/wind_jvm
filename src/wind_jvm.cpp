@@ -32,23 +32,12 @@ void * scapegoat (void *pp) {
 		wait_cur_thread_and_set_bit(&real->the_first_wait_executed, real->thread);
 	}
 
-	real->thread->start(*real->arg);		// 这个 arg 需要被 gc 特殊对待......
-
-//	if (!real->should_be_stop_first) {		// if it is main thread:
-//		// wait for all detached sub threads over
-//		pthread_exit(nullptr);		// bug report: 由于我的虚拟机的真·主线程启动了一个线程main线程来跑 public static void main()，结果我在这个 main 线程写了 pthread_exit......
-									// 造成了直接崩溃...... 因为，pthread_exit 放在对等线程(子线程)中，就是直接结束子线程，直接退出；
-									// 如果写在主线程(不是 main 线程，main 线程在我的 vm 中也是一个对等线程。)中，就会等待所有子线程结束之后自己才退出。
-									// 写错在这里了，造成了 main 线程不会等待其他线程停止，而跑完了 main，所以整个虚拟机都结束了......结果还有线程使用 UB 的资源在运行......
-									// 把 pthread_exit() 放到真·主线程中就好了。
-									// 另：很棒的一点！无论是主线程创建的子线程，还是子线程创建的子线程，对于主线程来说，都是“对等线程”～！
-									// 所以，在主线程中 pthread_exit()，直接就能收下真·所有的线程！包括子线程创建的！
-//	}
+	real->thread->start(*real->arg);
 
 	return nullptr;
 };
 
-void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调用 start() 函数。所以，这个 launch 函数是唯一的入口点。
+void vm_thread::launch(InstanceOop *cur_thread_obj)
 {
 	// start one thread
 	p.thread = this;
@@ -58,24 +47,20 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 		p.should_be_stop_first = true;
 	}
 
-	bool inited = wind_jvm::inited();		// 在这里设置一个局部变量并且读取。防止要读取 jvm 下竞态条件的 inited，造成线程不安全。
+	bool inited = wind_jvm::inited();
 	pthread_t tid;
-	pthread_create(&tid, nullptr, scapegoat, &p);		// 这里有可能产生的 tid 是相同数值的：但是并没有问题。因为这里可能会有 tid 的复用问题。
+	pthread_create(&tid, nullptr, scapegoat, &p);
 
 	this->tid = tid;		// save to the vm_thread.
 
 	if (!inited) {		// if this is the main thread which create the first init --> thread[0], then wait.
 
-		pthread_join(tid, nullptr);	// 等待 main 线程结束...
+		pthread_join(tid, nullptr);
 
-		// 用作在同一个 method 中执行完毕时，如果创建了线程，那么子线程将会 wait。于是我们一定要在这里建立一个 patch。
-		// 不过，必须在不是 GC 的时候才能执行此 signal ！
 		GC::signal_all_patch();
 
-//		pthread_exit(nullptr);		// 这里才是真·主线程......即开启 main 线程的线程......	// 可惜它还会把主线程退出。要不然用做等待所有 detach 线程结束是非常好的主意啊...... 因为等待 exit 之后还需要回收资源呢，不能退得这么快啊......
-
 		int remain_thread_num;
-		while(true) {				// 等待所有 start0 创建的子线程退出。
+		while(true) {
 			wind_jvm::num_lock().lock();
 			{
 				remain_thread_num = wind_jvm::thread_num();
@@ -90,10 +75,8 @@ void vm_thread::launch(InstanceOop *cur_thread_obj)		// 此 launch 函数会调�
 			sched_yield();
 		}
 
-		// 最后，cancel 掉 gc 线程。于是世界只剩下了此真·主线程。
 		GC::cancel_gc_thread();
 
-		// 回收资源......
 		wind_jvm::end();
 
 
@@ -114,19 +97,19 @@ void vm_thread::start(list<Oop *> & arg)
 		vm_thread::init_and_do_main();		// init global variables and execute `main()` function.
 	} else {
 		// [x] if this is not the thread[0], detach itself is okay because no one will pthread_join it.
-		pthread_detach(pthread_self());		// 很可惜 pthread_exit()，如果只有“等待所有对等线程的退出”而不退出主线程的语义就好了...还要自己实现。一个一个 join 太丑了。决定使用计数器: wind_jvm::thread_num()
+		pthread_detach(pthread_self());
 		assert(this->vm_stack.size() == 0);	// check
 		assert(arg.size() == 1);				// run() only has one argument `this`.
 
 		this->vm_stack.push_back(StackFrame(method, nullptr, nullptr, arg, this));
 		this->execute();
 
-		wind_jvm::num_lock().lock();				// 对于 start0 启动的线程：
+		wind_jvm::num_lock().lock();
 		{
 			wind_jvm::thread_num() --;
-			assert(wind_jvm::thread_num() >= 0);		// 一定要 >= 0。否则是线程不安全的。
+			assert(wind_jvm::thread_num() >= 0);
 		}
-		wind_jvm::num_lock().unlock();		// bug report: 一开始这里使用的是重量级的 wind_jvm lock，因此走到这里的时候，由于 signal 函数中直接持有了 wind_jvm lock，造成线程无法终止。遂换用另一个轻量的 wind_jvm num_lock 来改进。
+		wind_jvm::num_lock().unlock();
 	}
 
 	pthread_mutex_lock(&_all_thread_wait_mutex);
@@ -170,7 +153,7 @@ Oop * vm_thread::add_frame_and_execute(Method *new_method, const std::list<Oop *
 	// for defense:
 	int frame_num = this->vm_stack.size();
 	uint8_t *backup_pc = this->pc;
-	this->vm_stack.push_back(StackFrame(new_method, this->pc, nullptr, list, this));		// 设置下一帧的 return_pc 是现在的 pc 值，可以用于 printStackTrace。
+	this->vm_stack.push_back(StackFrame(new_method, this->pc, nullptr, list, this));
 	Oop * result = BytecodeEngine::execute(*this, this->vm_stack.back(), this->thread_no);
 	this->vm_stack.pop_back();
 	this->pc = backup_pc;
@@ -202,12 +185,11 @@ MirrorOop *vm_thread::get_caller_class_CallerSensitive()
 				continue;	// java/lang/Reflection/Method.invoke(), ignore.
 			} else if (m->get_klass()->check_parent(L"sun/reflect/MethodAccessorImpl")) {
 				continue;
-			} if (m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {	// 自己加的。详见：http://blog.csdn.net/hel_wor/article/details/50199797
+			} if (m->has_annotation_name_in_method(L"Lsun/reflect/CallerSensitive;")) {
 				continue;
 			} else {
 				break;
 			}
-			// TODO: 第三点名没有明白......有待研究... is_Compiled_lambda_form...
 		}
 	}
 	if (level == total_levelnum) {		// no stackframe any more...
@@ -231,23 +213,19 @@ void vm_thread::init_and_do_main()
 
 		// 1. create a [half-completed] Thread obj, using the ThreadGroup obj.(for currentThread(), this must be create first!!)
 		auto thread_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/Thread"));
-		// TODO: 要不要放到全局？
 		InstanceOop *init_thread = thread_klass->new_instance();
 		BytecodeEngine::initial_clinit(thread_klass, *this);		// first <clinit>!
 		// inject!!
-		init_thread->set_field_value(THREAD L":eetop:J", new LongOop((uint64_t)pthread_self()));		// TODO: 这样没有移植性！！要改啊！！！虽然很方便......其实在 linux 下，也是 8 bytes......
-		init_thread->set_field_value(THREAD L":priority:I", new IntOop(NormPriority));	// TODO: ......		// runtime/thread.cpp:1026
-		// add this Thread obj to ThreadTable!!!	// ......在这里放入的 init_thread 并没有初始化完全。因为它还没有执行构造函数。不过，那也必须放到表中了。因为在 <init> 执行的时候，内部有其他的类要调用 currentThread...... 所以不放入表中不行啊......
+		init_thread->set_field_value(THREAD L":eetop:J", new LongOop((uint64_t)pthread_self()));
+		init_thread->set_field_value(THREAD L":priority:I", new IntOop(NormPriority));
 		ThreadTable::add_a_thread(pthread_self(), init_thread, this);
 
 
 		// 2. create a [System] ThreadGroup obj.
 		auto threadgroup_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/ThreadGroup"));
-		// TODO: 要不要放到全局？
 		InstanceOop *init_threadgroup = threadgroup_klass->new_instance();
 		BytecodeEngine::initial_clinit(threadgroup_klass, *this);		// first <clinit>!
-		{	// 注意：这里创建了全局的第一个 System ThreadGroup !!
-			// TODO: 放到全局！
+		{
 			std::list<Oop *> list;
 			list.push_back(init_threadgroup);	// $0 = this
 			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!
@@ -258,8 +236,6 @@ void vm_thread::init_and_do_main()
 		// 3. INCOMPLETELY create a [Main] ThreadGroup obj.
 		InstanceOop *main_threadgroup = threadgroup_klass->new_instance();
 		{
-			// inject it into `init_thread`!! 否则，届时在 java/lang/SecurityManager <clinit> 时，会自动 getCurrentThread --> get 到 main_threadgroup --> get 到 system_threadgroup. 所以必须先行注入。
-			// hack...
 			init_thread->set_field_value(THREAD L":group:Ljava/lang/ThreadGroup;", main_threadgroup);
 		}
 		assert(this->vm_stack.size() == 0);
@@ -267,16 +243,7 @@ void vm_thread::init_and_do_main()
 		BytecodeEngine::initial_clinit(((InstanceKlass *)class_klass), *this);
 		((InstanceKlass *)class_klass)->set_static_field_value(L"useCaches:Z", new IntOop(false));
 
-		// 3.3 load System.class		// 需要在 Main ThreadGroup 之前执行。因为它的初始化会调用 System。因而会自动触发 <clinit> 的。需要提前把 System.class 设为 initialized.
-		// 这里要 hack 一下。不执行 System.<clinit> 了，而是手动执行。因为 Java 类库当中的 java/lang/System 这个类，在 <clinit> 中由于 putStatic，
-		// 会自动执行 java/lang/Console 的 <clinit>。而这个 <clinit> 会执行 <sun/misc/JavaLangAccess>registerShutdownHook:(IZLjava/lang/Runnable;)V invokeInterface 方法。
-		// 但是，真正的引用指向的是 null！！因为这个 sun/misc/JavaLangAccess 引用是经过 java/lang/System::initializeSystemClass() 来设置的......
-		// 然而，System 没有执行 <clinit>，是不可能执行方法的......至少在我这里是这样。
-		// 虽然看不太明白 openjdk 是怎么搞定这个环节的......主要是因为 openjdk 的 initialize_impl() 方法太长（逃......。不过这个循环依赖的问题也可以依靠 hack 来解决。
-		// System <clinit> 中仅仅执行了：java/io/InputStream::<clinit>, java/io/PrintStream::<clinit>, Ljava/lang/SecurityManager::<clinit>。
-		// 然后把 System 中的 static 变量：out, in, err 设成 null。也就是初始化打印设备。
-		// 然而我这里引用默认是 null。所以不用初始化。因此只要执行 <clinit> 原谅三连就行。
-		// 那么就让我们开始吧。仅仅 loadClass 而不 initial_clinit，即仅仅 load class，而不执行 system 的 <clinit>。
+		// 3. load System class
 		auto system_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"java/lang/System"));
 		system_klass->set_state(Klass::KlassState::Initializing);
 //		BytecodeEngine::initial_clinit(system_klass, *this);
@@ -288,21 +255,18 @@ void vm_thread::init_and_do_main()
 		BytecodeEngine::initial_clinit(SecurityManager_klass, *this);
 
 		// 3.5 COMPLETELY create the [Main] ThreadGroup obj.
-		{	// 注意：这里创建了针对此 main 的第二个 System ThreadGroup !!用第一个 System ThreadGroup 作为参数！
-			// TODO: pthread_mutex!!
+		{	// the second ThreadGroup, as openjdk
 			std::list<Oop *> list;
 			list.push_back(main_threadgroup);	// $0 = this
 			list.push_back(nullptr);				// $1 = nullptr
 			list.push_back(init_threadgroup);	// $2 = init_threadgroup
 			list.push_back(java_lang_string::intern(L"main"));	// $3 = L"main"
-			// execute method: java/lang/ThreadGroup.<init>:()V --> private Method!!		// 直接调用私有方法！为了避过狗日的 java/lang/SecurityManager 的检查......我也是挺拼的......QAQ
-			// TODO: 因为这里是直接调用了私方法，所以有可能是不可移植的。因为它私方法有可能变。
 			Method *target_method = threadgroup_klass->get_this_class_method(L"<init>:(Ljava/lang/Void;Ljava/lang/ThreadGroup;Ljava/lang/String;)V");
 			assert(target_method != nullptr);
 			this->add_frame_and_execute(target_method, list);
 		}
 
-		// 3.7 又需要 hack 一波。因为 java.security.util.Debug 这货需要调用 System 的各种东西，甚至是标准输入输出。因此不能初始化它。要延迟。
+		// 3.7 do not support Debug class
 		auto Security_DEBUG_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/security/util/Debug"));
 		Security_DEBUG_klass->set_state(Klass::KlassState::Initializing);
 
@@ -331,9 +295,9 @@ void vm_thread::init_and_do_main()
 	}
 
 	auto Perf_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Perf"));
-	Perf_klass->set_state(Klass::KlassState::Initializing);				// 禁用 Perf.
+	Perf_klass->set_state(Klass::KlassState::Initializing);				// ban Perf.
 	auto PerfCounter_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/PerfCounter"));
-	PerfCounter_klass->set_state(Klass::KlassState::Initializing);		// 禁用 PerfCounter.
+	PerfCounter_klass->set_state(Klass::KlassState::Initializing);		// ban PerfCounter.
 
 	auto launcher_helper_klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/launcher/LauncherHelper"));
 	BytecodeEngine::initial_clinit(launcher_helper_klass, *this);
@@ -341,7 +305,7 @@ void vm_thread::init_and_do_main()
 	// new a String.
 	InstanceOop *main_klass = (InstanceOop *)java_lang_string::intern(wind_jvm::main_class_name());
 
-	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_klass}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(load_main_method, nullptr, nullptr, {new IntOop(true), new IntOop(1), main_klass}, this));
 	MirrorOop *main_class_mirror = (MirrorOop *)this->execute();
 	assert(main_class_mirror->get_ooptype() == OopType::_InstanceOop);
 
@@ -368,22 +332,8 @@ void vm_thread::init_and_do_main()
 	}
 
 	// The World's End!
-	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}, this));		// TODO: 暂时设置 main 方法的 return_pc 和 prev 全是 nullptr。
+	this->vm_stack.push_back(StackFrame(main_method, nullptr, nullptr, {string_arr_oop}, this));
 	this->execute();
-
-	// **DO NOT** kill all other running thread except the one should be killed...
-//	ThreadTable::kill_all_except_main_thread(pthread_self());
-
-//	auto klass = ((InstanceKlass *)BootStrapClassLoader::get_bootstrap().loadClass(L"sun/misc/Launcher$AppClassLoader"));
-//
-//	// TODO: 不应该用 MyClassLoader ！！ 应该用 Java 写的 AppClassLoader!!!
-//	Klass *main_class = MyClassLoader::get_loader().loadClass(wind_jvm::main_class_name());		// this time, "java.lang.Object" has been convert to "java/lang/Object".
-//	Method *main_method = ((InstanceKlass *)main_class)->get_static_void_main();
-//	assert(main_method != nullptr);
-//	// TODO: 方法区，多线程，堆区，垃圾回收！现在的目标只是 BytecodeExecuteEngine，将来要都加上！！
-//
-//	// second execute [public static void main].
-//
 
 }
 
@@ -398,7 +348,7 @@ ArrayOop * vm_thread::get_stack_trace()
 
 	std::wstringstream ss;
 
-	uint8_t *last_frame_pc = this->pc;		// 先设置成 pc。下边会修改。
+	uint8_t *last_frame_pc = this->pc;
 	int i = 0;
 	for (list<StackFrame>::reverse_iterator it = this->vm_stack.rbegin(); it != this->vm_stack.rend(); ++it) {
 		Method *m = it->method;
@@ -470,11 +420,10 @@ void vm_thread::set_exception_at_last_second_frame() {
 pthread_mutex_t _all_thread_wait_mutex;
 pthread_cond_t _all_thread_wait_cond;
 
-// 不采用信号来实现 stop-the-world 了。那样太糟糕了。
 void wait_cur_thread(vm_thread *thread)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
-	thread->set_state(Waiting);			// 防止：GC 的时候，被其他已经阻塞很久的、当时没有 GC 的线程，通过 signal() 唤醒。或者是 signal 的同时唤醒多个线程的虚假唤醒。
+	thread->set_state(Waiting);
 	while (true) {
 		bool gc;
 		GC::gc_lock().lock();
@@ -484,10 +433,8 @@ void wait_cur_thread(vm_thread *thread)
 		GC::gc_lock().unlock();
 
 		if (gc) {
-//			std::wcout << "... AAAA " << pthread_self() << std::endl;		// delete
 			pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 			pthread_testcancel();
-//			std::wcout << "... BBBB " << pthread_self() << std::endl;		// delete
 		} else {
 			break;
 		}
@@ -500,35 +447,27 @@ void wait_cur_thread(vm_thread *thread)
 void wait_cur_thread_and_set_bit(volatile bool *bit, vm_thread *thread)
 {
 	pthread_mutex_lock(&_all_thread_wait_mutex);
-	*bit = true;																// 这里，可以防止伪wait。mutex 会自动锁定。
+	*bit = true;
 	thread->set_state(Waiting);
-//	std::wcout << "... AAA " << pthread_self() << std::endl;	// delete
 	pthread_cond_wait(&_all_thread_wait_cond, &_all_thread_wait_mutex);
 	pthread_testcancel();
-//	std::wcout << "... BBB " << pthread_self() << std::endl;	// delete
 	thread->set_state(Running);
 	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
-void signal_one_thread()		// 发现没有在 gc 的时候，仅仅唤醒一个线程，这样能够尽快进入 gc 吧...
+void signal_one_thread()
 {
-//	pthread_mutex_lock(&_all_thread_wait_mutex);
 	pthread_cond_signal(&_all_thread_wait_cond);
-//	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
-void signal_all_thread()		// 垃圾回收之后，就可以调用它，把所有的线程全部重新开启......
+void signal_all_thread()
 {
-//	pthread_mutex_lock(&_all_thread_wait_mutex);
 	pthread_cond_broadcast(&_all_thread_wait_cond);
-//	pthread_mutex_unlock(&_all_thread_wait_mutex);
 }
 
-void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是只要一 ctrl+c 就会产生 segmentation fault 的问题......虽然我也不知道为什么...... 不过这里还是要进行退出处理的......
+void SIGINT_handler(int signo)
 {
-	// TODO: 实现更加安全的：此函数只能执行一次的方法：
-
-	// 使用 GC 标志位来达到 stop-the-world，但是不触发 GC。
+	// re-use gc bit to stop-the-world，but won't trigger GC。
 	while (true) {
 		bool gc;
 		GC::gc_lock().lock();
@@ -538,10 +477,8 @@ void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是
 		GC::gc_lock().unlock();
 
 		if (gc) {
-			// 如果正在 GC 中，则等待 GC 结束.
 			continue;
 		} else {
-			// 否则如果不在 GC 中，那么就使用 GC 标志位，来达到 stop-the-world.
 			GC::gc_lock().lock();
 			{
 				GC::gc() = true;
@@ -563,18 +500,9 @@ void SIGINT_handler(int signo)		// 为了 fix Test16 无限生成线程，但是
 
 }
 
-//void SIGUSR1_handler(int signo)		// pthread_exit 也会抛出异常。弃用。这告诉我们不能强杀一个线程......QAQ
-//{
-//	// 由于信号会直接陷入内核，有时候锁来不及释放...... 唉。
-//	// 释放一堆锁...
-//	system_classmap_lock.unlock();
-//	pthread_exit(0);
-//}
-
 void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv)
 {
 	signal(SIGINT, SIGINT_handler);
-//	signal(SIGUSR1, SIGUSR1_handler);
 
 	wind_jvm::main_class_name() = std::regex_replace(main_class_name, std::wregex(L"\\."), L"/");
 	wind_jvm::argv() = const_cast<vector<wstring> &>(argv);
@@ -587,15 +515,13 @@ void wind_jvm::run(const wstring & main_class_name, const vector<wstring> & argv
 	}
 	wind_jvm::lock().unlock();
 
-	// 在这里，需要初始化全局变量。线程还没有开启。
 	init_native();
 
-	// 在这里，启动 GC 线程。
 	pthread_t gc_tid;
-	pthread_create(&gc_tid, nullptr, GC::gc_thread, nullptr);		// TODO: 这里可以直接转换为 C 指针！和 system_gc 是 static 函数以及 这个调用在 GC 类内调用应该有关系？
+	pthread_create(&gc_tid, nullptr, GC::gc_thread, nullptr);
 	gc_thread() = gc_tid;
 
-	// 在这里，启动虚拟机线程。
+	// go!
 	init_thread->launch();		// begin this thread.
 
 }
@@ -612,6 +538,5 @@ void wind_jvm::end()
 	MyClassLoader::get_loader().cleanup();
 
 	// finally! delete all allocated memory!!
-	MemAlloc::cleanup();				// 仅仅去掉 MyClassLoader 就没有问题了！！说明错误出现在 Test11 这个 parse 的 klass 上！！而且在 annotation 上！mac 是准的！！错误定位了！！
-//	std::wcout << "world ends..." << std::endl;
+	MemAlloc::cleanup();
 }
