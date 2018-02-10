@@ -1,6 +1,6 @@
 CC := g++
 CPP_FLAGS := -std=c++14 -O3 -pg
-# CPP_FLAGS := -std=c++14 -O3 -pg -DBYTECODE_DEBUG -DDEBUG
+#CPP_FLAGS := -std=c++14 -O3 -pg -DBYTECODE_DEBUG -DDEBUG
 # CPP_FLAGS := -std=c++14 -O3 -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG -DBYTECODE_DEBUG
 LINK_FLAGS := -std=c++14 -pg
 EXCEPT := ./useful_tools/classfile_interceptor.cpp
@@ -30,7 +30,7 @@ else
 endif
 
 test : $(JAVA_TEST_OBJ)
-#	@cd tests && make all
+	@cd tests && make all
 
 interceptor: $(EXCEPT) src/class_parser.o
 	$(CC) $(CPP_FLAGS) -g -DDEBUG -DKLASS_DEBUG -DPOOL_DEBUG -I./include $^ -o useful_tools/$@

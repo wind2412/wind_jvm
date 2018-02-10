@@ -7,7 +7,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/xml_parser.hpp>
 #include <jarLister.hpp>
-#include "utils/synchronize_wcout.hpp"
 #include "utils/utils.hpp"
 
 using std::wcout;
@@ -116,17 +115,17 @@ bool RtJarDirectory::find_file(StringSplitter && ss) const
 void RtJarDirectory::print() const
 {
 	#ifdef DEBUG
-	sync_wcout{} << "*********************************" << endl;
+	std::wcout << "*********************************" << endl;
 	wcout.imbue(std::locale(""));
 	this->print(0);
-	sync_wcout{} << "*********************************" << endl;
+	std::wcout << "*********************************" << endl;
 	#endif
 }
 
 void RtJarDirectory::print(int level) const
 {
-	for(int i = 0; i < level; i ++)	sync_wcout{} << "\t";
-	sync_wcout{} << this->name << endl;
+	for(int i = 0; i < level; i ++)	std::wcout << "\t";
+	std::wcout << this->name << endl;
 	if (this->subdir != nullptr) {
 		for(auto & sub : *subdir) {
 			(*sub).print(level+1);
@@ -191,7 +190,7 @@ JarLister::JarLister() : rjd(L"root")
 		std::wcerr << "error! didn't find wind_jvm/config.xml. maybe you deleted it or didn't run the program under the wind_jvm/ folder and using the ./bin/wind_jvm command?" << std::endl;
 	}
 	boost::property_tree::ptree pt;
-	boost::property_tree::read_xml("/Users/zhengxiaolin/Documents/github/wind_jvm/config.xml", pt);
+	boost::property_tree::read_xml(wstring_to_utf8(config_xml), pt);
 
 	wstring rtjar_folder;
 #if (defined (__APPLE__))

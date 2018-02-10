@@ -259,6 +259,7 @@ MyClassLoader::get_loader().print();
 					});
 
 					if (iter == anonymous_klassmap.end()) {
+						std::wcout << classname << std::endl;
 						std::wcerr << "wrong! --- at MyClassLoader::loadClass" << std::endl;
 						exit(-1);
 					} else {

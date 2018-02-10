@@ -7,5 +7,5 @@ int main()
 {
 	JarLister jl;
 	jl.print();
-	assert(jl.find_file(L"java/lang/Object.class") == 1);
+	assert(jl.find_file(L"java/util/ArrayList$1.class") == 1);
 }
